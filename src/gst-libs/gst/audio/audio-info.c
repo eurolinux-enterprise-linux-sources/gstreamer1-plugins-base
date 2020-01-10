@@ -13,14 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
- */
-/**
- * SECTION:gstaudio
- * @short_description: Support library for audio elements
- *
- * This library contains some helper functions for audio elements.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -32,6 +26,29 @@
 #include "audio.h"
 
 #include <gst/gststructure.h>
+
+#ifndef GST_DISABLE_GST_DEBUG
+#define GST_CAT_DEFAULT ensure_debug_category()
+static GstDebugCategory *
+ensure_debug_category (void)
+{
+  static gsize cat_gonce = 0;
+
+  if (g_once_init_enter (&cat_gonce)) {
+    gsize cat_done;
+
+    cat_done = (gsize) _gst_debug_category_new ("audio-info", 0,
+        "audio-info object");
+
+    g_once_init_leave (&cat_gonce, cat_done);
+  }
+
+  return (GstDebugCategory *) cat_gonce;
+}
+#else
+#define ensure_debug_category() /* NOOP */
+#endif /* GST_DISABLE_GST_DEBUG */
+
 
 /**
  * gst_audio_info_copy:
@@ -96,8 +113,6 @@ gst_audio_info_init (GstAudioInfo * info)
   memset (info, 0, sizeof (GstAudioInfo));
 
   info->finfo = gst_audio_format_get_info (GST_AUDIO_FORMAT_UNKNOWN);
-
-  memset (&info->position, 0xff, sizeof (info->position));
 }
 
 /**
@@ -109,6 +124,8 @@ gst_audio_info_init (GstAudioInfo * info)
  * @position: the channel positions
  *
  * Set the default info for the audio info of @format and @rate and @channels.
+ *
+ * Note: This initializes @info first, no values are preserved.
  */
 void
 gst_audio_info_set_format (GstAudioInfo * info, GstAudioFormat format,
@@ -119,6 +136,9 @@ gst_audio_info_set_format (GstAudioInfo * info, GstAudioFormat format,
 
   g_return_if_fail (info != NULL);
   g_return_if_fail (format != GST_AUDIO_FORMAT_UNKNOWN);
+  g_return_if_fail (channels <= 64 || position == NULL);
+
+  gst_audio_info_init (info);
 
   finfo = gst_audio_format_get_info (format);
 
@@ -178,6 +198,8 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
   guint64 channel_mask;
   gint i;
   GstAudioChannelPosition position[64];
+  GstAudioFlags flags;
+  GstAudioLayout layout;
 
   g_return_val_if_fail (info != NULL, FALSE);
   g_return_val_if_fail (caps != NULL, FALSE);
@@ -185,7 +207,7 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
 
   GST_DEBUG ("parsing caps %" GST_PTR_FORMAT, caps);
 
-  info->flags = 0;
+  flags = 0;
 
   str = gst_caps_get_structure (caps, 0);
 
@@ -202,9 +224,9 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
   if (!(s = gst_structure_get_string (str, "layout")))
     goto no_layout;
   if (g_str_equal (s, "interleaved"))
-    info->layout = GST_AUDIO_LAYOUT_INTERLEAVED;
+    layout = GST_AUDIO_LAYOUT_INTERLEAVED;
   else if (g_str_equal (s, "non-interleaved"))
-    info->layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
+    layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
   else
     goto unknown_layout;
 
@@ -214,7 +236,7 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
     goto no_channels;
 
   if (!gst_structure_get (str, "channel-mask", GST_TYPE_BITMASK, &channel_mask,
-          NULL)) {
+          NULL) || (channel_mask == 0 && channels == 1)) {
     if (channels == 1) {
       position[0] = GST_AUDIO_CHANNEL_POSITION_MONO;
     } else if (channels == 2) {
@@ -224,7 +246,7 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
       goto no_channel_mask;
     }
   } else if (channel_mask == 0) {
-    info->flags |= GST_AUDIO_FLAG_UNPOSITIONED;
+    flags |= GST_AUDIO_FLAG_UNPOSITIONED;
     for (i = 0; i < MIN (64, channels); i++)
       position[i] = GST_AUDIO_CHANNEL_POSITION_NONE;
   } else {
@@ -233,7 +255,11 @@ gst_audio_info_from_caps (GstAudioInfo * info, const GstCaps * caps)
       goto invalid_channel_mask;
   }
 
-  gst_audio_info_set_format (info, format, rate, channels, position);
+  gst_audio_info_set_format (info, format, rate, channels,
+      (channels > 64) ? NULL : position);
+
+  info->flags = flags;
+  info->layout = layout;
 
   return TRUE;
 
@@ -454,7 +480,47 @@ gst_audio_info_convert (const GstAudioInfo * info,
       break;
   }
 done:
-  GST_DEBUG ("ret=%d result %" G_GINT64_FORMAT, res, *dest_val);
+
+  GST_DEBUG ("ret=%d result %" G_GINT64_FORMAT, res, res ? *dest_val : -1);
 
   return res;
+}
+
+/**
+ * gst_audio_info_is_equal:
+ * @info: a #GstAudioInfo
+ * @other: a #GstAudioInfo
+ *
+ * Compares two #GstAudioInfo and returns whether they are equal or not
+ *
+ * Returns: %TRUE if @info and @other are equal, else %FALSE.
+ *
+ * Since: 1.2
+ *
+ */
+gboolean
+gst_audio_info_is_equal (const GstAudioInfo * info, const GstAudioInfo * other)
+{
+  if (info == other)
+    return TRUE;
+  if (info->finfo == NULL || other->finfo == NULL)
+    return FALSE;
+  if (GST_AUDIO_INFO_FORMAT (info) != GST_AUDIO_INFO_FORMAT (other))
+    return FALSE;
+  if (GST_AUDIO_INFO_FLAGS (info) != GST_AUDIO_INFO_FLAGS (other))
+    return FALSE;
+  if (GST_AUDIO_INFO_LAYOUT (info) != GST_AUDIO_INFO_LAYOUT (other))
+    return FALSE;
+  if (GST_AUDIO_INFO_RATE (info) != GST_AUDIO_INFO_RATE (other))
+    return FALSE;
+  if (GST_AUDIO_INFO_CHANNELS (info) != GST_AUDIO_INFO_CHANNELS (other))
+    return FALSE;
+  if (GST_AUDIO_INFO_CHANNELS (info) > 64)
+    return TRUE;
+  if (memcmp (info->position, other->position,
+          GST_AUDIO_INFO_CHANNELS (info) * sizeof (GstAudioChannelPosition)) !=
+      0)
+    return FALSE;
+
+  return TRUE;
 }

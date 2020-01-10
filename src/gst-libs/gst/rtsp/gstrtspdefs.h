@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /*
  * Unless otherwise indicated, Source Code is licensed under MIT license.
@@ -294,14 +294,12 @@ typedef enum {
   GST_RTSP_HDR_LANGUAGE,            /* Language */
   GST_RTSP_HDR_PLAYER_START_TIME,   /* PlayerStarttime */
 
-  /* Since 0.10.16 */
   GST_RTSP_HDR_LOCATION,            /* Location */
 
-  /* Since 0.10.23 */
   GST_RTSP_HDR_ETAG,                /* ETag */
   GST_RTSP_HDR_IF_MATCH,            /* If-Match */
 
-  /* WM extensions [MS-RTSP] Since 0.10.23 */
+  /* WM extensions [MS-RTSP] */
   GST_RTSP_HDR_ACCEPT_CHARSET,      /* Accept-Charset */
   GST_RTSP_HDR_SUPPORTED,           /* Supported */
   GST_RTSP_HDR_VARY,                /* Vary */
@@ -322,18 +320,18 @@ typedef enum {
   GST_RTSP_HDR_X_RTP_INFO,          /* X-RTP-Info */
   GST_RTSP_HDR_X_STARTUPPROFILE,    /* X-StartupProfile */
 
-  /* Since 0.10.24 */
   GST_RTSP_HDR_TIMESTAMP,           /* Timestamp */
 
-  /* Since 0.10.25 */
   GST_RTSP_HDR_AUTHENTICATION_INFO, /* Authentication-Info */
   GST_RTSP_HDR_HOST,                /* Host */
   GST_RTSP_HDR_PRAGMA,              /* Pragma */
   GST_RTSP_HDR_X_SERVER_IP_ADDRESS, /* X-Server-IP-Address */
-  GST_RTSP_HDR_X_SESSIONCOOKIE,     /* X-Sessioncookie */
+  GST_RTSP_HDR_X_SESSIONCOOKIE,     /* x-sessioncookie */
 
-  /* Since 0.10.36 */
   GST_RTSP_HDR_RTCP_INTERVAL,       /* RTCP-Interval */
+
+  /* Since 1.4 */
+  GST_RTSP_HDR_KEYMGMT,             /* KeyMgmt */
 
   GST_RTSP_HDR_LAST
 } GstRTSPHeaderField;
@@ -382,6 +380,7 @@ typedef enum {
   GST_RTSP_STS_ONLY_AGGREGATE_OPERATION_ALLOWED     = 460,
   GST_RTSP_STS_UNSUPPORTED_TRANSPORT                = 461,
   GST_RTSP_STS_DESTINATION_UNREACHABLE              = 462,
+  GST_RTSP_STS_KEY_MANAGEMENT_FAILURE               = 463, /* since 1.4 */
   GST_RTSP_STS_INTERNAL_SERVER_ERROR                = 500,
   GST_RTSP_STS_NOT_IMPLEMENTED                      = 501,
   GST_RTSP_STS_BAD_GATEWAY                          = 502,
@@ -399,6 +398,7 @@ const gchar*       gst_rtsp_header_as_text     (GstRTSPHeaderField field);
 const gchar*       gst_rtsp_status_as_text     (GstRTSPStatusCode code);
 
 gchar*             gst_rtsp_options_as_text    (GstRTSPMethod options);
+GstRTSPMethod      gst_rtsp_options_from_text  (const gchar *options);
 
 GstRTSPHeaderField gst_rtsp_find_header_field  (const gchar *header);
 GstRTSPMethod      gst_rtsp_find_method        (const gchar *method);

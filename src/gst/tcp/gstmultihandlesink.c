@@ -17,8 +17,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -29,7 +29,7 @@
  * file descriptors can be added to multihandlesink by emitting the #GstMultiHandleSink::add signal. 
  * For each descriptor added, the #GstMultiHandleSink::client-added signal will be called.
  *
- * As of version 0.10.8, a client can also be added with the #GstMultiHandleSink::add-full signal
+ * A client can also be added with the #GstMultiHandleSink::add-full signal
  * that allows for more control over what and how much data a client 
  * initially receives.
  *
@@ -61,7 +61,7 @@
  * Multisocketsink will always keep at least one keyframe in its internal buffers
  * when the sync-mode is set to latest-keyframe.
  *
- * As of version 0.10.8, there are additional values for the #GstMultiHandleSink:sync-method 
+ * There are additional values for the #GstMultiHandleSink:sync-method
  * property to allow finer control over burst-on-connect behaviour. By selecting
  * the 'burst' method a minimum burst size can be chosen, 'burst-keyframe'
  * additionally requires that the burst begin with a keyframe, and 
@@ -96,8 +96,6 @@
  * buffers to the clients. This behaviour can be disabled by setting the sync 
  * property to FALSE. Multisocketsink will by default not do QoS and will never
  * drop late buffers.
- *
- * Last reviewed on 2006-09-12 (0.10.10)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -107,7 +105,6 @@
 #include <gst/gst-i18n-plugin.h>
 
 #include "gstmultihandlesink.h"
-#include "gsttcp-marshal.h"
 
 #ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
@@ -116,6 +113,8 @@
 #ifndef G_OS_WIN32
 #include <netinet/in.h>
 #endif
+
+#include <string.h>
 
 #define NOT_IMPLEMENTED 0
 
@@ -197,9 +196,7 @@ enum
 
   PROP_RESEND_STREAMHEADER,
 
-  PROP_NUM_HANDLES,
-
-  PROP_LAST
+  PROP_NUM_HANDLES
 };
 
 GType
@@ -433,8 +430,6 @@ gst_multi_handle_sink_class_init (GstMultiHandleSinkClass * klass)
    * GstMultiHandleSink::resend-streamheader
    *
    * Resend the streamheaders to existing clients when they change.
-   *
-   * Since: 0.10.23
    */
   g_object_class_install_property (gobject_class, PROP_RESEND_STREAMHEADER,
       g_param_spec_boolean ("resend-streamheader", "Resend streamheader",
@@ -459,10 +454,9 @@ gst_multi_handle_sink_class_init (GstMultiHandleSinkClass * klass)
       g_signal_new ("clear", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiHandleSinkClass, clear), NULL, NULL,
-      g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+      g_cclosure_marshal_generic, G_TYPE_NONE, 0);
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&sinktemplate));
+  gst_element_class_add_static_pad_template (gstelement_class, &sinktemplate);
 
   gst_element_class_set_static_metadata (gstelement_class,
       "Multi socket sink", "Sink/Network",
@@ -656,6 +650,12 @@ gst_multi_handle_sink_add_full (GstMultiHandleSink * sink,
   GstMultiHandleSinkClass *mhsinkclass =
       GST_MULTI_HANDLE_SINK_GET_CLASS (mhsink);
 
+  if (!sink->running) {
+    g_warning ("Element %s must be set to READY, PAUSED or PLAYING state "
+        "before clients can be added", GST_OBJECT_NAME (sink));
+    return;
+  }
+
   mhsinkclass->handle_debug (handle, debug);
   GST_DEBUG_OBJECT (sink, "%s adding client, sync_method %d, "
       "min_format %d, min_value %" G_GUINT64_FORMAT
@@ -676,6 +676,10 @@ gst_multi_handle_sink_add_full (GstMultiHandleSink * sink,
   if (clink != NULL)
     goto duplicate;
 
+  /* We do not take ownership of @handle in this function, but we can't take a
+   * reference directly as we don't know the concrete type of the handle.
+   * GstMultiHandleSink relies on the derived class to take a reference for us
+   * in new_client: */
   mhclient = mhsinkclass->new_client (mhsink, handle, sync_method);
 
   /* we can add the handle now */
@@ -1137,13 +1141,9 @@ gst_multi_handle_sink_client_queue_buffer (GstMultiHandleSink * mhsink,
 static gboolean
 is_sync_frame (GstMultiHandleSink * sink, GstBuffer * buffer)
 {
-  if (GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
+  if (GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_DELTA_UNIT))
     return FALSE;
-  } else if (!GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_HEADER)) {
-    return TRUE;
-  }
-
-  return FALSE;
+  return TRUE;
 }
 
 /* find the keyframe in the list of buffers starting the
@@ -1686,9 +1686,6 @@ gst_multi_handle_sink_queue_buffer (GstMultiHandleSink * mhsink,
   GstMultiHandleSinkClass *mhsinkclass =
       GST_MULTI_HANDLE_SINK_GET_CLASS (mhsink);
 
-  g_get_current_time (&nowtv);
-  now = GST_TIMEVAL_TO_TIME (nowtv);
-
   CLIENTS_LOCK (mhsink);
   /* add buffer to queue */
   g_array_prepend_val (mhsink->bufqueue, buffer);
@@ -1707,23 +1704,14 @@ gst_multi_handle_sink_queue_buffer (GstMultiHandleSink * mhsink,
       soft_max_buffers);
 
   /* then loop over the clients and update the positions */
-  max_buffer_usage = 0;
-
-restart:
   cookie = mhsink->clients_cookie;
-  for (clients = mhsink->clients; clients; clients = next) {
+  for (clients = mhsink->clients; clients; clients = clients->next) {
     GstMultiHandleClient *mhclient = clients->data;
-
-    if (cookie != mhsink->clients_cookie) {
-      GST_DEBUG_OBJECT (sink, "Clients cookie outdated, restarting");
-      goto restart;
-    }
-
-    next = g_list_next (clients);
 
     mhclient->bufpos++;
     GST_LOG_OBJECT (sink, "%s client %p at position %d",
         mhclient->debug, mhclient, mhclient->bufpos);
+
     /* check soft max if needed, recover client */
     if (soft_max_buffers > 0 && mhclient->bufpos >= soft_max_buffers) {
       gint newpos;
@@ -1740,6 +1728,25 @@ restart:
             "%s client %p not recovering position", mhclient->debug, mhclient);
       }
     }
+  }
+
+  max_buffer_usage = 0;
+  g_get_current_time (&nowtv);
+  now = GST_TIMEVAL_TO_TIME (nowtv);
+
+  /* now check for new or slow clients */
+restart:
+  cookie = mhsink->clients_cookie;
+  for (clients = mhsink->clients; clients; clients = next) {
+    GstMultiHandleClient *mhclient = clients->data;
+
+    if (cookie != mhsink->clients_cookie) {
+      GST_DEBUG_OBJECT (sink, "Clients cookie outdated, restarting");
+      goto restart;
+    }
+
+    next = g_list_next (clients);
+
     /* check hard max and timeout, remove client */
     if ((max_buffers > 0 && mhclient->bufpos >= max_buffers) ||
         (mhsink->timeout > 0
@@ -1761,6 +1768,7 @@ restart:
       mhsinkclass->hash_adding (mhsink, mhclient);
       hash_changed = TRUE;
     }
+
     /* keep track of maximum buffer usage */
     if (mhclient->bufpos > max_buffer_usage) {
       max_buffer_usage = mhclient->bufpos;
@@ -1783,7 +1791,7 @@ restart:
     find_limits (mhsink, &usage, mhsink->bytes_min, mhsink->buffers_min,
         mhsink->time_min, &max, -1, -1, -1);
 
-    max_buffer_usage = MAX (max_buffer_usage, usage + 1);
+    max_buffer_usage = MAX (max_buffer_usage, usage);
     GST_LOG_OBJECT (sink, "extended queue to %d", max_buffer_usage);
   }
 
@@ -1832,7 +1840,7 @@ restart:
     gst_buffer_unref (old);
   }
   /* save for stats */
-  mhsink->buffers_queued = max_buffer_usage;
+  mhsink->buffers_queued = max_buffer_usage + 1;
   CLIENTS_UNLOCK (sink);
 
   /* and send a signal to thread if handle_set changed */
@@ -1841,10 +1849,64 @@ restart:
   }
 }
 
+static gboolean
+buffer_is_in_caps (GstMultiHandleSink * sink, GstBuffer * buf)
+{
+  GstCaps *caps;
+  GstStructure *s;
+  const GValue *v;
+
+  caps = gst_pad_get_current_caps (GST_BASE_SINK_PAD (sink));
+  if (!caps)
+    return FALSE;
+  s = gst_caps_get_structure (caps, 0);
+  if (!gst_structure_has_field (s, "streamheader")) {
+    gst_caps_unref (caps);
+    return FALSE;
+  }
+
+  v = gst_structure_get_value (s, "streamheader");
+  if (GST_VALUE_HOLDS_ARRAY (v)) {
+    guint n = gst_value_array_get_size (v);
+    guint i;
+    GstMapInfo map;
+
+    gst_buffer_map (buf, &map, GST_MAP_READ);
+
+    for (i = 0; i < n; i++) {
+      const GValue *v2 = gst_value_array_get_value (v, i);
+      GstBuffer *buf2;
+      GstMapInfo map2;
+
+      if (!GST_VALUE_HOLDS_BUFFER (v2))
+        continue;
+
+      buf2 = gst_value_get_buffer (v2);
+      if (buf == buf2) {
+        gst_caps_unref (caps);
+        return TRUE;
+      }
+      gst_buffer_map (buf2, &map2, GST_MAP_READ);
+      if (map.size == map2.size && memcmp (map.data, map2.data, map.size) == 0) {
+        gst_buffer_unmap (buf2, &map2);
+        gst_buffer_unmap (buf, &map);
+        gst_caps_unref (caps);
+        return TRUE;
+      }
+      gst_buffer_unmap (buf2, &map2);
+    }
+    gst_buffer_unmap (buf, &map);
+  }
+
+  gst_caps_unref (caps);
+
+  return FALSE;
+}
+
 static GstFlowReturn
 gst_multi_handle_sink_render (GstBaseSink * bsink, GstBuffer * buf)
 {
-  gboolean in_caps;
+  gboolean is_header, in_caps;
 #if 0
   GstCaps *bufcaps, *padcaps;
 #endif
@@ -1865,8 +1927,9 @@ gst_multi_handle_sink_render (GstBaseSink * bsink, GstBuffer * buf)
     goto no_caps;
 #endif
 
-  /* get IN_CAPS first, code below might mess with the flags */
-  in_caps = GST_BUFFER_FLAG_IS_SET (buf, GST_BUFFER_FLAG_HEADER);
+  /* get HEADER first, code below might mess with the flags */
+  is_header = GST_BUFFER_FLAG_IS_SET (buf, GST_BUFFER_FLAG_HEADER);
+  in_caps = is_header && buffer_is_in_caps (sink, buf);
 
 #if 0
   /* stamp the buffer with previous caps if no caps set */
@@ -1903,32 +1966,15 @@ gst_multi_handle_sink_render (GstBaseSink * bsink, GstBuffer * buf)
       GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buf)),
       GST_TIME_ARGS (GST_BUFFER_DURATION (buf)));
 
-  /* if we get IN_CAPS buffers, but the previous buffer was not IN_CAPS,
-   * it means we're getting new streamheader buffers, and we should clear
-   * the old ones */
-  if (in_caps && sink->previous_buffer_in_caps == FALSE) {
-    GST_DEBUG_OBJECT (sink,
-        "receiving new HEADER buffers, clearing old streamheader");
-    g_slist_foreach (sink->streamheader, (GFunc) gst_mini_object_unref, NULL);
-    g_slist_free (sink->streamheader);
-    sink->streamheader = NULL;
-  }
-
-  /* save the current in_caps */
-  sink->previous_buffer_in_caps = in_caps;
-
-  /* if the incoming buffer is marked as IN CAPS, then we assume for now
-   * it's a streamheader that needs to be sent to each new client, so we
-   * put it on our internal list of streamheader buffers.
-   * FIXME: we could check if the buffer's contents are in fact part of the
-   * current streamheader.
+  /* if the incoming buffer is a streamheader from the caps, then we assume for now
+   * it's a streamheader that needs to be sent to each new client.
    *
    * We don't send the buffer to the client, since streamheaders are sent
    * separately when necessary. */
   if (in_caps) {
-    GST_DEBUG_OBJECT (sink, "appending HEADER buffer with length %"
-        G_GSIZE_FORMAT " to streamheader", gst_buffer_get_size (buf));
-    sink->streamheader = g_slist_append (sink->streamheader, buf);
+    GST_DEBUG_OBJECT (sink, "ignoring HEADER buffer with length %"
+        G_GSIZE_FORMAT, gst_buffer_get_size (buf));
+    gst_buffer_unref (buf);
   } else {
     /* queue the buffer, this is a regular data buffer. */
     gst_multi_handle_sink_queue_buffer (sink, buf);
@@ -2106,7 +2152,6 @@ gst_multi_handle_sink_start (GstBaseSink * bsink)
   if (!mhsclass->start_pre (mhsink))
     return FALSE;
 
-  mhsink->streamheader = NULL;
   mhsink->bytes_to_serve = 0;
   mhsink->bytes_served = 0;
 
@@ -2151,12 +2196,6 @@ gst_multi_handle_sink_stop (GstBaseSink * bsink)
   /* free the clients */
   mhclass->clear (GST_MULTI_HANDLE_SINK (mhsink));
 
-  if (mhsink->streamheader) {
-    g_slist_foreach (mhsink->streamheader, (GFunc) gst_mini_object_unref, NULL);
-    g_slist_free (mhsink->streamheader);
-    mhsink->streamheader = NULL;
-  }
-
   if (mhclass->close)
     mhclass->close (mhsink);
 
@@ -2190,9 +2229,16 @@ gst_multi_handle_sink_change_state (GstElement * element,
   sink = GST_MULTI_HANDLE_SINK (element);
 
   /* we disallow changing the state from the streaming thread */
-  if (g_thread_self () == sink->thread)
-    return GST_STATE_CHANGE_FAILURE;
+  if (g_thread_self () == sink->thread) {
+    g_warning
+        ("\nTrying to change %s's state from its streaming thread would deadlock.\n"
+        "You cannot change the state of an element from its streaming\n"
+        "thread. Use g_idle_add() or post a GstMessage on the bus to\n"
+        "schedule the state change from the main thread.\n",
+        GST_ELEMENT_NAME (sink));
 
+    return GST_STATE_CHANGE_FAILURE;
+  }
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:

@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_SUBPARSE_H__
@@ -55,7 +55,9 @@ typedef enum
   GST_SUB_PARSE_FORMAT_MPL2 = 6,
   GST_SUB_PARSE_FORMAT_SUBVIEWER = 7,
   GST_SUB_PARSE_FORMAT_DKS = 8,
-  GST_SUB_PARSE_FORMAT_QTTEXT = 9
+  GST_SUB_PARSE_FORMAT_QTTEXT = 9,
+  GST_SUB_PARSE_FORMAT_LRC = 10,
+  GST_SUB_PARSE_FORMAT_VTT = 11
 } GstSubParseFormat;
 
 typedef struct {
@@ -68,6 +70,14 @@ typedef struct {
   gpointer user_data;
   gboolean have_internal_fps; /* If TRUE don't overwrite fps by property */
   gint fps_n, fps_d;     /* used by frame based parsers */
+  guint8 line_position;          /* percent value */
+  gint line_number;              /* line number, can be positive or negative */
+  guint8 text_position;          /* percent value */
+  guint8 text_size;          /* percent value */
+  gchar *vertical;        /* "", "vertical", "vertical-lr" */
+  gchar *alignment;       /* "", "start", "middle", "end" */
+  gconstpointer allowed_tags; /* list of markup tags allowed in the cue text. */
+  gboolean allows_tag_attributes;
 } ParserState;
 
 typedef gchar* (*Parser) (ParserState *state, const gchar *line);

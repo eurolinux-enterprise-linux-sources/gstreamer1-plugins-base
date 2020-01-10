@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -263,10 +263,10 @@ static const gchar *caps_strings[] = {
   "audio/x-svx", "audio/x-tta", "audio/x-ttafile",
   "audio/x-vnd.sony.atrac3", "audio/x-vorbis", "audio/x-voc", "audio/x-w64",
   "audio/x-wav", "audio/x-wavpack", "audio/x-wavpack-correction",
-  "audio/x-wms", "audio/x-voxware", "video/sp5x", "video/vivo",
+  "audio/x-wms", "audio/x-voxware", "audio/x-xi", "video/sp5x", "video/vivo",
   "video/x-4xm", "video/x-apple-video", "video/x-camtasia",
   "video/x-cdxa", "video/x-cinepak", "video/x-cirrus-logic-accupak",
-  "video/x-compressed-yuv", "video/x-dirac", "subpicture/x-dvd",
+  "video/x-compressed-yuv", "subpicture/x-dvd",
   "video/x-ffv", "video/x-flash-screen", "video/x-flash-video",
   "video/x-h261", "video/x-huffyuv", "video/x-intel-h263", "video/x-jpeg",
   "video/x-mjpeg", "video/x-mjpeg-b", "video/mpegts", "video/x-mng",
@@ -310,6 +310,8 @@ static const gchar *caps_strings[] = {
   "video/mpeg, mpegversion=(int)4, systemstream=(boolean)FALSE",
   "video/mpeg, mpegversion=(int)99, systemstream=(boolean)TRUE",
   "video/mpeg, mpegversion=(int)99, systemstream=(boolean)FALSE",
+  "video/mpeg, mpegversion=(int)4, systemstream=(boolean)FALSE, profile=main",
+  "video/mpeg, mpegversion=(int)4, systemstream=(boolean)FALSE, profile=adsfad",
   "video/mpeg",
   "video/x-indeo, indeoversion=(int)3",
   "video/x-indeo, indeoversion=(int)5",
@@ -324,6 +326,12 @@ static const gchar *caps_strings[] = {
   "audio/x-wma, wmaversion=(int)3",
   "audio/x-wma, wmaversion=(int)99",
   "audio/x-wma",
+  "video/x-dirac",
+  "video/x-dirac, profile=(string)vc2-low-delay",
+  "video/x-dirac, profile=(string)vc2-simple",
+  "video/x-dirac, profile=(string)vc2-main",
+  "video/x-dirac, profile=(string)main",
+  "video/x-dirac, profile=(string)czvja",
   "video/x-divx, divxversion=(int)3",
   "video/x-divx, divxversion=(int)4",
   "video/x-divx, divxversion=(int)5",
@@ -333,10 +341,16 @@ static const gchar *caps_strings[] = {
   "video/x-svq, svqversion=(int)3",
   "video/x-svq, svqversion=(int)99",
   "video/x-svq",
+  "video/x-h265, profile=(string)main",
+  "video/x-h265, profile=(string)xafasdf",
+  "video/x-h265",
   "video/x-h264, variant=(string)itu",
   "video/x-h264, variant=(string)videosoft",
   "video/x-h264, variant=(string)foobar",
   "video/x-h264",
+  "video/x-h264, profile=(string)foobar",
+  "video/x-h264, profile=(string)high-4:4:4-intra",
+  "video/x-h264, profile=(string)high",
   "video/x-h263, variant=(string)itu",
   "video/x-h263, variant=(string)lead",
   "video/x-h263, variant=(string)microsoft",
@@ -406,14 +420,17 @@ GST_START_TEST (test_pb_utils_get_codec_description)
     desc = gst_pb_utils_get_codec_description (caps);
     fail_unless (desc != NULL);
     GST_LOG (" - codec   : %s", desc);
+    fail_unless (g_utf8_validate (desc, -1, NULL));
     g_free (desc);
     desc = gst_pb_utils_get_decoder_description (caps);
     fail_unless (desc != NULL);
     GST_LOG (" - decoder : %s", desc);
+    fail_unless (g_utf8_validate (desc, -1, NULL));
     g_free (desc);
     desc = gst_pb_utils_get_encoder_description (caps);
     fail_unless (desc != NULL);
     GST_LOG (" - encoder : %s", desc);
+    fail_unless (g_utf8_validate (desc, -1, NULL));
     g_free (desc);
     gst_caps_unref (caps);
   }
@@ -425,7 +442,8 @@ GST_END_TEST;
 GST_START_TEST (test_pb_utils_taglist_add_codec_info)
 {
   GstTagList *list;
-  GstCaps *caps;
+  GstCaps *caps, *bogus_caps;
+  gchar *res;
 
   gst_pb_utils_init ();
   list = gst_tag_list_new_empty ();
@@ -434,8 +452,6 @@ GST_START_TEST (test_pb_utils_taglist_add_codec_info)
       (gst_pb_utils_add_codec_description_to_tag_list (NULL,
               GST_TAG_VIDEO_CODEC, caps)));
   ASSERT_CRITICAL (fail_if
-      (gst_pb_utils_add_codec_description_to_tag_list (list, NULL, caps)));
-  ASSERT_CRITICAL (fail_if
       (gst_pb_utils_add_codec_description_to_tag_list (list, "asdfa", caps)));
   ASSERT_CRITICAL (fail_if
       (gst_pb_utils_add_codec_description_to_tag_list (list,
@@ -443,10 +459,68 @@ GST_START_TEST (test_pb_utils_taglist_add_codec_info)
   ASSERT_CRITICAL (fail_if
       (gst_pb_utils_add_codec_description_to_tag_list (list,
               GST_TAG_VIDEO_CODEC, NULL)));
-  /* FIXME: do something here */
+
+  /* Try adding bogus caps (should fail) */
+  bogus_caps = gst_caps_new_empty_simple ("bogus/format");
+  fail_if (gst_pb_utils_add_codec_description_to_tag_list (list,
+          GST_TAG_VIDEO_CODEC, bogus_caps));
+  gst_caps_unref (bogus_caps);
+
+  /* Try adding valid caps with known tag */
   fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list,
           GST_TAG_VIDEO_CODEC, caps));
   fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_VIDEO_CODEC, &res));
+  g_free (res);
+  gst_tag_list_unref (list);
+
+  /* Try adding valid caps with auto-tag (for video, audio, subtitle, generic) */
+  list = gst_tag_list_new_empty ();
+  fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list, NULL,
+          caps));
+  fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_VIDEO_CODEC, &res));
+  g_free (res);
+  gst_tag_list_unref (list);
+  gst_caps_unref (caps);
+
+  list = gst_tag_list_new_empty ();
+  caps = gst_caps_new_empty_simple ("audio/x-vorbis");
+  fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list, NULL,
+          caps));
+  fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_AUDIO_CODEC, &res));
+  g_free (res);
+  gst_tag_list_unref (list);
+  gst_caps_unref (caps);
+
+  list = gst_tag_list_new_empty ();
+  caps = gst_caps_new_empty_simple ("subtitle/x-kate");
+  fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list, NULL,
+          caps));
+  fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_SUBTITLE_CODEC, &res));
+  g_free (res);
+  gst_tag_list_unref (list);
+  gst_caps_unref (caps);
+
+  list = gst_tag_list_new_empty ();
+  caps = gst_caps_new_empty_simple ("application/ogg");
+  fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list, NULL,
+          caps));
+  fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_CONTAINER_FORMAT, &res));
+  g_free (res);
+  gst_tag_list_unref (list);
+  gst_caps_unref (caps);
+
+  list = gst_tag_list_new_empty ();
+  caps = gst_caps_new_empty_simple ("image/bmp");
+  fail_unless (gst_pb_utils_add_codec_description_to_tag_list (list, NULL,
+          caps));
+  fail_if (gst_tag_list_is_empty (list));
+  fail_unless (gst_tag_list_get_string (list, GST_TAG_CODEC, &res));
+  g_free (res);
   gst_tag_list_unref (list);
   gst_caps_unref (caps);
 }

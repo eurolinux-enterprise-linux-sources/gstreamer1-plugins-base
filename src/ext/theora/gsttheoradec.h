@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_THEORADEC_H__
@@ -77,6 +77,7 @@ struct _GstTheoraDec
   gint telemetry_bits;
 
   gboolean can_crop;
+  GstVideoInfo uncropped_info;
 };
 
 struct _GstTheoraDecClass
@@ -85,7 +86,6 @@ struct _GstTheoraDecClass
 };
 
 GType gst_theora_dec_get_type (void);
-gboolean gst_theora_dec_register (GstPlugin * plugin);
 
 G_END_DECLS
 

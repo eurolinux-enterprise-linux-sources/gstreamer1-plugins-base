@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gst-plugins-base 0.10.30.3\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2013-04-26 12:33+0200\n"
+"POT-Creation-Date: 2017-02-23 15:14+0200\n"
 "PO-Revision-Date: 2010-10-25 10:27+0900\n"
 "Last-Translator: Makoto Kato <makoto.kt@gmail.com>\n"
 "Language-Team: Japanese <translation-team-ja@lists.sourceforge.net>\n"
@@ -72,14 +72,11 @@ msgstr "CDをシークすることができませんでした"
 msgid "Could not read CD."
 msgstr "CD を読むことができませんでした"
 
-msgid "Internal data stream error."
-msgstr "内部データストリームエラー"
-
 #, c-format
-msgid "A %s plugin is required to play this stream, but not installed."
+msgid "Missing element '%s' - check your GStreamer installation."
 msgstr ""
-"%s プラグインはこのストリームを再生するのに必要ですが、インストールされていま"
-"せん"
+"エレメント '%s' が見つかりません - GStreamer のインストールが失敗している可能"
+"性があります"
 
 msgid "Could not determine type of stream"
 msgstr "ストリームの種類を判別できませんでした"
@@ -87,11 +84,17 @@ msgstr "ストリームの種類を判別できませんでした"
 msgid "This appears to be a text file"
 msgstr "これはテキストファイルのようです"
 
-#, c-format
-msgid "Missing element '%s' - check your GStreamer installation."
-msgstr ""
-"エレメント '%s' が見つかりません - GStreamer のインストールが失敗している可能"
-"性があります"
+#, fuzzy
+msgid "Could not create \"uridecodebin\" element."
+msgstr "\"decodebin\" エレメントを作成できません。"
+
+#, fuzzy
+msgid "Could not create \"decodebin3\" element."
+msgstr "\"decodebin2\" エレメントを作成できませんでした"
+
+#, fuzzy
+msgid "Could not create \"urisourcebin\" element."
+msgstr "\"decodebin\" エレメントを作成できません。"
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -163,11 +166,193 @@ msgstr "ソースエレメントが不正です。"
 msgid "Error while sending data to \"%s:%d\"."
 msgstr "データを \"%s:%d\" へ送信中にエラーが発生しました"
 
+msgid "Can't record audio fast enough"
+msgstr "十分に速くオーディオを録音することができません"
+
 msgid "This CD has no audio tracks"
 msgstr "この CD にはオーディオトラックがありません"
 
-msgid "Can't record audio fast enough"
-msgstr "十分に速くオーディオを録音することができません"
+msgid "ID3 tag"
+msgstr "ID3 タグ"
+
+msgid "APE tag"
+msgstr "APE タグ"
+
+msgid "ICY internet radio"
+msgstr "ICY インターネットラジオ"
+
+msgid "Apple Lossless Audio (ALAC)"
+msgstr "Apple Lossless Audio (ALAC)"
+
+msgid "Free Lossless Audio Codec (FLAC)"
+msgstr "Free Lossless Audio Codec (FLAC)"
+
+msgid "Lossless True Audio (TTA)"
+msgstr "ロスレス True Audio (TTA)"
+
+msgid "Windows Media Speech"
+msgstr "Windows Media Speech"
+
+msgid "CYUV Lossless"
+msgstr "CYUV ロスレス"
+
+msgid "FFMpeg v1"
+msgstr "FFMpeg v1"
+
+msgid "Lossless MSZH"
+msgstr "ロスレス MSZH"
+
+msgid "Run-length encoding"
+msgstr "ランレングス符号化"
+
+msgid "Timed Text"
+msgstr ""
+
+msgid "Subtitle"
+msgstr ""
+
+#, fuzzy
+msgid "MPL2 subtitle format"
+msgstr "TMPlayer 字幕形式"
+
+#, fuzzy
+msgid "DKS subtitle format"
+msgstr "Sami 字幕形式"
+
+#, fuzzy
+msgid "QTtext subtitle format"
+msgstr "Kate 字幕形式"
+
+msgid "Sami subtitle format"
+msgstr "Sami 字幕形式"
+
+msgid "TMPlayer subtitle format"
+msgstr "TMPlayer 字幕形式"
+
+msgid "Kate subtitle format"
+msgstr "Kate 字幕形式"
+
+#, fuzzy
+msgid "WebVTT subtitle format"
+msgstr "Kate 字幕形式"
+
+#, fuzzy
+msgid "Uncompressed video"
+msgstr "非圧縮 YUV"
+
+#, fuzzy
+msgid "Uncompressed gray"
+msgstr "非圧縮グレーイメージ"
+
+#, fuzzy, c-format
+msgid "Uncompressed packed YUV %s"
+msgstr "非圧縮 packed YUV 4:2:2"
+
+#, fuzzy, c-format
+msgid "Uncompressed semi-planar YUV %s"
+msgstr "非圧縮 planar YUV 4:2:0"
+
+#, fuzzy, c-format
+msgid "Uncompressed planar YUV %s"
+msgstr "非圧縮 planar YUV 4:2:0"
+
+#, fuzzy, c-format
+msgid "Uncompressed palettized %d-bit %s"
+msgstr "非圧縮 palettized %d ビット %s"
+
+#, fuzzy, c-format
+msgid "Uncompressed %d-bit %s"
+msgstr "非圧縮 palettized %d ビット %s"
+
+#, c-format
+msgid "DivX MPEG-4 Version %d"
+msgstr "DivX MPEG-4 バージョン %d"
+
+#, fuzzy
+msgid "Uncompressed audio"
+msgstr "非圧縮 YUV"
+
+#, fuzzy, c-format
+msgid "Raw %d-bit %s audio"
+msgstr "Raw %d ビット PCM オーディオ"
+
+msgid "Audio CD source"
+msgstr "オーディオ CD ソース"
+
+msgid "DVD source"
+msgstr "DVD ソース"
+
+msgid "Real Time Streaming Protocol (RTSP) source"
+msgstr "Real Time Streaming Protocol (RTSP) ソース"
+
+msgid "Microsoft Media Server (MMS) protocol source"
+msgstr "Microsoft Media Server (MMS) プロトコルソース"
+
+#, c-format
+msgid "%s protocol source"
+msgstr "%s プロトコルソース"
+
+#, c-format
+msgid "%s video RTP depayloader"
+msgstr "%s ビデオ RTP デペイローダー"
+
+#, c-format
+msgid "%s audio RTP depayloader"
+msgstr "%s オーディオ RTP デペイローダー"
+
+#, c-format
+msgid "%s RTP depayloader"
+msgstr "%s RTP デペイローダー"
+
+#, c-format
+msgid "%s demuxer"
+msgstr "%s demuxer"
+
+#, c-format
+msgid "%s decoder"
+msgstr "%s デコーダー"
+
+#, c-format
+msgid "%s video RTP payloader"
+msgstr "%s ビデオ RTP ペイローダー"
+
+#, c-format
+msgid "%s audio RTP payloader"
+msgstr "%s オーディオ RTP ペイローダー"
+
+#, c-format
+msgid "%s RTP payloader"
+msgstr "%s RTP ペイローダー"
+
+#, c-format
+msgid "%s muxer"
+msgstr "%s ミキサー"
+
+#, c-format
+msgid "%s encoder"
+msgstr "%s エンコーダー"
+
+#, c-format
+msgid "GStreamer element %s"
+msgstr "GStreamer エレメント %s"
+
+msgid "Unknown source element"
+msgstr "不明なソースエレメント"
+
+msgid "Unknown sink element"
+msgstr "不明なシンクエレメント"
+
+msgid "Unknown element"
+msgstr "不明なエレメント"
+
+msgid "Unknown decoder element"
+msgstr "不明なデコーダーエレメント"
+
+msgid "Unknown encoder element"
+msgstr "不明なエンコーダーエレメント"
+
+msgid "Plugin or element of unknown type"
+msgstr "不明な種類のプラグインまたはエレメント"
 
 msgid "Failed to read tag: not enough data"
 msgstr "タグの読み込みに失敗しました: データが十分にありません"
@@ -218,6 +403,13 @@ msgid "capturing focal length"
 msgstr ""
 
 msgid "Focal length of the lens used capturing the image, in mm"
+msgstr ""
+
+msgid "capturing 35 mm equivalent focal length"
+msgstr ""
+
+msgid ""
+"35 mm equivalent focal length of the lens used capturing the image, in mm"
 msgstr ""
 
 msgid "capturing digital zoom ratio"
@@ -331,168 +523,171 @@ msgstr ""
 msgid "unparsed id3v2 tag frame"
 msgstr ""
 
-msgid "ID3 tag"
-msgstr "ID3 タグ"
+msgid "musical-key"
+msgstr ""
 
-msgid "APE tag"
-msgstr "APE タグ"
+msgid "Initial key in which the sound starts"
+msgstr ""
 
-msgid "ICY internet radio"
-msgstr "ICY インターネットラジオ"
+msgid "Print version information and exit"
+msgstr ""
 
-msgid "Apple Lossless Audio (ALAC)"
-msgstr "Apple Lossless Audio (ALAC)"
+msgid ""
+"Don't exit after showing the initial device list, but wait for devices to "
+"added/removed."
+msgstr ""
 
-msgid "Free Lossless Audio Codec (FLAC)"
-msgstr "Free Lossless Audio Codec (FLAC)"
+#, c-format
+msgid "Volume: %.0f%%"
+msgstr ""
 
-msgid "Lossless True Audio (TTA)"
-msgstr "ロスレス True Audio (TTA)"
+msgid "Buffering..."
+msgstr ""
 
-msgid "Windows Media Speech"
-msgstr "Windows Media Speech"
+msgid "Clock lost, selecting a new one\n"
+msgstr ""
 
-msgid "CYUV Lossless"
-msgstr "CYUV ロスレス"
+msgid "Reached end of play list."
+msgstr ""
 
-msgid "FFMpeg v1"
-msgstr "FFMpeg v1"
+msgid "Paused"
+msgstr ""
 
-msgid "Lossless MSZH"
-msgstr "ロスレス MSZH"
+#, c-format
+msgid "Now playing %s\n"
+msgstr ""
 
-msgid "Run-length encoding"
-msgstr "ランレングス符号化"
+#, c-format
+msgid "About to finish, preparing next title: %s"
+msgstr ""
 
-msgid "Subtitle"
+#, c-format
+msgid "Playback rate: %.2f"
+msgstr ""
+
+#, fuzzy, c-format
+msgid "Could not change playback rate to %.2f"
+msgstr "ステレオモードで再生用にデバイスをオープンできませんでした"
+
+msgid "space"
+msgstr ""
+
+msgid "pause/unpause"
+msgstr ""
+
+msgid "q or ESC"
+msgstr ""
+
+msgid "quit"
+msgstr ""
+
+msgid "> or n"
+msgstr ""
+
+msgid "play next"
+msgstr ""
+
+msgid "< or b"
+msgstr ""
+
+msgid "play previous"
+msgstr ""
+
+msgid "seek forward"
+msgstr ""
+
+msgid "seek backward"
+msgstr ""
+
+msgid "volume up"
+msgstr ""
+
+msgid "volume down"
+msgstr ""
+
+msgid "increase playback rate"
+msgstr ""
+
+msgid "decrease playback rate"
+msgstr ""
+
+msgid "change playback direction"
+msgstr ""
+
+msgid "enable/disable trick modes"
 msgstr ""
 
 #, fuzzy
-msgid "MPL2 subtitle format"
-msgstr "TMPlayer 字幕形式"
+msgid "change audio track"
+msgstr "この CD にはオーディオトラックがありません"
+
+msgid "change video track"
+msgstr ""
 
 #, fuzzy
-msgid "DKS subtitle format"
-msgstr "Sami 字幕形式"
-
-#, fuzzy
-msgid "QTtext subtitle format"
+msgid "change subtitle track"
 msgstr "Kate 字幕形式"
 
-msgid "Sami subtitle format"
-msgstr "Sami 字幕形式"
+msgid "seek to beginning"
+msgstr ""
 
-msgid "TMPlayer subtitle format"
-msgstr "TMPlayer 字幕形式"
+msgid "show keyboard shortcuts"
+msgstr ""
 
-msgid "Kate subtitle format"
-msgstr "Kate 字幕形式"
+msgid "Interactive mode - keyboard controls:"
+msgstr ""
+
+msgid "Output status information and property notifications"
+msgstr ""
+
+msgid "Control playback behaviour setting playbin 'flags' property"
+msgstr ""
+
+msgid "Video sink to use (default is autovideosink)"
+msgstr ""
+
+msgid "Audio sink to use (default is autoaudiosink)"
+msgstr ""
+
+msgid "Enable gapless playback"
+msgstr ""
+
+msgid "Shuffle playlist"
+msgstr ""
+
+msgid "Disable interactive control via the keyboard"
+msgstr ""
+
+msgid "Volume"
+msgstr ""
+
+msgid "Playlist file containing input media files"
+msgstr ""
+
+msgid "Do not print any output (apart from errors)"
+msgstr ""
+
+#, c-format
+msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
+msgstr ""
+
+msgid "You must provide at least one filename or URI to play."
+msgstr ""
+
+msgid "Press 'k' to see a list of keyboard shortcuts.\n"
+msgstr ""
+
+#~ msgid "Internal data stream error."
+#~ msgstr "内部データストリームエラー"
+
+#~ msgid "A %s plugin is required to play this stream, but not installed."
+#~ msgstr ""
+#~ "%s プラグインはこのストリームを再生するのに必要ですが、インストールされて"
+#~ "いません"
 
 #, fuzzy
-msgid "Uncompressed video"
-msgstr "非圧縮 YUV"
-
-#, fuzzy
-msgid "Uncompressed gray"
-msgstr "非圧縮グレーイメージ"
-
-#, fuzzy, c-format
-msgid "Uncompressed %s YUV %s"
-msgstr "非圧縮 YUV"
-
-#, fuzzy, c-format
-msgid "Uncompressed %s%d-bit %s"
-msgstr "非圧縮 palettized %d ビット %s"
-
-#, c-format
-msgid "DivX MPEG-4 Version %d"
-msgstr "DivX MPEG-4 バージョン %d"
-
-#, fuzzy
-msgid "Uncompressed audio"
-msgstr "非圧縮 YUV"
-
-#, fuzzy, c-format
-msgid "Raw %d-bit %s audio"
-msgstr "Raw %d ビット PCM オーディオ"
-
-msgid "Audio CD source"
-msgstr "オーディオ CD ソース"
-
-msgid "DVD source"
-msgstr "DVD ソース"
-
-msgid "Real Time Streaming Protocol (RTSP) source"
-msgstr "Real Time Streaming Protocol (RTSP) ソース"
-
-msgid "Microsoft Media Server (MMS) protocol source"
-msgstr "Microsoft Media Server (MMS) プロトコルソース"
-
-#, c-format
-msgid "%s protocol source"
-msgstr "%s プロトコルソース"
-
-#, c-format
-msgid "%s video RTP depayloader"
-msgstr "%s ビデオ RTP デペイローダー"
-
-#, c-format
-msgid "%s audio RTP depayloader"
-msgstr "%s オーディオ RTP デペイローダー"
-
-#, c-format
-msgid "%s RTP depayloader"
-msgstr "%s RTP デペイローダー"
-
-#, c-format
-msgid "%s demuxer"
-msgstr "%s demuxer"
-
-#, c-format
-msgid "%s decoder"
-msgstr "%s デコーダー"
-
-#, c-format
-msgid "%s video RTP payloader"
-msgstr "%s ビデオ RTP ペイローダー"
-
-#, c-format
-msgid "%s audio RTP payloader"
-msgstr "%s オーディオ RTP ペイローダー"
-
-#, c-format
-msgid "%s RTP payloader"
-msgstr "%s RTP ペイローダー"
-
-#, c-format
-msgid "%s muxer"
-msgstr "%s ミキサー"
-
-#, c-format
-msgid "%s encoder"
-msgstr "%s エンコーダー"
-
-#, c-format
-msgid "GStreamer element %s"
-msgstr "GStreamer エレメント %s"
-
-msgid "Unknown source element"
-msgstr "不明なソースエレメント"
-
-msgid "Unknown sink element"
-msgstr "不明なシンクエレメント"
-
-msgid "Unknown element"
-msgstr "不明なエレメント"
-
-msgid "Unknown decoder element"
-msgstr "不明なデコーダーエレメント"
-
-msgid "Unknown encoder element"
-msgstr "不明なエンコーダーエレメント"
-
-msgid "Plugin or element of unknown type"
-msgstr "不明な種類のプラグインまたはエレメント"
+#~ msgid "Uncompressed %s YUV %s"
+#~ msgstr "非圧縮 YUV"
 
 #~ msgid "Master"
 #~ msgstr "マスター"
@@ -530,14 +725,8 @@ msgstr "不明な種類のプラグインまたはエレメント"
 #~ msgid "Connection to %s:%d refused."
 #~ msgstr "%s:%d への接続が拒否されました"
 
-#~ msgid "Uncompressed planar YUV 4:2:0"
-#~ msgstr "非圧縮 planar YUV 4:2:0"
-
 #~ msgid "Uncompressed planar YVU 4:2:0"
 #~ msgstr "非圧縮 planar YVU 4:2:0"
-
-#~ msgid "Uncompressed packed YUV 4:2:2"
-#~ msgstr "非圧縮 packed YUV 4:2:2"
 
 #~ msgid "Uncompressed packed YUV 4:1:0"
 #~ msgstr "非圧縮 packed YUV 4:1:0"
@@ -586,9 +775,6 @@ msgstr "不明な種類のプラグインまたはエレメント"
 
 #~ msgid "RTSP streams cannot be played yet."
 #~ msgstr "RTSP ストリームをまだ再生できません"
-
-#~ msgid "Could not create \"decodebin\" element."
-#~ msgstr "\"decodebin\" エレメントを作成できません。"
 
 #~ msgid ""
 #~ "Only a subtitle stream was detected. Either you are loading a subtitle "
@@ -641,9 +827,6 @@ msgstr "不明な種類のプラグインまたはエレメント"
 
 #~ msgid "Could not open file \"%s\" for reading."
 #~ msgstr "読み込み用にファイル \"%s\" を開くことができませんでした"
-
-#~ msgid "Could not create \"decodebin2\" element."
-#~ msgstr "\"decodebin2\" エレメントを作成できませんでした"
 
 #~ msgid "Could not create \"queue2\" element."
 #~ msgstr "\"queue2\" エレメントを作成できませんでした"

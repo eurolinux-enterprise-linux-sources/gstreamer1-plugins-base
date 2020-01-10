@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -102,7 +102,11 @@ _internal_get_supported_protocols (gpointer data)
   gint i, j;
 
   schemes = g_vfs_get_supported_uri_schemes (g_vfs_get_default ());
-  num = g_strv_length ((gchar **) schemes);
+
+  if (schemes != NULL)
+    num = g_strv_length ((gchar **) schemes);
+  else
+    num = 0;
 
   if (num == 0) {
     GST_WARNING ("No GIO supported URI schemes found");
@@ -227,6 +231,11 @@ gst_gio_uri_handler_do_init (GType type)
   g_type_add_interface_static (type, GST_TYPE_URI_HANDLER, &uri_handler_info);
 }
 
+#define GIO_GVFS_MOUNTS_DIR GIO_PREFIX \
+    G_DIR_SEPARATOR_S "share" \
+    G_DIR_SEPARATOR_S "gvfs" \
+    G_DIR_SEPARATOR_S "mounts"
+
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
@@ -236,8 +245,8 @@ plugin_init (GstPlugin * plugin)
 
   gst_plugin_add_dependency_simple (plugin, NULL, GIO_MODULE_DIR, NULL,
       GST_PLUGIN_DEPENDENCY_FLAG_NONE);
-  gst_plugin_add_dependency_simple (plugin, "LD_LIBRARY_PATH", GIO_LIBDIR,
-      "gvfsd", GST_PLUGIN_DEPENDENCY_FLAG_NONE);
+  gst_plugin_add_dependency_simple (plugin, NULL, GIO_GVFS_MOUNTS_DIR, NULL,
+      GST_PLUGIN_DEPENDENCY_FLAG_NONE);
 
   /* FIXME: Rank is MARGINAL for now, should be at least SECONDARY+1 in the future
    * to replace gnomevfssink/src. For testing purposes PRIMARY+1 one makes sense

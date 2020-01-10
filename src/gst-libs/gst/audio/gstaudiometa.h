@@ -13,14 +13,12 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_AUDIO_META_H__
 #define __GST_AUDIO_META_H__
-
-#include <gst/gst.h>
 
 #include <gst/audio/audio.h>
 
@@ -61,7 +59,7 @@ struct _GstAudioDownmixMeta {
 GType gst_audio_downmix_meta_api_get_type (void);
 const GstMetaInfo * gst_audio_downmix_meta_get_info (void);
 
-#define gst_buffer_get_audio_downmix_meta(b) ((GstAudioDownmixMeta*)gst_buffer_get_meta((b),GST_AUDIO_DOWNMIX_META_INFO))
+#define gst_buffer_get_audio_downmix_meta(b) ((GstAudioDownmixMeta*)gst_buffer_get_meta((b), GST_AUDIO_DOWNMIX_META_API_TYPE))
 GstAudioDownmixMeta * gst_buffer_get_audio_downmix_meta_for_channels    (GstBuffer *buffer,
                                                                          const GstAudioChannelPosition *to_position,
                                                                          gint                           to_channels);
@@ -72,6 +70,51 @@ GstAudioDownmixMeta * gst_buffer_add_audio_downmix_meta (GstBuffer    *buffer,
                                                          const GstAudioChannelPosition *to_position,
                                                          gint                           to_channels,
                                                          const gfloat                 **matrix);
+
+
+#define GST_AUDIO_CLIPPING_META_API_TYPE (gst_audio_clipping_meta_api_get_type())
+#define GST_AUDIO_CLIPPING_META_INFO  (gst_audio_clipping_meta_get_info())
+
+typedef struct _GstAudioClippingMeta GstAudioClippingMeta;
+
+/**
+ * GstAudioClippingMeta:
+ * @meta: parent #GstMeta
+ * @format: GstFormat of @start and @stop, GST_FORMAT_DEFAULT is samples
+ * @start: Amount of audio to clip from start of buffer
+ * @end: Amount of  to clip from end of buffer
+ *
+ * Extra buffer metadata describing how much audio has to be clipped from
+ * the start or end of a buffer. This is used for compressed formats, where
+ * the first frame usually has some additional samples due to encoder and
+ * decoder delays, and the last frame usually has some additional samples to
+ * be able to fill the complete last frame.
+ *
+ * This is used to ensure that decoded data in the end has the same amount of
+ * samples, and multiply decoded streams can be gaplessly concatenated.
+ *
+ * Note: If clipping of the start is done by adjusting the segment, this meta
+ * has to be dropped from buffers as otherwise clipping could happen twice.
+ *
+ * Since: 1.8
+ */
+struct _GstAudioClippingMeta {
+  GstMeta   meta;
+
+  GstFormat format;
+  guint64   start;
+  guint64   end;
+};
+
+GType gst_audio_clipping_meta_api_get_type (void);
+const GstMetaInfo * gst_audio_clipping_meta_get_info (void);
+
+#define gst_buffer_get_audio_clipping_meta(b) ((GstAudioClippingMeta*)gst_buffer_get_meta((b), GST_AUDIO_CLIPPING_META_API_TYPE))
+
+GstAudioClippingMeta * gst_buffer_add_audio_clipping_meta (GstBuffer *buffer,
+                                                           GstFormat  format,
+                                                           guint64    start,
+                                                           guint64    end);
 
 G_END_DECLS
 

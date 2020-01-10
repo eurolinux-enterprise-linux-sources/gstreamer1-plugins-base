@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_OGG_STREAM_H__
@@ -70,7 +70,7 @@ struct _GstOggStream
   gint bitrate;
   guint64 total_time;
   gboolean is_sparse;
-  gboolean forbid_start_clamping;
+  gboolean audio_clipping;
 
   GstCaps *caps;
 
@@ -94,6 +94,7 @@ struct _GstOggStream
   gboolean theora_has_zero_keyoffset;
   /* VP8 stuff */
   gboolean is_vp8;
+  gint64 invisible_count;
   /* opus stuff */
   gint64 first_granpos;
   /* OGM stuff */
@@ -116,6 +117,8 @@ struct _GstOggStream
 gboolean gst_ogg_stream_setup_map (GstOggStream * pad, ogg_packet *packet);
 gboolean gst_ogg_stream_setup_map_from_caps_headers (GstOggStream * pad,
     const GstCaps * caps);
+gboolean gst_ogg_stream_setup_map_from_caps (GstOggStream * pad,
+    const GstCaps * caps);
 GstClockTime gst_ogg_stream_get_end_time_for_granulepos (GstOggStream *pad,
     gint64 granulepos);
 GstClockTime gst_ogg_stream_get_start_time_for_granulepos (GstOggStream *pad,
@@ -133,6 +136,8 @@ gboolean gst_ogg_stream_packet_is_key_frame (GstOggStream *pad, ogg_packet *pack
 gint64 gst_ogg_stream_get_packet_duration (GstOggStream * pad, ogg_packet *packet);
 void gst_ogg_stream_extract_tags (GstOggStream * pad, ogg_packet * packet);
 const char *gst_ogg_stream_get_media_type (GstOggStream * pad);
+GstBuffer *gst_ogg_stream_get_headers (GstOggStream *pad);
+void gst_ogg_stream_update_stats (GstOggStream * pad, ogg_packet * packet);
 
 gboolean gst_ogg_map_parse_fisbone (GstOggStream * pad, const guint8 * data, guint size,
     guint32 * serialno, GstOggSkeleton *type);

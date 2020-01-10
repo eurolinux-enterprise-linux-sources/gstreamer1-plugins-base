@@ -13,17 +13,19 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
 
 #ifndef __GST_AUDIO_FILTER_H__
 #define __GST_AUDIO_FILTER_H__
 
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
-#include <gst/audio/audio.h>
 
 G_BEGIN_DECLS
 
@@ -94,6 +96,10 @@ GType   gst_audio_filter_get_type (void);
 
 void    gst_audio_filter_class_add_pad_templates (GstAudioFilterClass * klass,
                                                   GstCaps             * allowed_caps);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioFilter, gst_object_unref)
+#endif
 
 G_END_DECLS
 

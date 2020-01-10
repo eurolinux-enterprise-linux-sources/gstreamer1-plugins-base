@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /*
@@ -214,6 +214,7 @@ do_switch (GstElement * pipeline)
 
   /* set the active pad */
   g_object_set (select, "active-pad", pad, NULL);
+  gst_object_unref (select);
 
   return TRUE;
 }
@@ -222,10 +223,11 @@ static gboolean
 my_bus_callback (GstBus * bus, GstMessage * message, gpointer data)
 {
   GstElement *sender = (GstElement *) GST_MESSAGE_SRC (message);
-  const gchar *name = gst_element_get_name (sender);
+  gchar *name = gst_element_get_name (sender);
   GMainLoop *loop = (GMainLoop *) data;
 
   g_print ("Got %s message from %s\n", GST_MESSAGE_TYPE_NAME (message), name);
+  g_free (name);
 
   switch (GST_MESSAGE_TYPE (message)) {
 
@@ -279,7 +281,7 @@ main (gint argc, gchar * argv[])
   gst_element_set_state (pipeline, GST_STATE_PLAYING);
 
   /* add a timeout to cycle between the formats */
-  g_timeout_add (1000, (GSourceFunc) do_switch, pipeline);
+  g_timeout_add_seconds (1, (GSourceFunc) do_switch, pipeline);
 
   /* now run */
   g_main_loop_run (loop);

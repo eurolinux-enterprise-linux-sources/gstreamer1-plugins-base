@@ -15,13 +15,15 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#define GDK_VERSION_MIN_REQUIRED (GDK_VERSION_3_0)
 
 #include <glib.h>
 #include <gdk/gdkx.h>
@@ -57,8 +59,8 @@ find_video_sink (void)
       return sink;
 
     gst_element_set_state (sink, GST_STATE_NULL);
+    gst_object_unref (sink);
   }
-  gst_object_unref (sink);
 
   if ((sink = gst_element_factory_make ("ximagesink", NULL))) {
     sret = gst_element_set_state (sink, GST_STATE_READY);
@@ -66,8 +68,8 @@ find_video_sink (void)
       return sink;
 
     gst_element_set_state (sink, GST_STATE_NULL);
+    gst_object_unref (sink);
   }
-  gst_object_unref (sink);
 
   if (strcmp (DEFAULT_VIDEOSINK, "xvimagesink") == 0 ||
       strcmp (DEFAULT_VIDEOSINK, "ximagesink") == 0)
@@ -84,8 +86,9 @@ find_video_sink (void)
       return sink;
 
     gst_element_set_state (sink, GST_STATE_NULL);
+    gst_object_unref (sink);
   }
-  gst_object_unref (sink);
+
   return NULL;
 }
 
@@ -122,12 +125,10 @@ main (int argc, char **argv)
   gtk_window_set_title (GTK_WINDOW (window), "GstVideoOverlay Gtk+ demo");
 
   video_window = gtk_drawing_area_new ();
-  gtk_widget_set_double_buffered (video_window, FALSE);
   gtk_container_add (GTK_CONTAINER (window), video_window);
   gtk_container_set_border_width (GTK_CONTAINER (window), 16);
 
   gtk_widget_show_all (window);
-  gtk_widget_realize (window);
 
   video_window_xwindow = gtk_widget_get_window (video_window);
   embed_xid = GDK_WINDOW_XID (video_window_xwindow);

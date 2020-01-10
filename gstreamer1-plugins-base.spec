@@ -2,15 +2,14 @@
 %global		_hardened_build 1
 
 Name:           gstreamer1-plugins-base
-Version:        1.0.7
-Release:        5%{?dist}
+Version:        1.10.4
+Release:        1%{?dist}
 Summary:        GStreamer streaming media framework base plugins
 
 License:        LGPLv2+
 URL:            http://gstreamer.freedesktop.org/
 Source0:        http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-%{version}.tar.xz
 Patch0:         0001-missing-plugins-Remove-the-mpegaudioversion-field.patch
-Patch1:         0001-gstplaysink-pass-translated-color-balance-value-to-c.patch
 
 BuildRequires:  gstreamer1-devel >= %{version}
 BuildRequires:  gobject-introspection-devel >= 1.31.1
@@ -23,10 +22,10 @@ BuildRequires:  libtheora-devel >= 1.1
 BuildRequires:  libvisual-devel
 BuildRequires:  libvorbis-devel >= 1.0
 BuildRequires:  libXv-devel
-BuildRequires:  orc-devel >= 0.4.11
+BuildRequires:  orc-devel >= 0.4.18
 BuildRequires:  pango-devel
 BuildRequires:  pkgconfig
-
+BuildRequires:  opus-devel
 BuildRequires:  chrpath
 
 # documentation
@@ -89,8 +88,6 @@ for the GStreamer Base Plugins library.
 %prep
 %setup -q -n gst-plugins-base-%{version}
 %patch0 -p1
-%patch1 -p1
-
 
 %build
 %configure \
@@ -105,6 +102,47 @@ make %{?_smp_mflags} V=1
 %install
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
+
+# Register as an AppStream component to be visible in the software center
+#
+# NOTE: It would be *awesome* if this file was maintained by the upstream
+# project, translated and installed into the right place during `make install`.
+#
+# See http://www.freedesktop.org/software/appstream/docs/ for more details.
+#
+mkdir -p $RPM_BUILD_ROOT%{_datadir}/appdata
+cat > $RPM_BUILD_ROOT%{_datadir}/appdata/gstreamer-base.appdata.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2013 Richard Hughes <richard@hughsie.com> -->
+<component type="codec">
+  <id>gstreamer-base</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>GStreamer Multimedia Codecs - Base</name>
+  <summary>Multimedia playback for Ogg, Theora and Vorbis</summary>
+  <description>
+    <p>
+      This addon includes system codecs that are essential for the running system.
+    </p>
+    <p>
+      A codec decodes audio and video for for playback or editing and is also
+      used for transmission or storage.
+      Different codecs are used in video-conferencing, streaming media and
+      video editing applications.
+    </p>
+  </description>
+  <keywords>
+    <keyword>Ogg</keyword>
+    <keyword>Theora</keyword>
+    <keyword>Vorbis</keyword>
+  </keywords>
+  <compulsory_for_desktop>GNOME</compulsory_for_desktop>
+  <url type="homepage">http://gstreamer.freedesktop.org/</url>
+  <url type="bugtracker">https://bugzilla.gnome.org/enter_bug.cgi?product=GStreamer</url>
+  <url type="donation">http://www.gnome.org/friends/</url>
+  <url type="help">http://gstreamer.freedesktop.org/documentation/</url>
+  <update_contact><!-- upstream-contact_at_email.com --></update_contact>
+</component>
+EOF
 
 %find_lang gst-plugins-base-%{majorminor}
 
@@ -137,9 +175,12 @@ chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstaudiore
 chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstlibvisual.so
 chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstaudioconvert.so
 chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstvideoconvert.so
+chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstvideorate.so
 chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstaudiotestsrc.so
 chrpath --delete $RPM_BUILD_ROOT%{_libdir}/gstreamer-%{majorminor}/libgstadder.so
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-device-monitor-1.0
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-play-1.0
 
 
 %post -p /sbin/ldconfig
@@ -149,7 +190,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 
 
 %files -f gst-plugins-base-%{majorminor}.lang
-%doc AUTHORS COPYING README REQUIREMENTS
+%license COPYING
+%doc AUTHORS README REQUIREMENTS
+%{_datadir}/appdata/*.appdata.xml
+%{_libdir}/libgstallocators-%{majorminor}.so.*
 %{_libdir}/libgstaudio-%{majorminor}.so.*
 %{_libdir}/libgstfft-%{majorminor}.so.*
 %{_libdir}/libgstriff-%{majorminor}.so.*
@@ -162,11 +206,11 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_libdir}/libgstapp-%{majorminor}.so.*
 
 # gobject-introspection files
+%{_libdir}/girepository-1.0/GstAllocators-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstApp-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstAudio-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstFft-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstPbutils-%{majorminor}.typelib
-%{_libdir}/girepository-1.0/GstRiff-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstRtp-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstRtsp-%{majorminor}.typelib
 %{_libdir}/girepository-1.0/GstSdp-%{majorminor}.typelib
@@ -197,6 +241,7 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_libdir}/gstreamer-%{majorminor}/libgstcdparanoia.so
 %{_libdir}/gstreamer-%{majorminor}/libgstlibvisual.so
 %{_libdir}/gstreamer-%{majorminor}/libgstogg.so
+%{_libdir}/gstreamer-%{majorminor}/libgstopus.so
 %{_libdir}/gstreamer-%{majorminor}/libgstpango.so
 %{_libdir}/gstreamer-%{majorminor}/libgsttheora.so
 %{_libdir}/gstreamer-%{majorminor}/libgstvorbis.so
@@ -206,17 +251,31 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 
 %files tools
 %{_bindir}/gst-discoverer-%{majorminor}
+%{_bindir}/gst-play-%{majorminor}
+%{_bindir}/gst-device-monitor-%{majorminor}
 %{_mandir}/man1/gst-discoverer-*.gz
+%{_mandir}/man1/gst-play-*.gz
+%{_mandir}/man1/gst-device-monitor-*.gz
+
 
 %files devel
+%dir %{_includedir}/gstreamer-%{majorminor}/gst/allocators
+%{_includedir}/gstreamer-%{majorminor}/gst/allocators/allocators.h
+%{_includedir}/gstreamer-%{majorminor}/gst/allocators/gstdmabuf.h
+%{_includedir}/gstreamer-%{majorminor}/gst/allocators/gstfdmemory.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/app
+%{_includedir}/gstreamer-%{majorminor}/gst/app/app.h
 %{_includedir}/gstreamer-%{majorminor}/gst/app/gstappsink.h
 %{_includedir}/gstreamer-%{majorminor}/gst/app/gstappsrc.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/audio
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-channels.h
+%{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-channel-mixer.h
+%{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-converter.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-format.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-info.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-enumtypes.h
+%{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-quantize.h
+%{_includedir}/gstreamer-%{majorminor}/gst/audio/audio-resampler.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiobasesink.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiobasesrc.h
@@ -232,6 +291,7 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiosrc.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/streamvolume.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/fft
+%{_includedir}/gstreamer-%{majorminor}/gst/fft/fft.h
 %{_includedir}/gstreamer-%{majorminor}/gst/fft/gstfft.h
 %{_includedir}/gstreamer-%{majorminor}/gst/fft/gstfftf32.h
 %{_includedir}/gstreamer-%{majorminor}/gst/fft/gstfftf64.h
@@ -242,6 +302,7 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/descriptions.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/encoding-profile.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/encoding-target.h
+%{_includedir}/gstreamer-%{majorminor}/gst/pbutils/gstaudiovisualizer.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/gstdiscoverer.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/gstpluginsbaseversion.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/install-plugins.h
@@ -249,6 +310,7 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/pbutils-enumtypes.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/pbutils.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/riff
+%{_includedir}/gstreamer-%{majorminor}/gst/riff/riff.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-ids.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-media.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-read.h
@@ -258,8 +320,13 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtpbasedepayload.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtpbasepayload.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtpbuffer.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtpdefs.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtp-enumtypes.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtphdrext.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtppayloads.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/rtp.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/rtsp
+%{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtsp.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtsp-enumtypes.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtspconnection.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtspdefs.h
@@ -268,9 +335,12 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtsprange.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtsptransport.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtspurl.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtsp/rtsp.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/sdp
 %{_includedir}/gstreamer-%{majorminor}/gst/sdp/gstsdp.h
 %{_includedir}/gstreamer-%{majorminor}/gst/sdp/gstsdpmessage.h
+%{_includedir}/gstreamer-%{majorminor}/gst/sdp/gstmikey.h
+%{_includedir}/gstreamer-%{majorminor}/gst/sdp/sdp.h
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/tag
 %{_includedir}/gstreamer-%{majorminor}/gst/tag/gsttagdemux.h
 %{_includedir}/gstreamer-%{majorminor}/gst/tag/gsttagmux.h
@@ -279,26 +349,37 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %dir %{_includedir}/gstreamer-%{majorminor}/gst/video
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalance.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalancechannel.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideoaffinetransformationmeta.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideodecoder.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideoencoder.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideofilter.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideometa.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideopool.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideosink.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideotimecode.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideoutils.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/navigation.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-blend.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-overlay-composition.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-chroma.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-color.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-converter.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-dither.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-enumtypes.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-event.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-format.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-frame.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-info.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-multiview.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-resampler.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-scaler.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-tile.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/videodirection.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videoorientation.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videooverlay.h
 
+%{_libdir}/libgstallocators-%{majorminor}.so
 %{_libdir}/libgstaudio-%{majorminor}.so
 %{_libdir}/libgstriff-%{majorminor}.so
 %{_libdir}/libgstrtp-%{majorminor}.so
@@ -313,11 +394,11 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 %dir %{_datadir}/gst-plugins-base/%{majorminor}/
 %{_datadir}/gst-plugins-base/%{majorminor}/license-translations.dict
 
+%{_datadir}/gir-1.0/GstAllocators-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstApp-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstAudio-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstFft-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstPbutils-%{majorminor}.gir
-%{_datadir}/gir-1.0/GstRiff-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstRtp-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstRtsp-%{majorminor}.gir
 %{_datadir}/gir-1.0/GstSdp-%{majorminor}.gir
@@ -334,6 +415,22 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 
 
 %changelog
+* Fri Feb 24 2017 Wim Taymans <wtaymans@redhat.com> - 1.10.4-1
+- Update to 1.10.4
+- Resolves: #1428918 
+
+* Wed Mar 30 2016 Wim Taymans <wtaymans@redhat.com> 1.4.5-3
+- Fix unit test on ppc64
+- Resolves: #1265905
+
+* Mon Sep 7 2015 Wim Taymans <wtaymans@redhat.com> 1.4.5-2
+- fix unit test on s390x
+- Related: rhbz#1249506
+
+* Wed Jan 28 2015 Bastien Nocera <bnocera@redhat.com> 1.4.5-1
+- Update to 1.4.5
+- Resolves: #1174395
+
 * Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 1.0.7-5
 - Mass rebuild 2014-01-24
 

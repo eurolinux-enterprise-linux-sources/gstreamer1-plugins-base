@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -28,11 +28,9 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch -v alsasrc ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
+ * gst-launch-1.0 -v alsasrc ! queue ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
  * ]| Record from a sound card using ALSA and encode to Ogg/Vorbis.
  * </refsect2>
- *
- * Last reviewed on 2006-03-01 (0.10.4)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -50,6 +48,10 @@
 #include "gstalsadeviceprobe.h"
 
 #include <gst/gst-i18n-plugin.h>
+
+#ifndef ESTRPIPE
+#define ESTRPIPE EPIPE
+#endif
 
 #define DEFAULT_PROP_DEVICE		"default"
 #define DEFAULT_PROP_DEVICE_NAME	""
@@ -140,8 +142,8 @@ gst_alsasrc_class_init (GstAlsaSrcClass * klass)
       "Audio source (ALSA)", "Source/Audio",
       "Read from a sound card via ALSA", "Wim Taymans <wim@fluendo.com>");
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&alsasrc_src_factory));
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &alsasrc_src_factory);
 
   gstbasesrc_class->get_caps = GST_DEBUG_FUNCPTR (gst_alsasrc_getcaps);
 
@@ -224,7 +226,6 @@ static GstStateChangeReturn
 gst_alsasrc_change_state (GstElement * element, GstStateChange transition)
 {
   GstStateChangeReturn ret = GST_STATE_CHANGE_SUCCESS;
-  GstAudioBaseSrc *src = GST_AUDIO_BASE_SRC (element);
   GstAlsaSrc *alsa = GST_ALSA_SRC (element);
   GstClock *clk;
 
@@ -238,15 +239,20 @@ gst_alsasrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
-      clk = src->clock;
       alsa->driver_timestamps = FALSE;
-      if (GST_IS_SYSTEM_CLOCK (clk)) {
-        gint clocktype;
-        g_object_get (clk, "clock-type", &clocktype, NULL);
-        if (clocktype == GST_CLOCK_TYPE_MONOTONIC) {
-          GST_INFO ("Using driver timestamps !");
-          alsa->driver_timestamps = TRUE;
+
+      clk = gst_element_get_clock (element);
+      if (clk != NULL) {
+        if (GST_IS_SYSTEM_CLOCK (clk)) {
+          gint clocktype;
+          g_object_get (clk, "clock-type", &clocktype, NULL);
+          if (clocktype == GST_CLOCK_TYPE_MONOTONIC) {
+            GST_INFO ("Using driver timestamps !");
+            alsa->driver_timestamps = TRUE;
+          }
         }
+
+        gst_object_unref (clk);
       }
       break;
   }
@@ -354,15 +360,41 @@ set_hwparams (GstAlsaSrc * alsa)
   if (rrate != alsa->rate)
     goto rate_match;
 
+#ifndef GST_DISABLE_GST_DEBUG
+  /* get and dump some limits */
+  {
+    guint min, max;
+
+    snd_pcm_hw_params_get_buffer_time_min (params, &min, NULL);
+    snd_pcm_hw_params_get_buffer_time_max (params, &max, NULL);
+
+    GST_DEBUG_OBJECT (alsa, "buffer time %u, min %u, max %u",
+        alsa->buffer_time, min, max);
+
+    snd_pcm_hw_params_get_period_time_min (params, &min, NULL);
+    snd_pcm_hw_params_get_period_time_max (params, &max, NULL);
+
+    GST_DEBUG_OBJECT (alsa, "period time %u, min %u, max %u",
+        alsa->period_time, min, max);
+
+    snd_pcm_hw_params_get_periods_min (params, &min, NULL);
+    snd_pcm_hw_params_get_periods_max (params, &max, NULL);
+
+    GST_DEBUG_OBJECT (alsa, "periods min %u, max %u", min, max);
+  }
+#endif
+
   if (alsa->buffer_time != -1) {
     /* set the buffer time */
     CHECK (snd_pcm_hw_params_set_buffer_time_near (alsa->handle, params,
             &alsa->buffer_time, NULL), buffer_time);
+    GST_DEBUG_OBJECT (alsa, "buffer time %u", alsa->buffer_time);
   }
   if (alsa->period_time != -1) {
     /* set the period time */
     CHECK (snd_pcm_hw_params_set_period_time_near (alsa->handle, params,
             &alsa->period_time, NULL), period_time);
+    GST_DEBUG_OBJECT (alsa, "period time %u", alsa->period_time);
   }
 
   /* write the parameters to device */
@@ -693,8 +725,7 @@ gst_alsasrc_open (GstAudioSrc * asrc)
   alsa = GST_ALSA_SRC (asrc);
 
   CHECK (snd_pcm_open (&alsa->handle, alsa->device, SND_PCM_STREAM_CAPTURE,
-          (alsa->driver_timestamps == TRUE) ? 0 : SND_PCM_NONBLOCK),
-      open_error);
+          (alsa->driver_timestamps) ? 0 : SND_PCM_NONBLOCK), open_error);
 
   return TRUE;
 
@@ -736,6 +767,27 @@ gst_alsasrc_prepare (GstAudioSrc * asrc, GstAudioRingBufferSpec * spec)
   alsa->bpf = GST_AUDIO_INFO_BPF (&spec->info);
   spec->segsize = alsa->period_size * alsa->bpf;
   spec->segtotal = alsa->buffer_size / alsa->period_size;
+
+  {
+    snd_output_t *out_buf = NULL;
+    char *msg = NULL;
+
+    snd_output_buffer_open (&out_buf);
+    snd_pcm_dump_hw_setup (alsa->handle, out_buf);
+    snd_output_buffer_string (out_buf, &msg);
+    GST_DEBUG_OBJECT (alsa, "Hardware setup: \n%s", msg);
+    snd_output_close (out_buf);
+    snd_output_buffer_open (&out_buf);
+    snd_pcm_dump_sw_setup (alsa->handle, out_buf);
+    snd_output_buffer_string (out_buf, &msg);
+    GST_DEBUG_OBJECT (alsa, "Software setup: \n%s", msg);
+    snd_output_close (out_buf);
+  }
+
+#ifdef SND_CHMAP_API_VERSION
+  alsa_detect_channels_mapping (GST_OBJECT (alsa), alsa->handle, spec,
+      alsa->channels, GST_AUDIO_BASE_SRC (alsa)->ringbuffer);
+#endif /* SND_CHMAP_API_VERSION */
 
   return TRUE;
 
@@ -805,13 +857,13 @@ gst_alsasrc_close (GstAudioSrc * asrc)
 static gint
 xrun_recovery (GstAlsaSrc * alsa, snd_pcm_t * handle, gint err)
 {
-  GST_DEBUG_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (err));
+  GST_WARNING_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (-err));
 
   if (err == -EPIPE) {          /* under-run */
     err = snd_pcm_prepare (handle);
     if (err < 0)
       GST_WARNING_OBJECT (alsa,
-          "Can't recovery from underrun, prepare failed: %s",
+          "Can't recover from underrun, prepare failed: %s",
           snd_strerror (err));
     return 0;
   } else if (err == -ESTRPIPE) {
@@ -822,7 +874,7 @@ xrun_recovery (GstAlsaSrc * alsa, snd_pcm_t * handle, gint err)
       err = snd_pcm_prepare (handle);
       if (err < 0)
         GST_WARNING_OBJECT (alsa,
-            "Can't recovery from suspend, prepare failed: %s",
+            "Can't recover from suspend, prepare failed: %s",
             snd_strerror (err));
     }
     return 0;
@@ -894,12 +946,11 @@ gst_alsasrc_read (GstAudioSrc * asrc, gpointer data, guint length,
   GstAlsaSrc *alsa;
   gint err;
   gint cptr;
-  gint16 *ptr;
+  guint8 *ptr = data;
 
   alsa = GST_ALSA_SRC (asrc);
 
   cptr = length / alsa->bpf;
-  ptr = data;
 
   GST_ALSA_SRC_LOCK (asrc);
   while (cptr > 0) {
@@ -915,7 +966,7 @@ gst_alsasrc_read (GstAudioSrc * asrc, gpointer data, guint length,
       continue;
     }
 
-    ptr += err * alsa->channels;
+    ptr += snd_pcm_frames_to_bytes (alsa->handle, err);
     cptr -= err;
   }
   GST_ALSA_SRC_UNLOCK (asrc);
@@ -936,7 +987,8 @@ device_disappeared:
     GST_ELEMENT_ERROR (asrc, RESOURCE, READ,
         (_("Error recording from audio device. "
                 "The device has been disconnected.")), (NULL));
-    goto read_error;
+    GST_ALSA_SRC_UNLOCK (asrc);
+    return (guint) - 1;
   }
 }
 

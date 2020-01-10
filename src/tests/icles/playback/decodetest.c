@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 #include <gst/gst.h>
 #include <string.h>
@@ -71,8 +71,7 @@ state_cb (GstBus * bus, GstMessage * msg, GstElement * pipeline)
 }
 
 static void
-new_decoded_pad_cb (GstElement * decodebin, GstPad * pad, gboolean last,
-    GstElement * pipeline)
+pad_added_cb (GstElement * decodebin, GstPad * pad, GstElement * pipeline)
 {
   GstPadLinkReturn ret;
   GstElement *fakesink;
@@ -149,8 +148,7 @@ main (gint argc, gchar * argv[])
 
   gst_element_link_pads (source, "src", decoder, "sink");
 
-  g_signal_connect (decoder, "new-decoded-pad",
-      G_CALLBACK (new_decoded_pad_cb), pipeline);
+  g_signal_connect (decoder, "pad-added", G_CALLBACK (pad_added_cb), pipeline);
 
   res = gst_element_set_state (pipeline, GST_STATE_PLAYING);
   if (res == GST_STATE_CHANGE_FAILURE) {

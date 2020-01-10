@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the Free
- * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -71,5 +71,15 @@ void      gst_alsa_add_channel_reorder_map (GstObject * obj,
                                             GstCaps   * caps);
 
 extern const GstAudioChannelPosition alsa_position[][8];
+#ifdef SND_CHMAP_API_VERSION
+gboolean alsa_chmap_to_channel_positions (const snd_pcm_chmap_t *chmap,
+                                          GstAudioChannelPosition *pos);
+
+void alsa_detect_channels_mapping (GstObject * obj,
+                                   snd_pcm_t * handle,
+                                   GstAudioRingBufferSpec * spec,
+                                   guint channels,
+                                   GstAudioRingBuffer * buf);
+#endif
 
 #endif /* __GST_ALSA_H__ */

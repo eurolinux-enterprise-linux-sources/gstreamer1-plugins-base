@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /*
  * Unless otherwise indicated, Source Code is licensed under MIT license.
@@ -45,8 +45,6 @@
  * @short_description: handling RTSP urls
  *  
  * Provides helper functions to handle RTSP urls.
- *  
- * Last reviewed on 2007-07-25 (0.10.14)
  */
 
 #include <stdlib.h>
@@ -67,7 +65,16 @@ static const struct
         GST_RTSP_LOWER_TRANS_UDP_MCAST}, {
   "rtspu", GST_RTSP_LOWER_TRANS_UDP | GST_RTSP_LOWER_TRANS_UDP_MCAST}, {
   "rtspt", GST_RTSP_LOWER_TRANS_TCP}, {
-  "rtsph", GST_RTSP_LOWER_TRANS_HTTP | GST_RTSP_LOWER_TRANS_TCP}
+  "rtsph", GST_RTSP_LOWER_TRANS_HTTP | GST_RTSP_LOWER_TRANS_TCP}, {
+  "rtsps", GST_RTSP_LOWER_TRANS_TCP | GST_RTSP_LOWER_TRANS_UDP |
+        GST_RTSP_LOWER_TRANS_UDP_MCAST | GST_RTSP_LOWER_TRANS_TLS}, {
+  "rtspsu",
+        GST_RTSP_LOWER_TRANS_UDP | GST_RTSP_LOWER_TRANS_UDP_MCAST |
+        GST_RTSP_LOWER_TRANS_TLS}, {
+  "rtspst", GST_RTSP_LOWER_TRANS_TCP | GST_RTSP_LOWER_TRANS_TLS}, {
+  "rtspsh",
+        GST_RTSP_LOWER_TRANS_HTTP | GST_RTSP_LOWER_TRANS_TCP |
+        GST_RTSP_LOWER_TRANS_TLS}
 };
 
 /* format is rtsp[u]://[user:passwd@]host[:port]/abspath[?query] where host
@@ -129,9 +136,9 @@ gst_rtsp_url_parse (const gchar * urlstr, GstRTSPUrl ** url)
     if (col == NULL || col > at)
       goto invalid;
 
-    res->user = g_strndup (p, col - p);
+    res->user = g_uri_unescape_segment (p, col, NULL);
     col++;
-    res->passwd = g_strndup (col, at - col);
+    res->passwd = g_uri_unescape_segment (col, at, NULL);
 
     /* move to host */
     p = at + 1;
@@ -184,7 +191,10 @@ gst_rtsp_url_parse (const gchar * urlstr, GstRTSPUrl ** url)
       res->abspath = g_strndup (p, delim - p);
     p = delim;
   } else {
-    res->abspath = g_strdup ("/");
+    /* IQinVision IQeye 1080p fails if a path '/' is provided
+     * and RTSP does not mandate that a non-zero-length path
+     * must be used */
+    res->abspath = g_strdup ("");
   }
 
   if (p && *p == '?')
@@ -381,7 +391,8 @@ unescape_path_component (gchar * comp)
  * Also note that since paths usually start with a slash, the first component
  * will usually be the empty string.
  *
- * Returns: a string vector. g_strfreev() after usage.
+ * Returns: (transfer full): %NULL-terminated array of URL components. Free with
+ * g_strfreev() when no longer needed.
  */
 gchar **
 gst_rtsp_url_decode_path_components (const GstRTSPUrl * url)

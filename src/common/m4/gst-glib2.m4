@@ -16,7 +16,7 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
 
   dnl Check for glib with everything
   AG_GST_PKG_CHECK_MODULES(GLIB,
-    glib-2.0 >= $GLIB_REQ gobject-2.0 gthread-2.0 gmodule-no-export-2.0)
+    glib-2.0 >= $GLIB_REQ gobject-2.0 gmodule-no-export-2.0)
 
   if test "x$HAVE_GLIB" = "xno"; then
     AC_MSG_ERROR([This package requires GLib >= $GLIB_REQ to compile.])
@@ -27,19 +27,19 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   dnl when using threading primitives)
   GLIB_EXTRA_CFLAGS="$GLIB_EXTRA_CFLAGS -DG_THREADS_MANDATORY"
 
-  dnl Define G_DISABLE_DEPRECATED for GIT versions
-  if test "x$PACKAGE_VERSION_NANO" = "x1"; then
+  dnl Define G_DISABLE_DEPRECATED for development versions
+  if test "x`expr $PACKAGE_VERSION_MINOR % 2`" = "x1" -a "x`expr $PACKAGE_VERSION_MICRO '<' 90`" = "x1"; then
     GLIB_EXTRA_CFLAGS="$GLIB_EXTRA_CFLAGS -DG_DISABLE_DEPRECATED"
   fi
 
   AC_ARG_ENABLE(gobject-cast-checks,
     AS_HELP_STRING([--enable-gobject-cast-checks[=@<:@no/auto/yes@:>@]],
-      [Enable GObject cast checks]),, 
+      [Enable GObject cast checks]),[enable_gobject_cast_checks=$enableval],
     [enable_gobject_cast_checks=auto])
 
   if test "x$enable_gobject_cast_checks" = "xauto"; then
-    dnl For releases, turn off the cast checks
-    if test "x$PACKAGE_VERSION_NANO" = "x1"; then
+    dnl Turn on cast checks only for development versions
+    if test "x`expr $PACKAGE_VERSION_MINOR % 2`" = "x1" -a "x`expr $PACKAGE_VERSION_MICRO '<' 90`" = "x1"; then
       enable_gobject_cast_checks=yes
     else
       enable_gobject_cast_checks=no
@@ -51,18 +51,9 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   fi
 
   AC_ARG_ENABLE(glib-asserts,
-    AS_HELP_STRING([--enable-glib-asserts[=@<:@no/auto/yes@:>@]],
-      [Enable GLib assertion]),, 
-    [enable_glib_assertions=auto])
-
-  if test "x$enable_glib_assertions" = "xauto"; then
-    dnl For releases, turn off the assertions
-    if test "x$PACKAGE_VERSION_NANO" = "x1"; then
-      enable_glib_assertions=yes
-    else
-      enable_glib_assertions=no
-    fi
-  fi
+    AS_HELP_STRING([--enable-glib-asserts[=@<:@no/yes@:>@]],
+      [Enable GLib assertion]),[enable_glib_assertions=$enableval],
+    [enable_glib_assertions=yes])
 
   if test "x$enable_glib_assertions" = "xno"; then
     GLIB_EXTRA_CFLAGS="$GLIB_EXTRA_CFLAGS -DG_DISABLE_ASSERT"
@@ -106,9 +97,6 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   fi
   AC_SUBST(GLIB_MKENUMS)
 
-  dnl for the poor souls who for example have glib in /usr/local
-  AS_SCRUB_INCLUDE(GLIB_CFLAGS)
-
   AC_SUBST(GLIB_EXTRA_CFLAGS)
 
   dnl Now check for GIO
@@ -123,6 +111,10 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   GIO_LIBDIR="`$PKG_CONFIG --variable=libdir gio-2.0`"
   AC_DEFINE_UNQUOTED(GIO_LIBDIR, "$GIO_LIBDIR",
       [The GIO library directory.])
+  GIO_PREFIX="`$PKG_CONFIG --variable=prefix gio-2.0`"
+  AC_DEFINE_UNQUOTED(GIO_PREFIX, "$GIO_PREFIX",
+      [The GIO install prefix.])
+
   AC_SUBST(GIO_CFLAGS)
   AC_SUBST(GIO_LIBS)
   AC_SUBST(GIO_LDFLAGS)

@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -28,9 +28,9 @@
  * <title>Example launch line</title>
  * |[
  * # server:
- * gst-launch tcpserversrc port=3000 ! fdsink fd=2
+ * gst-launch-1.0 tcpserversrc port=3000 ! fdsink fd=2
  * # client:
- * gst-launch fdsrc fd=1 ! tcpclientsink port=3000
+ * gst-launch-1.0 fdsrc fd=1 ! tcpclientsink port=3000
  * ]| 
  * </refsect2>
  */
@@ -98,6 +98,8 @@ gst_tcp_server_src_class_init (GstTCPServerSrcClass * klass)
   gobject_class->get_property = gst_tcp_server_src_get_property;
   gobject_class->finalize = gst_tcp_server_src_finalize;
 
+  /* FIXME 2.0: Rename this to bind-address, host does not make much
+   * sense here */
   g_object_class_install_property (gobject_class, PROP_HOST,
       g_param_spec_string ("host", "Host", "The hostname to listen as",
           TCP_DEFAULT_LISTEN_HOST, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
@@ -120,8 +122,7 @@ gst_tcp_server_src_class_init (GstTCPServerSrcClass * klass)
           "The port number the socket is currently bound to", 0,
           TCP_HIGHEST_PORT, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&srctemplate));
+  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
 
   gst_element_class_set_static_metadata (gstelement_class,
       "TCP server source", "Source/Network",
@@ -193,6 +194,12 @@ gst_tcp_server_src_create (GstPushSrc * psrc, GstBuffer ** outbuf)
         g_socket_accept (src->server_socket, src->cancellable, &err);
     if (!src->client_socket)
       goto accept_error;
+    GST_DEBUG_OBJECT (src, "closing server socket");
+
+    if (!g_socket_close (src->server_socket, &err)) {
+      GST_ERROR_OBJECT (src, "Failed to close socket: %s", err->message);
+      g_clear_error (&err);
+    }
     /* now read from the socket. */
   }
 
@@ -293,19 +300,27 @@ accept_error:
   {
     if (g_error_matches (err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
       GST_DEBUG_OBJECT (src, "Cancelled accepting of client");
+      ret = GST_FLOW_FLUSHING;
     } else {
       GST_ELEMENT_ERROR (src, RESOURCE, OPEN_READ, (NULL),
           ("Failed to accept client: %s", err->message));
+      ret = GST_FLOW_ERROR;
     }
     g_clear_error (&err);
-    return GST_FLOW_ERROR;
+    return ret;
   }
 select_error:
   {
-    GST_ELEMENT_ERROR (src, RESOURCE, READ, (NULL),
-        ("Select failed: %s", err->message));
+    if (g_error_matches (err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+      GST_DEBUG_OBJECT (src, "Cancelled select");
+      ret = GST_FLOW_FLUSHING;
+    } else {
+      GST_ELEMENT_ERROR (src, RESOURCE, OPEN_READ, (NULL),
+          ("Select failed: %s", err->message));
+      ret = GST_FLOW_ERROR;
+    }
     g_clear_error (&err);
-    return GST_FLOW_ERROR;
+    return ret;
   }
 get_available_error:
   {
@@ -543,7 +558,8 @@ gst_tcp_server_src_unlock_stop (GstBaseSrc * bsrc)
 {
   GstTCPServerSrc *src = GST_TCP_SERVER_SRC (bsrc);
 
-  g_cancellable_reset (src->cancellable);
+  g_object_unref (src->cancellable);
+  src->cancellable = g_cancellable_new ();
 
   return TRUE;
 }

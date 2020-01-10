@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /**
  * SECTION:gstvideooverlay
@@ -99,18 +99,22 @@
  * <title>Two basic usage scenarios</title>
  * <para>
  * There are two basic usage scenarios: in the simplest case, the application
- * knows exactly what particular element is used for video output, which is
- * usually the case when the application creates the videosink to use
- * (e.g. #xvimagesink, #ximagesink, etc.) itself; in this case, the application
- * can just create the videosink element, create and realize the window to
- * render the video on and then call gst_video_overlay_set_window_handle() directly
- * with the XID or native window handle, before starting up the pipeline.
+ * uses #playbin or #plasink or knows exactly what particular element is used
+ * for video output, which is usually the case when the application creates
+ * the videosink to use (e.g. #xvimagesink, #ximagesink, etc.) itself; in this
+ * case, the application can just create the videosink element, create and
+ * realize the window to render the video on and then
+ * call gst_video_overlay_set_window_handle() directly with the XID or native
+ * window handle, before starting up the pipeline.
+ * As #playbin and #playsink implement the video overlay interface and proxy
+ * it transparently to the actual video sink even if it is created later, this
+ * case also applies when using these elements.
  * </para>
  * <para>
  * In the other and more common case, the application does not know in advance
  * what GStreamer video sink element will be used for video output. This is
- * usually the case when an element such as #autovideosink or #gconfvideosink
- * is used. In this case, the video sink element itself is created
+ * usually the case when an element such as #autovideosink is used.
+ * In this case, the video sink element itself is created
  * asynchronously from a GStreamer streaming thread some time after the
  * pipeline has been started up. When that happens, however, the video sink
  * will need to know right then whether to render onto an already existing
@@ -308,6 +312,9 @@
 
 #include "videooverlay.h"
 
+GST_DEBUG_CATEGORY_STATIC (gst_video_overlay_debug);
+#define GST_CAT_DEFAULT gst_video_overlay_debug
+
 GType
 gst_video_overlay_get_type (void)
 {
@@ -328,6 +335,9 @@ gst_video_overlay_get_type (void)
 
     gst_video_overlay_type = g_type_register_static (G_TYPE_INTERFACE,
         "GstVideoOverlay", &gst_video_overlay_info, 0);
+
+    GST_DEBUG_CATEGORY_INIT (gst_video_overlay_debug, "videooverlay", 0,
+        "videooverlay interface");
   }
 
   return gst_video_overlay_type;

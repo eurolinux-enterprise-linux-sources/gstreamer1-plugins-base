@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_OGG_DEMUX_H__
@@ -25,6 +25,7 @@
 #include <ogg/ogg.h>
 
 #include <gst/gst.h>
+#include <gst/base/gstflowcombiner.h>
 
 #include "gstoggstream.h"
 
@@ -88,6 +89,7 @@ struct _GstOggPad
 
   gint64 packetno;
   gint64 current_granule;
+  gint64 prev_granule;
   gint64 keyframe_granule;
 
   GstClockTime start_time;      /* the timestamp of the first sample */
@@ -127,6 +129,8 @@ struct _GstOggDemux
 
   GstPad *sinkpad;
 
+  GstFlowCombiner *flowcombiner;
+
   gint64 length;
   gint64 read_offset;
   gint64 offset;
@@ -134,12 +138,17 @@ struct _GstOggDemux
   gboolean pullmode;
   gboolean running;
 
+  gboolean have_group_id;
+  guint group_id;
+
   gboolean need_chains;
   gboolean resync;
 
   /* keep track of how large pages and packets are,
      useful for skewing when seeking */
   guint64 max_packet_size, max_page_size;
+
+  gboolean check_index_overflow;
 
   /* state */
   GMutex chain_lock;           /* we need the lock to protect the chains */
@@ -154,7 +163,6 @@ struct _GstOggDemux
   GstSegment segment;
   guint32  seqnum;
 
-  GstEvent *event;
   GstEvent *newsegment;         /* pending newsegment to be sent from _loop */
 
   /* annodex stuff */
@@ -171,6 +179,7 @@ struct _GstOggDemux
   enum { PUSH_PLAYING, PUSH_DURATION, PUSH_BISECT1, PUSH_LINEAR1, PUSH_BISECT2, PUSH_LINEAR2 } push_state;
 
   GstClockTime push_seek_time_original_target;
+  GstClockTime push_seek_time_original_stop;
   GstClockTime push_seek_time_target;
   gint64 push_last_seek_offset;
   GstClockTime push_last_seek_time;
@@ -192,6 +201,15 @@ struct _GstOggDemux
 
   /* ogg stuff */
   ogg_sync_state sync;
+  long chunk_size;
+
+  /* Seek events set up by the streaming thread in push mode */
+  GstEvent *seek_event;
+  GThread *seek_event_thread;
+  GMutex seek_event_mutex;
+  GCond seek_event_cond;
+  gboolean seek_event_thread_stop;
+  guint32 seek_event_drop_till;
 };
 
 struct _GstOggDemuxClass

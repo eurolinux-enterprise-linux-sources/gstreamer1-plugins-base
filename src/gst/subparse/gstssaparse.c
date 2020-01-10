@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* Super-primitive SSA parser - we just want the text and ignore
@@ -83,8 +83,6 @@ gst_ssa_parse_init (GstSsaParse * parse)
       GST_DEBUG_FUNCPTR (gst_ssa_parse_src_event));
   gst_element_add_pad (GST_ELEMENT (parse), parse->srcpad);
   gst_pad_use_fixed_caps (parse->srcpad);
-  gst_pad_set_caps (parse->srcpad,
-      gst_static_pad_template_get_caps (&src_templ));
 
   parse->ini = NULL;
   parse->framed = FALSE;
@@ -99,10 +97,8 @@ gst_ssa_parse_class_init (GstSsaParseClass * klass)
 
   object_class->dispose = gst_ssa_parse_dispose;
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&sink_templ));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&src_templ));
+  gst_element_class_add_static_pad_template (element_class, &sink_templ);
+  gst_element_class_add_static_pad_template (element_class, &src_templ);
   gst_element_class_set_static_metadata (element_class,
       "SSA Subtitle Parser", "Codec/Parser/Subtitle",
       "Parses SSA subtitle streams",
@@ -199,6 +195,8 @@ gst_ssa_parse_setcaps (GstPad * sinkpad, GstCaps * caps)
   }
 
   /* FIXME: parse initial section */
+  if (parse->ini)
+    g_free (parse->ini);
   parse->ini = g_strndup (ptr, left);
   GST_LOG_OBJECT (parse, "Init section:\n%s", parse->ini);
 
@@ -236,7 +234,7 @@ gst_ssa_parse_remove_override_codes (GstSsaParse * parse, gchar * txt)
       return removed_any;
     }
     /* move terminating NUL character forward as well */
-    g_memmove (t, end + 1, strlen (end + 1) + 1);
+    memmove (t, end + 1, strlen (end + 1) + 1);
     removed_any = TRUE;
   }
 

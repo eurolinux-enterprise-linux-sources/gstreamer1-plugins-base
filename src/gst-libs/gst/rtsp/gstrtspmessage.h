@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /*
  * Unless otherwise indicated, Source Code is licensed under MIT license.
@@ -43,8 +43,7 @@
 #ifndef __GST_RTSP_MESSAGE_H__
 #define __GST_RTSP_MESSAGE_H__
 
-#include <glib.h>
-
+#include <gst/gst.h>
 #include <gst/rtsp/gstrtspdefs.h>
 
 G_BEGIN_DECLS
@@ -164,6 +163,25 @@ GstRTSPResult      gst_rtsp_message_get_header      (const GstRTSPMessage *msg,
                                                      GstRTSPHeaderField field,
                                                      gchar **value,
                                                      gint indx);
+
+GstRTSPResult      gst_rtsp_message_add_header_by_name    (GstRTSPMessage * msg,
+                                                           const gchar    * header,
+                                                           const gchar    * value);
+
+GstRTSPResult      gst_rtsp_message_take_header_by_name   (GstRTSPMessage * msg,
+                                                           const gchar    * header,
+                                                           gchar          * value);
+
+GstRTSPResult      gst_rtsp_message_remove_header_by_name (GstRTSPMessage * msg,
+                                                           const gchar    * header,
+                                                           gint             index);
+
+GstRTSPResult      gst_rtsp_message_get_header_by_name    (GstRTSPMessage * msg,
+                                                           const gchar    * header,
+                                                           gchar         ** value,
+                                                           gint             index);
+
+/* header serialization */
 GstRTSPResult      gst_rtsp_message_append_headers  (const GstRTSPMessage *msg,
                                                      GString *str);
 

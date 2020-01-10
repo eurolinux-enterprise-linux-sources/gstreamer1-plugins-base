@@ -4,7 +4,7 @@
 %define gst_minver  0.11.0
 
 Name: 		%{gstreamer}-plugins-base
-Version: 	1.0.7
+Version: 	1.10.4
 Release: 	1.gst
 Summary: 	GStreamer streaming media framework plug-ins
 
@@ -80,7 +80,11 @@ rm -rf $RPM_BUILD_ROOT
 
 # helper programs
 %{_bindir}/gst-discoverer-%{majorminor}
+%{_bindir}/gst-play-%{majorminor}
+%{_bindir}/gst-device-monitor-%{majorminor}
 %{_mandir}/man1/gst-discoverer-%{majorminor}*
+%{_mandir}/man1/gst-play-%{majorminor}*
+%{_mandir}/man1/gst-device-monitor-%{majorminor}*
 
 # libraries
 %{_libdir}/libgstaudio-%{majorminor}.so.*
@@ -93,6 +97,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libgstrtsp-%{majorminor}.so.*
 %{_libdir}/libgstsdp-%{majorminor}.so.*
 %{_libdir}/libgstapp-%{majorminor}.so.*
+%{_libdir}/libgstallocators-%{majorminor}.so.*
 
 # base plugins without external dependencies
 %{_libdir}/gstreamer-%{majorminor}/libgstadder.so
@@ -111,8 +116,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/gstreamer-%{majorminor}/libgstapp.so
 %{_libdir}/gstreamer-%{majorminor}/libgstencodebin.so
 %{_libdir}/gstreamer-%{majorminor}/libgstsubparse.so
-%{_libdir}/gstreamer-%{majorminor}/libgstximagesink.so
-
 
 # Here are packages not in the base plugins package but not dependant
 # on an external lib
@@ -148,6 +151,7 @@ GStreamer Plugins Base library development and header files.
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideodecoder.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideoencoder.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideoutils.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-tile.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/navigation.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-blend.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-color.h
@@ -156,13 +160,12 @@ GStreamer Plugins Base library development and header files.
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-frame.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-info.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/video-overlay-composition.h
-
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtphdrext.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/audio.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiofilter.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-ids.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-media.h
 %{_includedir}/gstreamer-%{majorminor}/gst/riff/riff-read.h
-%{_includedir}/gstreamer-%{majorminor}/gst/video/video.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideopool.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideometa.h
 %{_includedir}/gstreamer-%{majorminor}//gst/audio/gstaudiometa.h
@@ -170,14 +173,12 @@ GStreamer Plugins Base library development and header files.
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtpbuffer.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudioclock.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiosink.h
-%{_includedir}/gstreamer-%{majorminor}/gst/tag/tag.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideofilter.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/gstvideosink.h
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/gstaudiocdsrc.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/descriptions.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/install-plugins.h
 %{_includedir}/gstreamer-%{majorminor}/gst/pbutils/missing-plugins.h
-%{_includedir}/gstreamer-%{majorminor}/gst/pbutils/pbutils.h
 %{_includedir}/gstreamer-%{majorminor}/gst/rtp/gstrtcpbuffer.h
 %{_includedir}/gstreamer-%{majorminor}/gst/fft/gstfft.h
 %{_includedir}/gstreamer-%{majorminor}/gst/fft/gstfftf32.h
@@ -220,8 +221,28 @@ GStreamer Plugins Base library development and header files.
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/streamvolume.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalance.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalancechannel.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/videodirection.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videoorientation.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videooverlay.h
+%{_includedir}/gstreamer-%{majorminor}/gst/app/app.h
+%{_includedir}/gstreamer-%{majorminor}/gst/pbutils/pbutils.h
+%{_includedir}/gstreamer-%{majorminor}/gst/riff/riff.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtp/rtp.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtsp/rtsp.h
+%{_includedir}/gstreamer-%{majorminor}/gst/tag/tag.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video.h
+%{_includedir}/gstreamer-%{majorminor}/gst/fft/fft.h
+%{_includedir}/gstreamer-%{majorminor}/gst/rtsp/gstrtsp.h
+%{_includedir}/gstreamer-%{majorminor}/gst/sdp/sdp.h
+%{_includedir}/gstreamer-%{majorminor}/gst/allocators/allocators.h
+%{_includedir}/gstreamer-%{majorminor}/gst/allocators/gstdmabuf.h
+%{_includedir}/gstreamer-%{majorminor}/gst/video/video-chroma.h
+%{_includedir}/gstreamer-%{majorminor}/gst/sdp/gstmikey.h
+%{_libdir}/girepository-1.0/GstAllocators-1.0.typelib
+%{_libdir}/libgstallocators-1.0.so
+%{_libdir}/pkgconfig/gstreamer-allocators-1.0.pc
+%{_datadir}/gir-1.0/GstAllocators-1.0.gir
+
 
 %{_libdir}/libgstfft-%{majorminor}.so
 %{_libdir}/libgstrtsp-%{majorminor}.so

@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  *
  * Based on python script by Thiago Sousa Santos
  */
@@ -128,7 +128,7 @@ bus_cb (GstBus * bus, GstMessage * msg, gpointer user_data)
 
       gst_message_parse_error (msg, &err, &dbg);
       gst_object_default_error (msg->src, err, dbg);
-      g_error_free (err);
+      g_clear_error (&err);
       g_free (dbg);
       g_main_loop_quit (loop);
       break;
@@ -158,6 +158,8 @@ main (int argc, char **argv)
   g_option_context_add_group (ctx, gst_init_get_option_group ());
   if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
     g_print ("Error initializing: %s\n", err->message);
+    g_option_context_free (ctx);
+    g_clear_error (&err);
     return 1;
   }
   g_option_context_free (ctx);
@@ -186,7 +188,7 @@ main (int argc, char **argv)
 
   filter1 = gst_element_factory_make ("capsfilter", NULL);
   gst_util_set_object_arg (G_OBJECT (filter1), "caps",
-      "video/x-raw, format=I420, width=320, height=240, "
+      "video/x-raw, width=320, height=240, "
       "format={ I420, YV12, YUY2, UYVY, AYUV, Y41B, Y42B, "
       "YVYU, Y444, v210, v216, NV12, NV21, UYVP, A420, YUV9, YVU9, IYU1 }");
 

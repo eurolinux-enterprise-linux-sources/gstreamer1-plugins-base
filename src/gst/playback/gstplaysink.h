@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_PLAY_SINK_H__
@@ -71,6 +71,9 @@ GType gst_play_sink_get_type (void);
 GstPad *         gst_play_sink_request_pad    (GstPlaySink *playsink, GstPlaySinkType type);
 void             gst_play_sink_release_pad    (GstPlaySink *playsink, GstPad *pad);
 void             gst_play_sink_refresh_pad    (GstPlaySink *playsink, GstPad *pad, GstPlaySinkType type);
+
+void             gst_play_sink_set_filter     (GstPlaySink * playsink, GstPlaySinkType type, GstElement * filter);
+GstElement *     gst_play_sink_get_filter     (GstPlaySink * playsink, GstPlaySinkType type);
 
 void             gst_play_sink_set_sink       (GstPlaySink * playsink, GstPlaySinkType type, GstElement * sink);
 GstElement *     gst_play_sink_get_sink       (GstPlaySink * playsink, GstPlaySinkType type);

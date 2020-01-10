@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* TODO:
@@ -291,8 +291,8 @@ gst_audio_cd_src_class_init (GstAudioCdSrcClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 #endif
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&gst_audio_cd_src_src_template));
+  gst_element_class_add_static_pad_template (element_class,
+      &gst_audio_cd_src_src_template);
 
 #if 0
   element_class->set_index = GST_DEBUG_FUNCPTR (gst_audio_cd_src_set_index);
@@ -519,7 +519,7 @@ gst_audio_cd_src_convert (GstAudioCdSrc * src, GstFormat src_format,
       goto wrong_value;
     }
     src_format = GST_FORMAT_DEFAULT;
-    src_val = src->priv->tracks[src_val].start * SAMPLES_PER_SECTOR;
+    src_val = src->priv->tracks[src_val].start * (gint64) SAMPLES_PER_SECTOR;
   } else if (src_format == sector_format) {
     src_format = GST_FORMAT_DEFAULT;
     src_val = src_val * SAMPLES_PER_SECTOR;
@@ -965,6 +965,7 @@ gst_audio_cd_src_handle_event (GstBaseSrc * basesrc, GstEvent * event)
         ret = gst_audio_cd_src_handle_track_seek (src, 1.0, GST_SEEK_FLAG_FLUSH,
             GST_SEEK_TYPE_SET, track_num, GST_SEEK_TYPE_NONE, -1);
       }
+      g_free (uid);
       break;
     }
     default:{
@@ -1102,7 +1103,7 @@ gst_audio_cd_src_uri_handler_init (gpointer g_iface, gpointer iface_data)
  * gst_audio_cd_src_add_track:
  * @src: a #GstAudioCdSrc
  * @track: address of #GstAudioCdSrcTrack to add
- * 
+ *
  * CDDA sources use this function from their start vfunc to announce the
  * available data and audio tracks to the base source class. The caller
  * should allocate @track on the stack, the base source will do a shallow
@@ -1189,13 +1190,23 @@ gst_audio_cd_src_calculate_musicbrainz_discid (GstAudioCdSrc * src)
   gchar *ptr;
   gchar tmp[9];
   gulong i;
+  unsigned int last_audio_track;
   guint leadout_sector;
   gsize digest_len;
 
   s = g_string_new (NULL);
 
+  /* MusicBrainz doesn't consider trailing data tracks
+   * data tracks up front stay, since the disc has to start with 1 */
+  last_audio_track = 0;
+  for (i = 0; i < src->priv->num_tracks; i++) {
+    if (src->priv->tracks[i].is_audio) {
+      last_audio_track = src->priv->tracks[i].num;
+    }
+  }
+
   leadout_sector =
-      src->priv->tracks[src->priv->num_tracks - 1].end + 1 + CD_MSF_OFFSET;
+      src->priv->tracks[last_audio_track - 1].end + 1 + CD_MSF_OFFSET;
 
   /* generate SHA digest */
   sha = g_checksum_new (G_CHECKSUM_SHA1);
@@ -1203,10 +1214,8 @@ gst_audio_cd_src_calculate_musicbrainz_discid (GstAudioCdSrc * src)
   g_string_append_printf (s, "%02X", src->priv->tracks[0].num);
   g_checksum_update (sha, (guchar *) tmp, 2);
 
-  g_snprintf (tmp, sizeof (tmp), "%02X",
-      src->priv->tracks[src->priv->num_tracks - 1].num);
-  g_string_append_printf (s, " %02X",
-      src->priv->tracks[src->priv->num_tracks - 1].num);
+  g_snprintf (tmp, sizeof (tmp), "%02X", last_audio_track);
+  g_string_append_printf (s, " %02X", last_audio_track);
   g_checksum_update (sha, (guchar *) tmp, 2);
 
   g_snprintf (tmp, sizeof (tmp), "%08X", leadout_sector);
@@ -1214,7 +1223,7 @@ gst_audio_cd_src_calculate_musicbrainz_discid (GstAudioCdSrc * src)
   g_checksum_update (sha, (guchar *) tmp, 8);
 
   for (i = 0; i < 99; i++) {
-    if (i < src->priv->num_tracks) {
+    if (i < last_audio_track) {
       guint frame_offset = src->priv->tracks[i].start + CD_MSF_OFFSET;
 
       g_snprintf (tmp, sizeof (tmp), "%08X", frame_offset);

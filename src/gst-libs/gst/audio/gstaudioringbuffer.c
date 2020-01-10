@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -35,12 +35,11 @@
  * implementations.
  * </para>
  * </refsect2>
- *
- * Last reviewed on 2006-02-02 (0.10.4)
  */
 
 #include <string.h>
 
+#include <gst/audio/audio.h>
 #include "gstaudioringbuffer.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_audio_ring_buffer_debug);
@@ -87,6 +86,8 @@ gst_audio_ring_buffer_init (GstAudioRingBuffer * ringbuffer)
   ringbuffer->waiting = 0;
   ringbuffer->empty_seg = NULL;
   ringbuffer->flushing = TRUE;
+  ringbuffer->segbase = 0;
+  ringbuffer->segdone = 0;
 }
 
 static void
@@ -123,7 +124,9 @@ static const gchar *format_type_names[] = {
   "iec958",
   "ac3",
   "eac3",
-  "dts"
+  "dts",
+  "aac mpeg2",
+  "aac mpeg4"
 };
 #endif
 
@@ -175,9 +178,10 @@ gst_audio_ring_buffer_debug_spec_buff (GstAudioRingBufferSpec * spec)
   GST_DEBUG ("acquire ringbuffer: total segments: %d", spec->segtotal);
   GST_DEBUG ("acquire ringbuffer: latency segments: %d", spec->seglatency);
   GST_DEBUG ("acquire ringbuffer: segment size: %d bytes = %d samples",
-      spec->segsize, spec->segsize / bpf);
+      spec->segsize, (bpf != 0) ? (spec->segsize / bpf) : -1);
   GST_DEBUG ("acquire ringbuffer: buffer size: %d bytes = %d samples",
-      spec->segsize * spec->segtotal, spec->segsize * spec->segtotal / bpf);
+      spec->segsize * spec->segtotal,
+      (bpf != 0) ? (spec->segsize * spec->segtotal / bpf) : -1);
 }
 
 /**
@@ -214,12 +218,20 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
             gst_structure_get_int (structure, "channels", &info.channels)))
       goto parse_error;
 
+    if (!(gst_audio_channel_positions_from_mask (info.channels, 0,
+                info.position)))
+      goto parse_error;
+
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_A_LAW;
     info.bpf = info.channels;
   } else if (g_str_equal (mimetype, "audio/x-mulaw")) {
     /* extract the needed information from the cap */
     if (!(gst_structure_get_int (structure, "rate", &info.rate) &&
             gst_structure_get_int (structure, "channels", &info.channels)))
+      goto parse_error;
+
+    if (!(gst_audio_channel_positions_from_mask (info.channels, 0,
+                info.position)))
       goto parse_error;
 
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_MU_LAW;
@@ -236,6 +248,7 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
     if (!(gst_structure_get_int (structure, "rate", &info.rate)))
       goto parse_error;
 
+    gst_structure_get_int (structure, "channels", &info.channels);
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_AC3;
     info.bpf = 4;
   } else if (g_str_equal (mimetype, "audio/x-eac3")) {
@@ -243,6 +256,7 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
     if (!(gst_structure_get_int (structure, "rate", &info.rate)))
       goto parse_error;
 
+    gst_structure_get_int (structure, "channels", &info.channels);
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_EAC3;
     info.bpf = 16;
   } else if (g_str_equal (mimetype, "audio/x-dts")) {
@@ -250,6 +264,7 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
     if (!(gst_structure_get_int (structure, "rate", &info.rate)))
       goto parse_error;
 
+    gst_structure_get_int (structure, "channels", &info.channels);
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_DTS;
     info.bpf = 4;
   } else if (g_str_equal (mimetype, "audio/mpeg") &&
@@ -260,7 +275,21 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
     if (!(gst_structure_get_int (structure, "rate", &info.rate)))
       goto parse_error;
 
+    gst_structure_get_int (structure, "channels", &info.channels);
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_MPEG;
+    info.bpf = 4;
+  } else if (g_str_equal (mimetype, "audio/mpeg") &&
+      gst_structure_get_int (structure, "mpegversion", &i) &&
+      (i == 2 || i == 4) &&
+      !g_strcmp0 (gst_structure_get_string (structure, "stream-format"),
+          "adts")) {
+    /* MPEG-2 AAC or MPEG-4 AAC */
+    if (!(gst_structure_get_int (structure, "rate", &info.rate)))
+      goto parse_error;
+
+    gst_structure_get_int (structure, "channels", &info.channels);
+    spec->type = (i == 2) ? GST_AUDIO_RING_BUFFER_FORMAT_TYPE_MPEG2_AAC :
+        GST_AUDIO_RING_BUFFER_FORMAT_TYPE_MPEG4_AAC;
     info.bpf = 4;
   } else {
     goto parse_error;
@@ -654,7 +683,7 @@ gst_audio_ring_buffer_release (GstAudioRingBuffer * buf)
   buf->acquired = FALSE;
 
   /* if this fails, something is wrong in this file */
-  g_assert (buf->open == TRUE);
+  g_assert (buf->open);
 
   rclass = GST_AUDIO_RING_BUFFER_GET_CLASS (buf);
   if (G_LIKELY (rclass->release))
@@ -667,6 +696,8 @@ gst_audio_ring_buffer_release (GstAudioRingBuffer * buf)
   if (G_UNLIKELY (!res))
     goto release_failed;
 
+  g_atomic_int_set (&buf->segdone, 0);
+  buf->segbase = 0;
   g_free (buf->empty_seg);
   buf->empty_seg = NULL;
   gst_caps_replace (&buf->spec.caps, NULL);
@@ -887,7 +918,7 @@ gst_audio_ring_buffer_start (GstAudioRingBuffer * buf)
   if (G_UNLIKELY (!buf->acquired))
     goto not_acquired;
 
-  if (G_UNLIKELY (g_atomic_int_get (&buf->may_start) == FALSE))
+  if (G_UNLIKELY (!g_atomic_int_get (&buf->may_start)))
     goto may_not_start;
 
   /* if stopped, set to started */
@@ -1195,7 +1226,7 @@ gst_audio_ring_buffer_set_sample (GstAudioRingBuffer * buf, guint64 sample)
   if (G_UNLIKELY (buf->samples_per_seg == 0))
     return;
 
-  /* FIXME, we assume the ringbuffer can restart at a random 
+  /* FIXME, we assume the ringbuffer can restart at a random
    * position, round down to the beginning and keep track of
    * offset when calculating the processed samples. */
   buf->segbase = buf->segdone - sample / buf->samples_per_seg;
@@ -1254,7 +1285,7 @@ wait_segment (GstAudioRingBuffer * buf)
   if (G_UNLIKELY (g_atomic_int_get (&buf->state) !=
           GST_AUDIO_RING_BUFFER_STATE_STARTED)) {
     /* see if we are allowed to start it */
-    if (G_UNLIKELY (g_atomic_int_get (&buf->may_start) == FALSE))
+    if (G_UNLIKELY (!g_atomic_int_get (&buf->may_start)))
       goto no_start;
 
     GST_DEBUG_OBJECT (buf, "start!");
@@ -1469,6 +1500,8 @@ default_commit (GstAudioRingBuffer * buf, guint64 * sample,
   writeseg = *sample / sps;
   sampleoff = (*sample % sps) * bpf;
 
+  GST_DEBUG_OBJECT (buf, "write %d : %d", in_samples, out_samples);
+
   /* write out all samples */
   while (*toprocess > 0) {
     gint avail;
@@ -1485,14 +1518,13 @@ default_commit (GstAudioRingBuffer * buf, guint64 * sample,
       /* see how far away it is from the write segment */
       diff = writeseg - segdone;
 
-      GST_DEBUG
-          ("pointer at %d, write to %d-%d, diff %d, segtotal %d, segsize %d, base %d",
+      GST_DEBUG_OBJECT (buf,
+          "pointer at %d, write to %d-%d, diff %d, segtotal %d, segsize %d, base %d",
           segdone, writeseg, sampleoff, diff, segtotal, segsize, buf->segbase);
 
       /* segment too far ahead, writer too slow, we need to drop, hopefully UNLIKELY */
       if (G_UNLIKELY (diff < 0)) {
-        /* we need to drop one segment at a time, pretend we wrote a
-         * segment. */
+        /* we need to drop one segment at a time, pretend we wrote a segment. */
         skip = TRUE;
         break;
       }
@@ -1641,7 +1673,7 @@ gst_audio_ring_buffer_commit (GstAudioRingBuffer * buf, guint64 * sample,
  * @len: the number of samples in data to read
  * @timestamp: where the timestamp is returned
  *
- * Read @len samples from the ringbuffer into the memory pointed 
+ * Read @len samples from the ringbuffer into the memory pointed
  * to by @data.
  * The first sample should be read from position @sample in
  * the ringbuffer.
@@ -1701,8 +1733,8 @@ gst_audio_ring_buffer_read (GstAudioRingBuffer * buf, guint64 sample,
        * reading) */
       diff = segdone - readseg;
 
-      GST_DEBUG
-          ("pointer at %d, sample %" G_GUINT64_FORMAT
+      GST_DEBUG_OBJECT
+          (buf, "pointer at %d, sample %" G_GUINT64_FORMAT
           ", read from %d-%d, to_read %d, diff %d, segtotal %d, segsize %d",
           segdone, sample, readseg, sampleoff, to_read, diff, segtotal,
           segsize);
@@ -1814,7 +1846,7 @@ gst_audio_ring_buffer_prepare_read (GstAudioRingBuffer * buf, gint * segment,
   *len = buf->spec.segsize;
   *readptr = data + *segment * *len;
 
-  GST_LOG ("prepare read from segment %d (real %d) @%p",
+  GST_LOG_OBJECT (buf, "prepare read from segment %d (real %d) @%p",
       *segment, segdone, *readptr);
 
   /* callback to fill the memory with data, for pull based
@@ -1830,7 +1862,7 @@ gst_audio_ring_buffer_prepare_read (GstAudioRingBuffer * buf, gint * segment,
  * @buf: the #GstAudioRingBuffer to advance
  * @advance: the number of segments written
  *
- * Subclasses should call this function to notify the fact that 
+ * Subclasses should call this function to notify the fact that
  * @advance segments are now processed by the device.
  *
  * MT safe.
@@ -1884,7 +1916,7 @@ gst_audio_ring_buffer_clear (GstAudioRingBuffer * buf, gint segment)
   data = buf->memory;
   data += segment * buf->spec.segsize;
 
-  GST_LOG ("clear segment %d @%p", segment, data);
+  GST_LOG_OBJECT (buf, "clear segment %d @%p", segment, data);
 
   memcpy (data, buf->empty_seg, buf->spec.segsize);
 }
@@ -1895,7 +1927,7 @@ gst_audio_ring_buffer_clear (GstAudioRingBuffer * buf, gint segment)
  * @allowed: the new value
  *
  * Tell the ringbuffer that it is allowed to start playback when
- * the ringbuffer is filled with samples. 
+ * the ringbuffer is filled with samples.
  *
  * MT safe.
  */
@@ -1906,6 +1938,23 @@ gst_audio_ring_buffer_may_start (GstAudioRingBuffer * buf, gboolean allowed)
 
   GST_LOG_OBJECT (buf, "may start: %d", allowed);
   g_atomic_int_set (&buf->may_start, allowed);
+}
+
+/* GST_AUDIO_CHANNEL_POSITION_NONE is used for position-less
+ * mutually exclusive channels. In this case we should not attempt
+ * to do any reordering.
+ */
+static gboolean
+position_less_channels (const GstAudioChannelPosition * pos, guint channels)
+{
+  guint i;
+
+  for (i = 0; i < channels; i++) {
+    if (pos[i] != GST_AUDIO_CHANNEL_POSITION_NONE)
+      return FALSE;
+  }
+
+  return TRUE;
 }
 
 /**
@@ -1930,16 +1979,34 @@ gst_audio_ring_buffer_set_channel_positions (GstAudioRingBuffer * buf,
   channels = buf->spec.info.channels;
   to = buf->spec.info.position;
 
-  buf->need_reorder = FALSE;
   if (memcmp (position, to, channels * sizeof (to[0])) == 0)
     return;
 
+  if (position_less_channels (position, channels)) {
+    GST_LOG_OBJECT (buf, "position-less channels, no need to reorder");
+    return;
+  }
+
+  buf->need_reorder = FALSE;
   if (!gst_audio_get_channel_reorder_map (channels, position, to,
           buf->channel_reorder_map))
     g_return_if_reached ();
 
   for (i = 0; i < channels; i++) {
     if (buf->channel_reorder_map[i] != i) {
+#ifndef GST_DISABLE_GST_DEBUG
+      {
+        gchar *tmp1, *tmp2;
+
+        tmp1 = gst_audio_channel_positions_to_string (position, channels);
+        tmp2 = gst_audio_channel_positions_to_string (to, channels);
+        GST_LOG_OBJECT (buf, "may have to reorder channels: %s -> %s", tmp1,
+            tmp2);
+        g_free (tmp1);
+        g_free (tmp2);
+      }
+#endif /* GST_DISABLE_GST_DEBUG */
+
       buf->need_reorder = TRUE;
       break;
     }
@@ -1964,9 +2031,20 @@ gst_audio_ring_buffer_set_timestamp (GstAudioRingBuffer * buf, gint readseg,
 
   GST_INFO_OBJECT (buf, "Storing timestamp %" GST_TIME_FORMAT
       " @ %d", GST_TIME_ARGS (timestamp), readseg);
-  if (buf->timestamps) {
-    buf->timestamps[readseg] = timestamp;
-  } else {
-    GST_ERROR_OBJECT (buf, "Could not store timestamp, no timestamps buffer");
+
+  GST_OBJECT_LOCK (buf);
+  if (G_UNLIKELY (!buf->acquired))
+    goto not_acquired;
+
+  buf->timestamps[readseg] = timestamp;
+
+done:
+  GST_OBJECT_UNLOCK (buf);
+  return;
+
+not_acquired:
+  {
+    GST_DEBUG_OBJECT (buf, "we are not acquired");
+    goto done;
   }
 }

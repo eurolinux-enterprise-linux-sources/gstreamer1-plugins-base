@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -66,10 +66,8 @@ gst_stream_splitter_class_init (GstStreamSplitterClass * klass)
   GST_DEBUG_CATEGORY_INIT (gst_stream_splitter_debug, "streamsplitter", 0,
       "Stream Splitter");
 
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&src_template));
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&sink_template));
+  gst_element_class_add_static_pad_template (gstelement_klass, &src_template);
+  gst_element_class_add_static_pad_template (gstelement_klass, &sink_template);
 
   gstelement_klass->request_new_pad =
       GST_DEBUG_FUNCPTR (gst_stream_splitter_request_new_pad);
@@ -105,6 +103,21 @@ gst_stream_splitter_finalize (GObject * object)
   G_OBJECT_CLASS (gst_stream_splitter_parent_class)->finalize (object);
 }
 
+static void
+gst_stream_splitter_push_pending_events (GstStreamSplitter * splitter,
+    GstPad * srcpad)
+{
+  GList *tmp;
+  GST_DEBUG_OBJECT (srcpad, "Pushing out pending events");
+
+  for (tmp = splitter->pending_events; tmp; tmp = tmp->next) {
+    GstEvent *event = (GstEvent *) tmp->data;
+    gst_pad_push_event (srcpad, event);
+  }
+  g_list_free (splitter->pending_events);
+  splitter->pending_events = NULL;
+}
+
 static GstFlowReturn
 gst_stream_splitter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 {
@@ -120,17 +133,8 @@ gst_stream_splitter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   if (G_UNLIKELY (srcpad == NULL))
     goto nopad;
 
-  if (G_UNLIKELY (stream_splitter->pending_events)) {
-    GList *tmp;
-    GST_DEBUG_OBJECT (srcpad, "Pushing out pending events");
-
-    for (tmp = stream_splitter->pending_events; tmp; tmp = tmp->next) {
-      GstEvent *event = (GstEvent *) tmp->data;
-      gst_pad_push_event (srcpad, event);
-    }
-    g_list_free (stream_splitter->pending_events);
-    stream_splitter->pending_events = NULL;
-  }
+  if (G_UNLIKELY (stream_splitter->pending_events))
+    gst_stream_splitter_push_pending_events (stream_splitter, srcpad);
 
   /* Forward to currently activated stream */
   res = gst_pad_push (srcpad, buf);
@@ -143,6 +147,24 @@ nopad:
   return GST_FLOW_ERROR;
 }
 
+static GList *
+_flush_events (GstPad * pad, GList * events)
+{
+  GList *tmp;
+
+  for (tmp = events; tmp; tmp = tmp->next) {
+    if (GST_EVENT_TYPE (tmp->data) != GST_EVENT_EOS &&
+        GST_EVENT_TYPE (tmp->data) != GST_EVENT_SEGMENT &&
+        GST_EVENT_IS_STICKY (tmp->data) && pad != NULL) {
+      gst_pad_store_sticky_event (pad, GST_EVENT_CAST (tmp->data));
+    }
+    gst_event_unref (tmp->data);
+  }
+  g_list_free (events);
+
+  return NULL;
+}
+
 static gboolean
 gst_stream_splitter_sink_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
@@ -151,11 +173,7 @@ gst_stream_splitter_sink_event (GstPad * pad, GstObject * parent,
   gboolean res = TRUE;
   gboolean toall = FALSE;
   gboolean store = FALSE;
-  gboolean eos = FALSE;
-  gboolean flushpending = FALSE;
-
   /* FLUSH_START/STOP : forward to all
-   * EOS : transform to CUSTOM_REAL_EOS and forward to all
    * INBAND events : store to send in chain function to selected chain
    * OUT_OF_BAND events : send to all
    */
@@ -175,37 +193,42 @@ gst_stream_splitter_sink_event (GstPad * pad, GstObject * parent,
       break;
     }
     case GST_EVENT_FLUSH_STOP:
-      flushpending = TRUE;
       toall = TRUE;
+      STREAMS_LOCK (stream_splitter);
+      stream_splitter->pending_events = _flush_events (stream_splitter->current,
+          stream_splitter->pending_events);
+      STREAMS_UNLOCK (stream_splitter);
       break;
     case GST_EVENT_FLUSH_START:
       toall = TRUE;
       break;
     case GST_EVENT_EOS:
-      /* Replace with our custom eos event */
-      gst_event_unref (event);
-      event =
-          gst_event_new_custom (GST_EVENT_CUSTOM_DOWNSTREAM,
-          gst_structure_new_empty ("stream-switching-eos"));
+
+      if (G_UNLIKELY (stream_splitter->pending_events)) {
+        GstPad *srcpad = NULL;
+
+        STREAMS_LOCK (stream_splitter);
+        if (stream_splitter->current)
+          srcpad = gst_object_ref (stream_splitter->current);
+        STREAMS_UNLOCK (stream_splitter);
+
+        if (srcpad) {
+          gst_stream_splitter_push_pending_events (stream_splitter, srcpad);
+          gst_object_unref (srcpad);
+        }
+      }
+
       toall = TRUE;
-      eos = TRUE;
       break;
     default:
       if (GST_EVENT_TYPE (event) & GST_EVENT_TYPE_SERIALIZED)
         store = TRUE;
   }
 
-  if (flushpending) {
-    g_list_foreach (stream_splitter->pending_events, (GFunc) gst_event_unref,
-        NULL);
-    g_list_free (stream_splitter->pending_events);
-    stream_splitter->pending_events = NULL;
-  }
-
   if (store) {
     stream_splitter->pending_events =
         g_list_append (stream_splitter->pending_events, event);
-  } else if (toall || eos) {
+  } else if (toall) {
     GList *tmp;
     guint32 cookie;
 
@@ -224,12 +247,6 @@ gst_stream_splitter_sink_event (GstPad * pad, GstObject * parent,
     while (tmp) {
       GstPad *srcpad = (GstPad *) tmp->data;
       STREAMS_UNLOCK (stream_splitter);
-      /* In case of EOS, we first push out the real one to flush out
-       * each streams (but which will be discarded in the streamcombiner)
-       * before our custom one (which will be converted back to and EOS
-       * in the streamcombiner) */
-      if (eos)
-        gst_pad_push_event (srcpad, gst_event_new_eos ());
       gst_event_ref (event);
       res = gst_pad_push_event (srcpad, event);
       STREAMS_LOCK (stream_splitter);
@@ -285,6 +302,8 @@ resync:
   while (tmp) {
     GstPad *srcpad = (GstPad *) tmp->data;
 
+    /* Ensure srcpad doesn't get destroyed while we query peer */
+    gst_object_ref (srcpad);
     STREAMS_UNLOCK (stream_splitter);
     if (res) {
       GstCaps *peercaps = gst_pad_peer_query_caps (srcpad, filter);
@@ -294,12 +313,60 @@ resync:
       res = gst_pad_peer_query_caps (srcpad, filter);
     }
     STREAMS_LOCK (stream_splitter);
+    gst_object_unref (srcpad);
 
     if (G_UNLIKELY (cookie != stream_splitter->cookie)) {
       if (res)
         gst_caps_unref (res);
       goto resync;
     }
+    tmp = tmp->next;
+  }
+
+beach:
+  STREAMS_UNLOCK (stream_splitter);
+  return res;
+}
+
+static gboolean
+gst_stream_splitter_sink_acceptcaps (GstPad * pad, GstCaps * caps)
+{
+  GstStreamSplitter *stream_splitter =
+      (GstStreamSplitter *) GST_PAD_PARENT (pad);
+  guint32 cookie;
+  GList *tmp;
+  gboolean res = FALSE;
+
+  /* check if one of the downstream elements accepts the caps */
+  STREAMS_LOCK (stream_splitter);
+
+resync:
+  res = FALSE;
+
+  if (G_UNLIKELY (stream_splitter->srcpads == NULL))
+    goto beach;
+
+  cookie = stream_splitter->cookie;
+  tmp = stream_splitter->srcpads;
+
+  while (tmp) {
+    GstPad *srcpad = (GstPad *) tmp->data;
+
+    /* Ensure srcpad doesn't get destroyed while we query peer */
+    gst_object_ref (srcpad);
+    STREAMS_UNLOCK (stream_splitter);
+
+    res = gst_pad_peer_query_accept_caps (srcpad, caps);
+
+    STREAMS_LOCK (stream_splitter);
+    gst_object_unref (srcpad);
+
+    if (G_UNLIKELY (cookie != stream_splitter->cookie))
+      goto resync;
+
+    if (res)
+      break;
+
     tmp = tmp->next;
   }
 
@@ -323,6 +390,17 @@ gst_stream_splitter_sink_query (GstPad * pad, GstObject * parent,
       caps = gst_stream_splitter_sink_getcaps (pad, filter);
       gst_query_set_caps_result (query, caps);
       gst_caps_unref (caps);
+      res = TRUE;
+      break;
+    }
+    case GST_QUERY_ACCEPT_CAPS:
+    {
+      GstCaps *caps;
+      gboolean result;
+
+      gst_query_parse_accept_caps (query, &caps);
+      result = gst_stream_splitter_sink_acceptcaps (pad, caps);
+      gst_query_set_accept_caps_result (query, result);
       res = TRUE;
       break;
     }
@@ -386,30 +464,6 @@ beach:
   return res;
 }
 
-static gboolean
-gst_stream_splitter_src_event (GstPad * pad, GstObject * parent,
-    GstEvent * event)
-{
-  GstStreamSplitter *stream_splitter = (GstStreamSplitter *) parent;
-
-  GST_DEBUG_OBJECT (pad, "%s", GST_EVENT_TYPE_NAME (event));
-
-  /* Forward upstream as is */
-  return gst_pad_push_event (stream_splitter->sinkpad, event);
-}
-
-static gboolean
-gst_stream_splitter_src_query (GstPad * pad, GstObject * parent,
-    GstQuery * query)
-{
-  GstStreamSplitter *stream_splitter = (GstStreamSplitter *) parent;
-
-  GST_DEBUG_OBJECT (pad, "%s", GST_QUERY_TYPE_NAME (query));
-
-  /* Forward upstream as is */
-  return gst_pad_peer_query (stream_splitter->sinkpad, query);
-}
-
 static void
 gst_stream_splitter_init (GstStreamSplitter * stream_splitter)
 {
@@ -434,8 +488,6 @@ gst_stream_splitter_request_new_pad (GstElement * element,
   GstPad *srcpad;
 
   srcpad = gst_pad_new_from_static_template (&src_template, name);
-  gst_pad_set_event_function (srcpad, gst_stream_splitter_src_event);
-  gst_pad_set_query_function (srcpad, gst_stream_splitter_src_query);
 
   STREAMS_LOCK (stream_splitter);
   stream_splitter->srcpads = g_list_append (stream_splitter->srcpads, srcpad);

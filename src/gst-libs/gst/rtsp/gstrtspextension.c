@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -29,15 +29,12 @@
  *  exentension (rtspwms) and the RealMedia RTSP extension (rtspreal).
  * </para>
  * </refsect2>
- *
- * Last reviewed on 2007-07-25 (0.10.14)
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-#include "gstrtsp-marshal.h"
 #include "gstrtsp-enumtypes.h"
 #include "gstrtspextension.h"
 
@@ -84,7 +81,7 @@ gst_rtsp_extension_iface_init (GstRTSPExtension * iface)
     gst_rtsp_extension_signals[SIGNAL_SEND] =
         g_signal_new ("send", G_TYPE_FROM_CLASS (iface),
         G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstRTSPExtensionInterface,
-            send), NULL, NULL, __gst_rtsp_marshal_ENUM__POINTER_POINTER,
+            send), NULL, NULL, g_cclosure_marshal_generic,
         GST_TYPE_RTSP_RESULT, 2, G_TYPE_POINTER, G_TYPE_POINTER);
     initialized = TRUE;
   }

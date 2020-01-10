@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -32,7 +32,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_play_sink_convert_bin_debug);
 
 #define parent_class gst_play_sink_convert_bin_parent_class
 
-static gboolean gst_play_sink_convert_bin_sink_setcaps (GstPlaySinkConvertBin *
+static void gst_play_sink_convert_bin_sink_setcaps (GstPlaySinkConvertBin *
     self, GstCaps * caps);
 
 G_DEFINE_TYPE (GstPlaySinkConvertBin, gst_play_sink_convert_bin, GST_TYPE_BIN);
@@ -74,25 +74,6 @@ gst_play_sink_convert_bin_post_missing_element_message (GstPlaySinkConvertBin *
 
   msg = gst_missing_element_message_new (GST_ELEMENT_CAST (self), name);
   gst_element_post_message (GST_ELEMENT_CAST (self), msg);
-}
-
-static void
-distribute_running_time (GstElement * element, const GstSegment * segment)
-{
-  GstEvent *event;
-  GstPad *pad;
-
-  pad = gst_element_get_static_pad (element, "sink");
-
-  gst_pad_send_event (pad, gst_event_new_flush_start ());
-  gst_pad_send_event (pad, gst_event_new_flush_stop (FALSE));
-
-  if (segment->format != GST_FORMAT_UNDEFINED) {
-    event = gst_event_new_segment (segment);
-    gst_pad_send_event (pad, event);
-  }
-
-  gst_object_unref (pad);
 }
 
 void
@@ -197,7 +178,6 @@ gst_play_sink_convert_bin_on_element_added (GstElement * element,
     GstPlaySinkConvertBin * self)
 {
   gst_element_sync_state_with_parent (element);
-  distribute_running_time (element, &self->segment);
 }
 
 static GstPadProbeReturn
@@ -207,6 +187,12 @@ pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   GstPad *peer;
   GstCaps *caps;
   gboolean raw;
+
+  if (GST_IS_EVENT (info->data) && !GST_EVENT_IS_SERIALIZED (info->data)) {
+    GST_DEBUG_OBJECT (self, "Letting non-serialized event %s pass",
+        GST_EVENT_TYPE_NAME (info->data));
+    return GST_PAD_PROBE_PASS;
+  }
 
   GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
   GST_DEBUG_OBJECT (self, "Pad blocked");
@@ -264,7 +250,7 @@ gst_play_sink_convert_bin_sink_event (GstPad * pad, GstObject * parent,
       GstCaps *caps;
 
       gst_event_parse_caps (event, &caps);
-      ret = gst_play_sink_convert_bin_sink_setcaps (self, caps);
+      gst_play_sink_convert_bin_sink_setcaps (self, caps);
       break;
     }
     default:
@@ -272,25 +258,6 @@ gst_play_sink_convert_bin_sink_event (GstPad * pad, GstObject * parent,
   }
 
   ret = gst_pad_event_default (pad, parent, gst_event_ref (event));
-
-  if (GST_EVENT_TYPE (event) == GST_EVENT_SEGMENT) {
-    GstSegment seg;
-
-    GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
-    gst_event_copy_segment (event, &seg);
-
-    GST_DEBUG_OBJECT (self, "Segment before %" GST_SEGMENT_FORMAT,
-        &self->segment);
-    self->segment = seg;
-    GST_DEBUG_OBJECT (self, "Segment after %" GST_SEGMENT_FORMAT,
-        &self->segment);
-    GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
-  } else if (GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_STOP) {
-    GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
-    GST_DEBUG_OBJECT (self, "Resetting segment");
-    gst_segment_init (&self->segment, GST_FORMAT_UNDEFINED);
-    GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
-  }
 
   gst_event_unref (event);
 
@@ -316,7 +283,7 @@ unblock_proxypad (GstPlaySinkConvertBin * self)
   }
 }
 
-static gboolean
+static void
 gst_play_sink_convert_bin_sink_setcaps (GstPlaySinkConvertBin * self,
     GstCaps * caps)
 {
@@ -325,7 +292,8 @@ gst_play_sink_convert_bin_sink_setcaps (GstPlaySinkConvertBin * self,
   gboolean reconfigure = FALSE;
   gboolean raw;
 
-  GST_DEBUG_OBJECT (self, "setcaps");
+  GST_DEBUG_OBJECT (self, "Setting sink caps %" GST_PTR_FORMAT, caps);
+
   GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
   s = gst_caps_get_structure (caps, 0);
   name = gst_structure_get_name (s);
@@ -371,10 +339,51 @@ gst_play_sink_convert_bin_sink_setcaps (GstPlaySinkConvertBin * self,
   }
 
   GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
+}
 
-  GST_DEBUG_OBJECT (self, "Setting sink caps %" GST_PTR_FORMAT, caps);
+#define GST_PLAY_SINK_CONVERT_BIN_FILTER_CAPS(filter,caps) G_STMT_START {     \
+  if ((filter)) {                                                             \
+    GstCaps *intersection =                                                   \
+        gst_caps_intersect_full ((filter), (caps), GST_CAPS_INTERSECT_FIRST); \
+    gst_caps_unref ((caps));                                                  \
+    (caps) = intersection;                                                    \
+  }                                                                           \
+} G_STMT_END
 
-  return TRUE;
+static gboolean
+gst_play_sink_convert_bin_acceptcaps (GstPad * pad, GstCaps * caps)
+{
+  GstPlaySinkConvertBin *self =
+      GST_PLAY_SINK_CONVERT_BIN (gst_pad_get_parent (pad));
+  gboolean ret;
+  GstPad *otherpad;
+
+  GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
+  if (pad == self->srcpad) {
+    otherpad = self->sinkpad;
+  } else if (pad == self->sinkpad) {
+    otherpad = self->srcpad;
+  } else {
+    GST_ERROR_OBJECT (pad, "Not one of our pads");
+    otherpad = NULL;
+  }
+
+  if (otherpad) {
+    ret = gst_pad_peer_query_accept_caps (otherpad, caps);
+    if (!ret && self->converter_caps) {
+      /* maybe we can convert */
+      ret = gst_caps_can_intersect (caps, self->converter_caps);
+    }
+  } else {
+    ret = TRUE;
+  }
+  GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
+
+  gst_object_unref (self);
+
+  GST_DEBUG_OBJECT (pad, "Accept caps: '%" GST_PTR_FORMAT "' %d", caps, ret);
+
+  return ret;
 }
 
 static GstCaps *
@@ -406,50 +415,79 @@ gst_play_sink_convert_bin_getcaps (GstPad * pad, GstCaps * filter)
        * it doesn't handle the filter caps but we could still convert
        * to these caps */
       if (filter) {
-        downstream_filter = gst_caps_copy (filter);
+        guint i, n;
+
+        downstream_filter = gst_caps_new_empty ();
+
+        /* Intersect raw video caps in the filter caps with the converter
+         * caps. This makes sure that we don't accept raw video that we
+         * can't handle, e.g. because of caps features */
+        n = gst_caps_get_size (filter);
+        for (i = 0; i < n; i++) {
+          GstStructure *s;
+          GstCaps *tmp, *tmp2;
+
+          s = gst_structure_copy (gst_caps_get_structure (filter, i));
+          if (gst_structure_has_name (s,
+                  self->audio ? "audio/x-raw" : "video/x-raw")) {
+            tmp = gst_caps_new_full (s, NULL);
+            tmp2 = gst_caps_intersect (tmp, self->converter_caps);
+            gst_caps_append (downstream_filter, tmp2);
+            gst_caps_unref (tmp);
+          } else {
+            gst_caps_append_structure (downstream_filter, s);
+          }
+        }
         downstream_filter =
             gst_caps_merge (downstream_filter,
             gst_caps_ref (self->converter_caps));
       }
 
       peer_caps = gst_pad_query_caps (peer, downstream_filter);
+      if (downstream_filter)
+        gst_caps_unref (downstream_filter);
       gst_object_unref (peer);
       if (self->converter_caps && is_raw_caps (peer_caps, self->audio)) {
-        ret = gst_caps_merge (peer_caps, gst_caps_ref (self->converter_caps));
+        GstCaps *converter_caps = gst_caps_ref (self->converter_caps);
+        GstCapsFeatures *cf;
+        GstStructure *s;
+        guint i, n;
+
+        ret = gst_caps_make_writable (peer_caps);
+
+        /* Filter out ANY capsfeatures from the converter caps. We can't
+         * convert to ANY capsfeatures, they are only there so that we
+         * can passthrough whatever downstream can support... but we
+         * definitely don't want to return them here
+         */
+        n = gst_caps_get_size (converter_caps);
+        for (i = 0; i < n; i++) {
+          s = gst_caps_get_structure (converter_caps, i);
+          cf = gst_caps_get_features (converter_caps, i);
+
+          if (cf && gst_caps_features_is_any (cf))
+            continue;
+          ret =
+              gst_caps_merge_structure_full (ret, gst_structure_copy (s),
+              (cf ? gst_caps_features_copy (cf) : NULL));
+        }
+        gst_caps_unref (converter_caps);
       } else {
         ret = peer_caps;
       }
     } else {
       ret = gst_caps_ref (self->converter_caps);
     }
+    GST_PLAY_SINK_CONVERT_BIN_FILTER_CAPS (filter, ret);
+
   } else {
-    ret = gst_caps_new_any ();
+    ret = filter ? gst_caps_ref (filter) : gst_caps_new_any ();
   }
   GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
 
   gst_object_unref (self);
 
-  if (filter) {
-    GstCaps *intersection =
-        gst_caps_intersect_full (filter, ret, GST_CAPS_INTERSECT_FIRST);
-    gst_caps_unref (ret);
-    ret = intersection;
-  }
-
   GST_DEBUG_OBJECT (pad, "Returning caps %" GST_PTR_FORMAT, ret);
-
-  return ret;
-}
-
-static gboolean
-gst_play_sink_convert_bin_acceptcaps (GstPad * pad, GstCaps * caps)
-{
-  GstCaps *allowed_caps;
-  gboolean ret;
-
-  allowed_caps = gst_pad_query_caps (pad, NULL);
-  ret = gst_caps_is_subset (caps, allowed_caps);
-  gst_caps_unref (allowed_caps);
 
   return ret;
 }
@@ -461,16 +499,6 @@ gst_play_sink_convert_bin_query (GstPad * pad, GstObject * parent,
   gboolean res = FALSE;
 
   switch (GST_QUERY_TYPE (query)) {
-    case GST_QUERY_ACCEPT_CAPS:
-    {
-      GstCaps *caps;
-
-      gst_query_parse_accept_caps (query, &caps);
-      gst_query_set_accept_caps_result (query,
-          gst_play_sink_convert_bin_acceptcaps (pad, caps));
-      res = TRUE;
-      break;
-    }
     case GST_QUERY_CAPS:
     {
       GstCaps *filter, *caps;
@@ -479,6 +507,17 @@ gst_play_sink_convert_bin_query (GstPad * pad, GstObject * parent,
       caps = gst_play_sink_convert_bin_getcaps (pad, filter);
       gst_query_set_caps_result (query, caps);
       gst_caps_unref (caps);
+      res = TRUE;
+      break;
+    }
+    case GST_QUERY_ACCEPT_CAPS:
+    {
+      gboolean ret;
+      GstCaps *caps;
+
+      gst_query_parse_accept_caps (query, &caps);
+      ret = gst_play_sink_convert_bin_acceptcaps (pad, caps);
+      gst_query_set_accept_caps_result (query, ret);
       res = TRUE;
       break;
     }
@@ -570,7 +609,6 @@ gst_play_sink_convert_bin_change_state (GstElement * element,
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
-      gst_segment_init (&self->segment, GST_FORMAT_UNDEFINED);
       gst_play_sink_convert_bin_set_targets (self, TRUE);
       self->raw = FALSE;
       GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
@@ -586,7 +624,6 @@ gst_play_sink_convert_bin_change_state (GstElement * element,
   switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       GST_PLAY_SINK_CONVERT_BIN_LOCK (self);
-      gst_segment_init (&self->segment, GST_FORMAT_UNDEFINED);
       gst_play_sink_convert_bin_set_targets (self, TRUE);
       self->raw = FALSE;
       GST_PLAY_SINK_CONVERT_BIN_UNLOCK (self);
@@ -618,10 +655,8 @@ gst_play_sink_convert_bin_class_init (GstPlaySinkConvertBinClass * klass)
   gobject_class->dispose = gst_play_sink_convert_bin_dispose;
   gobject_class->finalize = gst_play_sink_convert_bin_finalize;
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&srctemplate));
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&sinktemplate));
+  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
+  gst_element_class_add_static_pad_template (gstelement_class, &sinktemplate);
   gst_element_class_set_static_metadata (gstelement_class,
       "Player Sink Converter Bin", "Bin/Converter",
       "Convenience bin for audio/video conversion",
@@ -637,7 +672,6 @@ gst_play_sink_convert_bin_init (GstPlaySinkConvertBin * self)
   GstPadTemplate *templ;
 
   g_mutex_init (&self->lock);
-  gst_segment_init (&self->segment, GST_FORMAT_UNDEFINED);
 
   templ = gst_static_pad_template_get (&sinktemplate);
   self->sinkpad = gst_ghost_pad_new_no_target_from_template ("sink", templ);

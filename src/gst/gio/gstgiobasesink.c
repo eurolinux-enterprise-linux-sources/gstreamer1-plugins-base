@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -59,8 +59,7 @@ gst_gio_base_sink_class_init (GstGioBaseSinkClass * klass)
 
   gobject_class->finalize = gst_gio_base_sink_finalize;
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&sink_factory));
+  gst_element_class_add_static_pad_template (gstelement_class, &sink_factory);
 
   gstbasesink_class->start = GST_DEBUG_FUNCPTR (gst_gio_base_sink_start);
   gstbasesink_class->stop = GST_DEBUG_FUNCPTR (gst_gio_base_sink_stop);
@@ -191,7 +190,8 @@ gst_gio_base_sink_unlock_stop (GstBaseSink * base_sink)
 
   GST_LOG_OBJECT (sink, "resetting cancellable");
 
-  g_cancellable_reset (sink->cancel);
+  g_object_unref (sink->cancel);
+  sink->cancel = g_cancellable_new ();
 
   return TRUE;
 }
@@ -325,7 +325,7 @@ gst_gio_base_sink_query (GstBaseSink * bsink, GstQuery * query)
       switch (format) {
         case GST_FORMAT_BYTES:
         case GST_FORMAT_DEFAULT:
-          gst_query_set_position (query, GST_FORMAT_BYTES, sink->position);
+          gst_query_set_position (query, format, sink->position);
           return TRUE;
         default:
           return FALSE;
@@ -343,6 +343,15 @@ gst_gio_base_sink_query (GstBaseSink * bsink, GstQuery * query)
         return TRUE;
       }
       return FALSE;
+    case GST_QUERY_SEEKING:
+      gst_query_parse_seeking (query, &format, NULL, NULL, NULL);
+      if (format == GST_FORMAT_BYTES || format == GST_FORMAT_DEFAULT) {
+        gst_query_set_seeking (query, format,
+            GST_GIO_STREAM_IS_SEEKABLE (sink->stream), 0, -1);
+      } else {
+        gst_query_set_seeking (query, format, FALSE, 0, -1);
+      }
+      return TRUE;
     default:
       return GST_BASE_SINK_CLASS (parent_class)->query (bsink, query);
   }

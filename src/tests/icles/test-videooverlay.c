@@ -15,15 +15,15 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-/* FIXME 0.11: suppress warnings for deprecated API such as GStaticRecMutex
- * with newer GTK versions (>= 3.3.0) */
+/* Disable deprecation warnings because we need to use
+ * gtk_widget_set_double_buffered () or display will flicker */
 #define GDK_DISABLE_DEPRECATION_WARNINGS
 
 #include <stdlib.h>
@@ -97,15 +97,17 @@ static gboolean
 handle_draw_cb (GtkWidget * widget, cairo_t * cr, gpointer user_data)
 {
   GstVideoRectangle *r = &anim_state.rect;
-  GtkStyle *style;
+  GtkStyleContext *style;
+  GdkRGBA color;
   int width, height;
 
   width = gtk_widget_get_allocated_width (widget);
   height = gtk_widget_get_allocated_height (widget);
 
-  style = gtk_widget_get_style (widget);
+  style = gtk_widget_get_style_context (widget);
 
-  gdk_cairo_set_source_color (cr, &style->bg[GTK_STATE_NORMAL]);
+  gtk_style_context_get_color (style, 0, &color);
+  gdk_cairo_set_source_rgba (cr, &color);
 
   /* we should only redraw outside of the video rect! */
   cairo_rectangle (cr, 0, 0, r->x, height);

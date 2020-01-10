@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -31,10 +31,10 @@
  * <refsect2>
  * <title>Example launch lines</title>
  * |[
- * gst-launch -v videotestsrc ! clockoverlay ! xvimagesink
- * ]| Display the current time in the top left corner of the video picture
+ * gst-launch-1.0 -v videotestsrc ! clockoverlay ! autovideosink
+ * ]| Display the current wall clock time in the top left corner of the video picture
  * |[
- * gst-launch -v videotestsrc ! clockoverlay halign=right valign=bottom text="Edge City" shaded-background=true ! videoconvert ! ximagesink
+ * gst-launch-1.0 -v videotestsrc ! clockoverlay halignment=right valignment=bottom text="Edge City" shaded-background=true font-desc="Sans, 36" ! videoconvert ! autovideosink
  * ]| Another pipeline that displays the current time with some leading
  * text in the bottom right corner of the video picture, with the background
  * of the text being shaded in order to make it more legible on top of a

@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -58,10 +58,8 @@ test_injector_class_init (TestInjectorClass * klass)
 {
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&src_template));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&sink_template));
+  gst_element_class_add_static_pad_template (element_class, &src_template);
+  gst_element_class_add_static_pad_template (element_class, &sink_template);
 }
 
 static GstFlowReturn
@@ -419,6 +417,9 @@ GST_START_TEST (test_large_discont)
   sinkpad = gst_check_setup_sink_pad (audiorate, &sinktemplate);
 
   gst_pad_set_active (srcpad, TRUE);
+
+  gst_check_setup_events (srcpad, audiorate, caps, GST_FORMAT_TIME);
+
   gst_pad_set_active (sinkpad, TRUE);
 
   fail_unless (gst_element_set_state (audiorate,
@@ -426,7 +427,6 @@ GST_START_TEST (test_large_discont)
       "failed to set audiorate playing");
 
   buf = gst_buffer_new_and_alloc (4);
-  gst_pad_set_caps (srcpad, caps);
   GST_BUFFER_TIMESTAMP (buf) = 0;
   gst_pad_push (srcpad, buf);
 
@@ -442,6 +442,7 @@ GST_START_TEST (test_large_discont)
   gst_element_set_state (audiorate, GST_STATE_NULL);
   gst_caps_unref (caps);
 
+  gst_check_drop_buffers ();
   gst_check_teardown_sink_pad (audiorate);
   gst_check_teardown_src_pad (audiorate);
 

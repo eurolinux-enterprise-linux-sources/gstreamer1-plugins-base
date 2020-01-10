@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -89,6 +89,7 @@
 #include <gst/video/video.h>
 #include <gst/video/colorbalancechannel.h>
 #include <gst/video/colorbalance.h>
+#include <gst/video/videodirection.h>
 #include <gst/video/videoorientation.h>
 #include <gst/video/videooverlay.h>
 #include <gst/video/navigation.h>
@@ -102,6 +103,17 @@ GST_START_TEST (test_nothing)
 
 GST_END_TEST;
 
+GST_START_TEST (test_init_macros)
+{
+  GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
+  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+
+  fail_unless_equals_int (rtp.size[0], 0)
+  fail_unless_equals_int (rtcp.map.size, 0);
+}
+
+GST_END_TEST;
+
 static Suite *
 libscpp_suite (void)
 {
@@ -110,6 +122,7 @@ libscpp_suite (void)
 
   suite_add_tcase (s, tc_chain);
   tcase_add_test (tc_chain, test_nothing);
+  tcase_add_test (tc_chain, test_init_macros);
 
   return s;
 }

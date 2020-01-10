@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -36,9 +36,17 @@ G_BEGIN_DECLS
   (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_TIME_OVERLAY))
 #define GST_IS_TIME_OVERLAY_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_TIME_OVERLAY))
+#define GST_TIME_OVERLAY_CAST(obj) ((GstTimeOverlay*)(obj))
 
 typedef struct _GstTimeOverlay GstTimeOverlay;
 typedef struct _GstTimeOverlayClass GstTimeOverlayClass;
+
+typedef enum {
+  GST_TIME_OVERLAY_TIME_LINE_BUFFER_TIME,
+  GST_TIME_OVERLAY_TIME_LINE_STREAM_TIME,
+  GST_TIME_OVERLAY_TIME_LINE_RUNNING_TIME,
+  GST_TIME_OVERLAY_TIME_LINE_TIME_CODE
+} GstTimeOverlayTimeLine;
 
 /**
  * GstTimeOverlay:
@@ -47,6 +55,9 @@ typedef struct _GstTimeOverlayClass GstTimeOverlayClass;
  */
 struct _GstTimeOverlay {
   GstBaseTextOverlay textoverlay;
+
+  /*< private >*/
+  GstTimeOverlayTimeLine time_line;
 };
 
 struct _GstTimeOverlayClass {

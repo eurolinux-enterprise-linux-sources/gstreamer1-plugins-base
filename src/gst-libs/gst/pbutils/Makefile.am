@@ -8,7 +8,8 @@ headers_pbutils = \
 	encoding-target.h	\
 	install-plugins.h \
 	missing-plugins.h \
-	gstdiscoverer.h
+	gstdiscoverer.h \
+	gstaudiovisualizer.h
 
 # variables used for enum/marshal generation
 glib_enum_headers = $(headers_pbutils)
@@ -29,7 +30,8 @@ libgstpbutils_@GST_API_VERSION@_la_SOURCES = \
 	install-plugins.c \
 	missing-plugins.c \
 	gstdiscoverer.c   \
-	gstdiscoverer-types.c
+	gstdiscoverer-types.c \
+	gstaudiovisualizer.c
 
 nodist_libgstpbutils_@GST_API_VERSION@_la_SOURCES = \
 	pbutils-enumtypes.c
@@ -46,8 +48,10 @@ noinst_HEADERS = \
 libgstpbutils_@GST_API_VERSION@_la_LIBADD = \
   $(top_builddir)/gst-libs/gst/video/libgstvideo-@GST_API_VERSION@.la \
   $(top_builddir)/gst-libs/gst/audio/libgstaudio-@GST_API_VERSION@.la \
+  $(top_builddir)/gst-libs/gst/tag/libgsttag-@GST_API_VERSION@.la \
+  $(GST_BASE_LIBS) \
   $(GST_LIBS)
-libgstpbutils_@GST_API_VERSION@_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_CFLAGS)
+libgstpbutils_@GST_API_VERSION@_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS)
 libgstpbutils_@GST_API_VERSION@_la_LDFLAGS = $(GST_LIB_LDFLAGS) $(GST_ALL_LDFLAGS) $(GST_LT_LDFLAGS)
 
 BUILT_SOURCES = \
@@ -68,31 +72,41 @@ gir_headers=$(patsubst %,$(srcdir)/%, $(libgstpbutils_@GST_API_VERSION@include_H
 gir_headers+=$(patsubst %,$(builddir)/%, $(nodist_libgstpbutils_@GST_API_VERSION@include_HEADERS))
 gir_sources=$(patsubst %,$(srcdir)/%, $(libgstpbutils_@GST_API_VERSION@_la_SOURCES))
 gir_sources+=$(patsubst %,$(builddir)/%, $(nodist_libgstpbutils_@GST_API_VERSION@_la_SOURCES))
-gir_cincludes=$(patsubst %,--c-include='gst/pbutils/%',$(libgstpbutils_@GST_API_VERSION@include_HEADERS))
-gir_cincludes+=$(patsubst %,--c-include='gst/pbutils/%',$(nodist_libgstpbutils_@GST_API_VERSION@include_HEADERS))
 
 GstPbutils-@GST_API_VERSION@.gir: $(INTROSPECTION_SCANNER) libgstpbutils-@GST_API_VERSION@.la
-	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" \
-		GST_PLUGIN_SYSTEM_PATH="" GST_PLUGIN_PATH="" GST_REGISTRY_UPDATE=no \
+	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" GI_SCANNER_DISABLE_CACHE=yes\
+		GST_PLUGIN_SYSTEM_PATH_1_0="" GST_PLUGIN_PATH_1_0="" GST_REGISTRY_UPDATE=no \
+		CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CC="$(CC)" PKG_CONFIG="$(PKG_CONFIG)" DLLTOOL="$(DLLTOOL)" \
 		$(INTROSPECTION_SCANNER) -v --namespace GstPbutils \
 		--nsversion=@GST_API_VERSION@ \
-		--strip-prefix=Gst \
+		--identifier-prefix=Gst \
+		--symbol-prefix=gst \
 		--warn-all \
-		$(gir_cincludes) \
+		--c-include "gst/pbutils/pbutils.h" \
 		-I$(top_srcdir)/gst-libs \
 		-I$(top_builddir)/gst-libs \
 		--add-include-path=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=girdir gstreamer-@GST_API_VERSION@` \
-		--library=$(top_builddir)/gst-libs/gst/tag/libgsttag-@GST_API_VERSION@.la \
-		--library=$(top_builddir)/gst-libs/gst/video/libgstvideo-@GST_API_VERSION@.la \
-		--library=$(top_builddir)/gst-libs/gst/audio/libgstaudio-@GST_API_VERSION@.la \
+		--add-include-path=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=girdir gstreamer-base-@GST_API_VERSION@` \
+		--add-include-path="$(top_builddir)/gst-libs/gst/tag/" \
+		--add-include-path="$(top_builddir)/gst-libs/gst/video/" \
+		--add-include-path="$(top_builddir)/gst-libs/gst/audio/" \
 		--library=libgstpbutils-@GST_API_VERSION@.la \
 		--library-path=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=libdir gstreamer-@GST_API_VERSION@` \
-		--library=gstreamer-@GST_API_VERSION@ \
+		--library-path=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=libdir gstreamer-base-@GST_API_VERSION@` \
+		--library-path="$(top_builddir)/gst-libs/gst/tag/" \
+		--library-path="$(top_builddir)/gst-libs/gst/video/" \
+		--library-path="$(top_builddir)/gst-libs/gst/audio/" \
 		--include=Gst-@GST_API_VERSION@ \
+		--include=GstTag-@GST_API_VERSION@ \
+		--include=GstVideo-@GST_API_VERSION@ \
+		--include=GstAudio-@GST_API_VERSION@ \
 		--libtool="$(top_builddir)/libtool" \
 		--pkg gstreamer-@GST_API_VERSION@ \
+		--pkg gstreamer-tag-@GST_API_VERSION@ \
+		--pkg gstreamer-video-@GST_API_VERSION@ \
+		--pkg gstreamer-audio-@GST_API_VERSION@ \
 		--pkg-export gstreamer-pbutils-@GST_API_VERSION@ \
-		--add-init-section="gst_init(NULL,NULL);" \
+		--add-init-section="$(INTROSPECTION_INIT)" \
 		--output $@ \
 		$(gir_headers) \
 		$(gir_sources)
@@ -112,23 +126,11 @@ typelibs_DATA = $(BUILT_GIRSOURCES:.gir=.typelib)
 		--includedir=$(srcdir) \
 		--includedir=$(builddir) \
 		--includedir=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=girdir gstreamer-@GST_API_VERSION@` \
+		--includedir=`PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" $(PKG_CONFIG) --variable=girdir gstreamer-base-@GST_API_VERSION@` \
+		--includedir="$(top_builddir)/gst-libs/gst/tag/" \
+		--includedir="$(top_builddir)/gst-libs/gst/video/" \
+		--includedir="$(top_builddir)/gst-libs/gst/audio/" \
 		$(INTROSPECTION_COMPILER_OPTS) $< -o $(@F)
 
 CLEANFILES += $(BUILT_GIRSOURCES) $(typelibs_DATA)
 endif
-
-Android.mk: Makefile.am $(BUILT_SOURCES)
-	androgenizer -:PROJECT libgstpbutils -:SHARED libgstpbutils-@GST_API_VERSION@ \
-	 -:TAGS eng debug \
-         -:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
-	 -:SOURCES $(libgstpbutils_@GST_API_VERSION@_la_SOURCES) \
-	           $(nodist_libgstpbutils_@GST_API_VERSION@_la_SOURCES) \
-	 -:CFLAGS $(DEFS) $(DEFAULT_INCLUDES) $(libgstpbutils_@GST_API_VERSION@_la_CFLAGS) \
-	 -:LDFLAGS $(libgstpbutils_@GST_API_VERSION@_la_LDFLAGS) \
-	           $(libgstpbutils_@GST_API_VERSION@_la_LIBADD) \
-	           -ldl \
-	 -:HEADER_TARGET gstreamer-@GST_API_VERSION@/gst/pbutils \
-	 -:HEADERS $(libgstpbutils_@GST_API_VERSION@include_HEADERS) \
-	           $(nodist_libgstpbutils_@GST_API_VERSION@include_HEADERS) \
-	 -:PASSTHROUGH LOCAL_ARM_MODE:=arm \
-	> $@

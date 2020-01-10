@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -24,7 +24,7 @@
 #define __GST_ALSASINK_H__
 
 #include <gst/gst.h>
-#include <gst/audio/gstaudiosink.h>
+#include <gst/audio/audio.h>
 #include <alsa/asoundlib.h>
 
 G_BEGIN_DECLS
@@ -58,8 +58,6 @@ struct _GstAlsaSink {
   gchar                 *device;
 
   snd_pcm_t             *handle;
-  snd_pcm_hw_params_t   *hwparams;
-  snd_pcm_sw_params_t   *swparams;
 
   snd_pcm_access_t access;
   snd_pcm_format_t format;

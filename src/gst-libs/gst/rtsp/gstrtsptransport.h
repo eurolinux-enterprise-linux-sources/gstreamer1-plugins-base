@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /*
  * Unless otherwise indicated, Source Code is licensed under MIT license.
@@ -45,6 +45,7 @@
 
 #include <gst/gstconfig.h>
 #include <gst/rtsp/gstrtspdefs.h>
+#include <gst/rtsp/gstrtsp-enumtypes.h>
 
 G_BEGIN_DECLS
 
@@ -65,15 +66,21 @@ typedef enum {
 /**
  * GstRTSPProfile:
  * @GST_RTSP_PROFILE_UNKNOWN: invalid profile
- * @GST_RTSP_PROFILE_AVP: the Audio/Visual profile
- * @GST_RTSP_PROFILE_SAVP: the secure Audio/Visual profile
+ * @GST_RTSP_PROFILE_AVP: the Audio/Visual profile (RFC 3551)
+ * @GST_RTSP_PROFILE_SAVP: the secure Audio/Visual profile (RFC 3711)
+ * @GST_RTSP_PROFILE_AVPF: the Audio/Visual profile with feedback (RFC 4585)
+ * @GST_RTSP_PROFILE_SAVPF: the secure Audio/Visual profile with feedback (RFC 5124)
  *
  * The transfer profile to use.
  */
+/* FIXME 2.0: This should probably be an enum, not flags and maybe be replaced
+ * by GstRTPTransport */
 typedef enum {
   GST_RTSP_PROFILE_UNKNOWN =  0,
   GST_RTSP_PROFILE_AVP     = (1 << 0),
-  GST_RTSP_PROFILE_SAVP    = (1 << 1)
+  GST_RTSP_PROFILE_SAVP    = (1 << 1),
+  GST_RTSP_PROFILE_AVPF    = (1 << 2),
+  GST_RTSP_PROFILE_SAVPF   = (1 << 3),
 } GstRTSPProfile;
 
 /**
@@ -83,6 +90,7 @@ typedef enum {
  * @GST_RTSP_LOWER_TRANS_UDP_MCAST: stream data over UDP multicast
  * @GST_RTSP_LOWER_TRANS_TCP: stream data over TCP
  * @GST_RTSP_LOWER_TRANS_HTTP: stream data tunneled over HTTP.
+ * @GST_RTSP_LOWER_TRANS_TLS: encrypt TCP and HTTP with TLS
  *
  * The different transport methods.
  */
@@ -91,11 +99,9 @@ typedef enum {
   GST_RTSP_LOWER_TRANS_UDP       = (1 << 0),
   GST_RTSP_LOWER_TRANS_UDP_MCAST = (1 << 1),
   GST_RTSP_LOWER_TRANS_TCP       = (1 << 2),
-  GST_RTSP_LOWER_TRANS_HTTP      = (1 << 4)
+  GST_RTSP_LOWER_TRANS_HTTP      = (1 << 4),
+  GST_RTSP_LOWER_TRANS_TLS       = (1 << 5)
 } GstRTSPLowerTrans;
-
-#define GST_TYPE_RTSP_LOWER_TRANS (gst_rtsp_lower_trans_get_type())
-GType gst_rtsp_lower_trans_get_type (void);
 
 typedef struct _GstRTSPRange GstRTSPRange;
 typedef struct _GstRTSPTransport GstRTSPTransport;
@@ -127,8 +133,12 @@ struct _GstRTSPRange {
  * @interleaved: the interleave range
  * @ttl: the time to live for multicast UDP
  * @port: the port pair for multicast sessions
- * @client_port: the client port pair for receiving data
- * @server_port: the server port pair for receiving data
+ * @client_port: the client port pair for receiving data. For TCP
+ *   based transports, applications can use this field to store the
+ *   sender and receiver ports of the client.
+ * @server_port: the server port pair for receiving data. For TCP
+ *   based transports, applications can use this field to store the
+ *   sender and receiver ports of the server.
  * @ssrc: the ssrc that the sender/receiver will use
  *
  * A structure holding the RTSP transport values.
@@ -149,9 +159,9 @@ struct _GstRTSPTransport {
 
   /* multicast specific */
   guint  ttl;
-
-  /* UDP specific */
   GstRTSPRange   port;
+
+  /* UDP/TCP specific */
   GstRTSPRange   client_port;
   GstRTSPRange   server_port;
   /* RTP specific */
@@ -169,6 +179,9 @@ gchar*             gst_rtsp_transport_as_text      (GstRTSPTransport *transport)
 
 GstRTSPResult      gst_rtsp_transport_get_mime     (GstRTSPTransMode trans, const gchar **mime);
 GstRTSPResult      gst_rtsp_transport_get_manager  (GstRTSPTransMode trans, const gchar **manager, guint option);
+
+GstRTSPResult      gst_rtsp_transport_get_media_type (GstRTSPTransport *transport,
+                                                      const gchar **media_type);
 
 GstRTSPResult      gst_rtsp_transport_free         (GstRTSPTransport *transport);
 

@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -69,6 +69,8 @@ gst_discoverer_stream_info_finalize (GObject * object)
 
   if (info->toc)
     gst_toc_unref (info->toc);
+
+  g_free (info->stream_id);
 
   if (info->misc)
     gst_structure_free (info->misc);
@@ -131,6 +133,9 @@ gst_discoverer_info_copy_int (GstDiscovererStreamInfo * info,
 
   if (info->toc)
     ret->toc = gst_toc_ref (info->toc);
+
+  if (info->stream_id)
+    ret->stream_id = g_strdup (info->stream_id);
 
   if (info->misc)
     ret->misc = gst_structure_copy (info->misc);
@@ -348,7 +353,7 @@ G_DEFINE_TYPE (GstDiscovererInfo, gst_discoverer_info, G_TYPE_OBJECT);
 static void
 gst_discoverer_info_init (GstDiscovererInfo * info)
 {
-  /* Nothing needs initialization */
+  info->missing_elements_details = g_ptr_array_new_with_free_func (g_free);
 }
 
 static void
@@ -370,6 +375,8 @@ gst_discoverer_info_finalize (GObject * object)
 
   if (info->toc)
     gst_toc_unref (info->toc);
+
+  g_ptr_array_unref (info->missing_elements_details);
 }
 
 static GstDiscovererInfo *
@@ -403,6 +410,8 @@ gst_discoverer_info_copy (GstDiscovererInfo * ptr)
         stream_map);
   }
   ret->duration = ptr->duration;
+  ret->result = ptr->result;
+  ret->seekable = ptr->seekable;
   if (ptr->misc)
     ret->misc = gst_structure_copy (ptr->misc);
 
@@ -664,8 +673,26 @@ gst_discoverer_stream_info_get_toc (GstDiscovererStreamInfo * info)
 }
 
 /**
+ * gst_discoverer_stream_info_get_stream_id:
+ * @info: a #GstDiscovererStreamInfo
+ *
+ * Returns: (transfer none): the stream ID of this stream. If you wish to
+ * use the stream ID after the life-time of @info you will need to copy it.
+ */
+const gchar *
+gst_discoverer_stream_info_get_stream_id (GstDiscovererStreamInfo * info)
+{
+  g_return_val_if_fail (GST_IS_DISCOVERER_STREAM_INFO (info), NULL);
+
+  return info->stream_id;
+}
+
+/**
  * gst_discoverer_stream_info_get_misc:
  * @info: a #GstDiscovererStreamInfo
+ *
+ * Deprecated: This functions is deprecated since version 1.4, use
+ * #gst_discoverer_info_get_missing_elements_installer_details
  *
  * Returns: (transfer none): additional information regarding the stream (for
  * example codec version, profile, etc..). If you wish to use the #GstStructure
@@ -990,6 +1017,9 @@ DISCOVERER_INFO_ACCESSOR_CODE (seekable, gboolean, FALSE);
  * gst_discoverer_info_get_misc:
  * @info: a #GstDiscovererInfo
  *
+ * Deprecated: This functions is deprecated since version 1.4, use
+ * #gst_discoverer_info_get_missing_elements_installer_details
+ *
  * Returns: (transfer none): Miscellaneous information stored as a #GstStructure
  * (for example: information about missing plugins). If you wish to use the
  * #GstStructure after the life-time of @info, you will need to copy it.
@@ -1048,3 +1078,39 @@ DISCOVERER_INFO_ACCESSOR_CODE (toc, const GstToc *, NULL);
  *
  * Decrements the reference count of @info.
  */
+
+
+/**
+ * gst_discoverer_info_get_missing_elements_installer_details:
+ * @info: a #GstDiscovererStreamInfo to retrieve installer detail
+ * for the missing element
+ *
+ * Get the installer details for missing elements
+ *
+ * Returns: (transfer none) (array zero-terminated=1): An array of strings
+ * containing informations about how to install the various missing elements
+ * for @info to be usable. If you wish to use the strings after the life-time
+ * of @info, you will need to copy them.
+ *
+ * Since: 1.4
+ */
+const gchar **
+gst_discoverer_info_get_missing_elements_installer_details (const
+    GstDiscovererInfo * info)
+{
+
+  if (info->result != GST_DISCOVERER_MISSING_PLUGINS) {
+    GST_WARNING_OBJECT (info, "Trying to get missing element installed details "
+        "but result is not 'MISSING_PLUGINS'");
+
+    return NULL;
+  }
+
+  if (info->missing_elements_details->pdata[info->missing_elements_details->
+          len]) {
+    GST_DEBUG ("Adding NULL pointer to the end of missing_elements_details");
+    g_ptr_array_add (info->missing_elements_details, NULL);
+  }
+
+  return (const gchar **) info->missing_elements_details->pdata;
+}

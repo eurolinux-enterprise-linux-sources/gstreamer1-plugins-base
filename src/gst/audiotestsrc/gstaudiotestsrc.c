@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /**
  * SECTION:element-audiotestsrc
@@ -25,11 +25,11 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch audiotestsrc ! audioconvert ! alsasink
+ * gst-launch-1.0 audiotestsrc ! audioconvert ! autoaudiosink
  * ]| This pipeline produces a sine with default frequency, 440 Hz, and the
  * default volume, 0.8 (relative to a maximum 1.0).
  * |[
- * gst-launch audiotestsrc wave=2 freq=200 ! audioconvert ! tee name=t ! queue ! alsasink t. ! queue ! libvisual_lv_scope ! videoconvert ! xvimagesink
+ * gst-launch-1.0 audiotestsrc wave=2 freq=200 ! tee name=t ! queue ! audioconvert ! autoaudiosink t. ! queue ! audioconvert ! libvisual_lv_scope ! videoconvert ! autovideosink
  * ]| In this example a saw wave is generated. The wave is shown using a
  * scope visualizer from libvisual, allowing you to visually verify that
  * the saw wave is correct.
@@ -71,32 +71,29 @@ enum
   PROP_IS_LIVE,
   PROP_TIMESTAMP_OFFSET,
   PROP_CAN_ACTIVATE_PUSH,
-  PROP_CAN_ACTIVATE_PULL,
-  PROP_LAST
+  PROP_CAN_ACTIVATE_PULL
 };
 
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-#define FORMAT_STR "{ S16LE, S32LE, F32LE, F64LE }"
-#define DEFAULT_FORMAT_STR "S16LE"
-#else
-#define FORMAT_STR "{ S16BE, S32BE, F32BE, F64BE }"
-#define DEFAULT_FORMAT_STR "S16BE"
-#endif
+#define FORMAT_STR  " { S16LE, S16BE, U16LE, U16BE, " \
+    "S24_32LE, S24_32BE, U24_32LE, U24_32BE, " \
+    "S32LE, S32BE, U32LE, U32BE, " \
+    "S24LE, S24BE, U24LE, U24BE, " \
+    "S20LE, S20BE, U20LE, U20BE, " \
+    "S18LE, S18BE, U18LE, U18BE, " \
+    "F32LE, F32BE, F64LE, F64BE, " \
+    "S8, U8 }"
+
+#define DEFAULT_FORMAT_STR GST_AUDIO_NE ("S16")
 
 static GstStaticPadTemplate gst_audio_test_src_src_template =
-    GST_STATIC_PAD_TEMPLATE ("src",
+GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("audio/x-raw, "
         "format = (string) " FORMAT_STR ", "
         "layout = (string) interleaved, "
-        "rate = (int) [ 1, MAX ], "
-        "channels = (int) 1; "
-        "audio/x-raw, "
-        "format = (string) " FORMAT_STR ", "
-        "layout = (string) interleaved, "
-        "rate = (int) [ 1, MAX ], "
-        "channels = (int) 2, " "channel-mask = (bitmask) 0x3")
+        "rate = " GST_AUDIO_RATE_RANGE ", "
+        "channels = " GST_AUDIO_CHANNELS_RANGE)
     );
 
 #define gst_audio_test_src_parent_class parent_class
@@ -183,8 +180,9 @@ gst_audio_test_src_class_init (GstAudioTestSrcClass * klass)
           GST_TYPE_AUDIO_TEST_SRC_WAVE, GST_AUDIO_TEST_SRC_WAVE_SINE,
           G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_FREQ,
-      g_param_spec_double ("freq", "Frequency", "Frequency of test signal",
-          0.0, 20000.0, DEFAULT_FREQ,
+      g_param_spec_double ("freq", "Frequency", "Frequency of test signal. "
+          "The sample rate needs to be at least 4 times higher.",
+          0.0, (gdouble) G_MAXINT / 4, DEFAULT_FREQ,
           G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_VOLUME,
       g_param_spec_double ("volume", "Volume", "Volume of test signal", 0.0,
@@ -209,10 +207,10 @@ gst_audio_test_src_class_init (GstAudioTestSrcClass * klass)
           "Can activate in pull mode", DEFAULT_CAN_ACTIVATE_PULL,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_audio_test_src_src_template));
-  gst_element_class_set_static_metadata (gstelement_class,
-      "Audio test source", "Source/Audio",
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &gst_audio_test_src_src_template);
+  gst_element_class_set_static_metadata (gstelement_class, "Audio test source",
+      "Source/Audio",
       "Creates audio test signals of given frequency and volume",
       "Stefan Kost <ensonic@users.sf.net>");
 
@@ -258,6 +256,9 @@ gst_audio_test_src_finalize (GObject * object)
   if (src->gen)
     g_rand_free (src->gen);
   src->gen = NULL;
+  g_free (src->tmp);
+  src->tmp = NULL;
+  src->tmpsize = 0;
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -267,6 +268,7 @@ gst_audio_test_src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 {
   GstAudioTestSrc *src = GST_AUDIO_TEST_SRC (bsrc);
   GstStructure *structure;
+  gint channels, rate;
 
   caps = gst_caps_make_writable (caps);
 
@@ -274,13 +276,20 @@ gst_audio_test_src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 
   GST_DEBUG_OBJECT (src, "fixating samplerate to %d", GST_AUDIO_DEF_RATE);
 
-  gst_structure_fixate_field_nearest_int (structure, "rate",
-      GST_AUDIO_DEF_RATE);
+  rate = MAX (GST_AUDIO_DEF_RATE, src->freq * 4);
+  gst_structure_fixate_field_nearest_int (structure, "rate", rate);
 
   gst_structure_fixate_field_string (structure, "format", DEFAULT_FORMAT_STR);
 
   /* fixate to mono unless downstream requires stereo, for backwards compat */
   gst_structure_fixate_field_nearest_int (structure, "channels", 1);
+
+  if (gst_structure_get_int (structure, "channels", &channels) && channels > 2) {
+    if (!gst_structure_has_field_typed (structure, "channel-mask",
+            GST_TYPE_BITMASK))
+      gst_structure_set (structure, "channel-mask", GST_TYPE_BITMASK, 0ULL,
+          NULL);
+  }
 
   caps = GST_BASE_SRC_CLASS (parent_class)->fixate (bsrc, caps);
 
@@ -345,6 +354,23 @@ gst_audio_test_src_query (GstBaseSrc * basesrc, GstQuery * query)
         gst_query_add_scheduling_mode (query, GST_PAD_MODE_PULL);
 
       res = TRUE;
+      break;
+    }
+    case GST_QUERY_LATENCY:
+    {
+      if (src->info.rate > 0) {
+        GstClockTime latency;
+
+        latency =
+            gst_util_uint64_scale (src->generate_samples_per_buffer, GST_SECOND,
+            src->info.rate);
+        gst_query_set_latency (query,
+            gst_base_src_is_live (GST_BASE_SRC_CAST (src)), latency,
+            GST_CLOCK_TIME_NONE);
+        GST_DEBUG_OBJECT (src, "Reporting latency of %" GST_TIME_FORMAT,
+            GST_TIME_ARGS (latency));
+        res = TRUE;
+      }
       break;
     }
     default:
@@ -709,7 +735,7 @@ static const ProcessFunc sine_table_funcs[] = {
 static void \
 gst_audio_test_src_create_tick_##type (GstAudioTestSrc * src, g##type * samples) \
 { \
-  gint i, c, channels, samplerate; \
+  gint i, c, channels, samplerate, samplemod; \
   gdouble step, scl; \
   \
   channels = GST_AUDIO_INFO_CHANNELS (&src->info); \
@@ -718,17 +744,20 @@ gst_audio_test_src_create_tick_##type (GstAudioTestSrc * src, g##type * samples)
   scl = 1024.0 / M_PI_M2; \
   \
   for (i = 0; i < src->generate_samples_per_buffer; i++) { \
-    src->accumulator += step; \
-    if (src->accumulator >= M_PI_M2) \
-      src->accumulator -= M_PI_M2; \
-    \
-    if ((src->next_sample + i)%samplerate < 1600) { \
+    samplemod = (src->next_sample + i) % samplerate; \
+    if (samplemod == 0) { \
+      src->accumulator = 0; \
+    } else if (samplemod < 1600) { \
       for (c = 0; c < channels; ++c) \
         samples[(i * channels) + c] = (g##type) scale * src->wave_table[(gint) (src->accumulator * scl)]; \
     } else { \
       for (c = 0; c < channels; ++c) \
         samples[(i * channels) + c] = 0; \
     } \
+    \
+    src->accumulator += step; \
+    if (src->accumulator >= M_PI_M2) \
+      src->accumulator -= M_PI_M2; \
   } \
 }
 
@@ -898,11 +927,12 @@ gst_audio_test_src_change_wave (GstAudioTestSrc * src)
 {
   gint idx;
 
+  src->pack_func = NULL;
+  src->process = NULL;
+
   /* not negotiated yet? */
-  if (src->info.finfo == NULL) {
-    src->process = NULL;
+  if (src->info.finfo == NULL)
     return;
-  }
 
   switch (GST_AUDIO_FORMAT_INFO_FORMAT (src->info.finfo)) {
     case GST_AUDIO_FORMAT_S16:
@@ -918,8 +948,22 @@ gst_audio_test_src_change_wave (GstAudioTestSrc * src)
       idx = 3;
       break;
     default:
-      src->process = NULL;
-      return;
+      /* special format */
+      switch (src->info.finfo->unpack_format) {
+        case GST_AUDIO_FORMAT_S32:
+          idx = 1;
+          src->pack_func = src->info.finfo->pack_func;
+          src->pack_size = sizeof (gint32);
+          break;
+        case GST_AUDIO_FORMAT_F64:
+          idx = 3;
+          src->pack_func = src->info.finfo->pack_func;
+          src->pack_size = sizeof (gdouble);
+          break;
+        default:
+          g_assert_not_reached ();
+          return;
+      }
   }
 
   switch (src->wave) {
@@ -1055,6 +1099,7 @@ gst_audio_test_src_do_seek (GstBaseSrc * basesrc, GstSegment * segment)
   GstAudioTestSrc *src = GST_AUDIO_TEST_SRC (basesrc);
   GstClockTime time;
   gint samplerate, bpf;
+  gint64 next_sample;
 
   GST_DEBUG_OBJECT (src, "seeking %" GST_SEGMENT_FORMAT, segment);
 
@@ -1064,34 +1109,32 @@ gst_audio_test_src_do_seek (GstBaseSrc * basesrc, GstSegment * segment)
   samplerate = GST_AUDIO_INFO_RATE (&src->info);
   bpf = GST_AUDIO_INFO_BPF (&src->info);
 
-  /* now move to the time indicated */
-  src->next_sample = gst_util_uint64_scale_int (time, samplerate, GST_SECOND);
-  src->next_byte = src->next_sample * bpf;
+  /* now move to the time indicated, don't seek to the sample *after* the time */
+  next_sample = gst_util_uint64_scale_int (time, samplerate, GST_SECOND);
+  src->next_byte = next_sample * bpf;
   if (samplerate == 0)
     src->next_time = 0;
   else
     src->next_time =
-        gst_util_uint64_scale_int (src->next_sample, GST_SECOND, samplerate);
+        gst_util_uint64_scale_round (next_sample, GST_SECOND, samplerate);
 
   GST_DEBUG_OBJECT (src, "seeking next_sample=%" G_GINT64_FORMAT
-      " next_time=%" GST_TIME_FORMAT, src->next_sample,
+      " next_time=%" GST_TIME_FORMAT, next_sample,
       GST_TIME_ARGS (src->next_time));
 
   g_assert (src->next_time <= time);
 
-  if (!src->reverse) {
-    if (GST_CLOCK_TIME_IS_VALID (segment->start)) {
-      segment->time = segment->start;
-    }
-  } else {
-    if (GST_CLOCK_TIME_IS_VALID (segment->stop)) {
-      segment->time = segment->stop;
-    }
-  }
+  src->next_sample = next_sample;
 
-  if (GST_CLOCK_TIME_IS_VALID (segment->stop)) {
+  if (segment->rate > 0 && GST_CLOCK_TIME_IS_VALID (segment->stop)) {
     time = segment->stop;
-    src->sample_stop = gst_util_uint64_scale_int (time, samplerate, GST_SECOND);
+    src->sample_stop =
+        gst_util_uint64_scale_round (time, samplerate, GST_SECOND);
+    src->check_seek_stop = TRUE;
+  } else if (segment->rate < 0) {
+    time = segment->start;
+    src->sample_stop =
+        gst_util_uint64_scale_round (time, samplerate, GST_SECOND);
     src->check_seek_stop = TRUE;
   } else {
     src->check_seek_stop = FALSE;
@@ -1167,9 +1210,16 @@ gst_audio_test_src_fill (GstBaseSrc * basesrc, guint64 offset,
   }
 
   /* check for eos */
-  if (src->check_seek_stop &&
+  if (src->check_seek_stop && !src->reverse &&
       (src->sample_stop > src->next_sample) &&
       (src->sample_stop < src->next_sample + samples)
+      ) {
+    /* calculate only partial buffer */
+    src->generate_samples_per_buffer = src->sample_stop - src->next_sample;
+    next_sample = src->sample_stop;
+    src->eos_reached = TRUE;
+  } else if (src->check_seek_stop && src->reverse &&
+      (src->sample_stop > src->next_sample)
       ) {
     /* calculate only partial buffer */
     src->generate_samples_per_buffer = src->sample_stop - src->next_sample;
@@ -1189,6 +1239,8 @@ gst_audio_test_src_fill (GstBaseSrc * basesrc, guint64 offset,
   GST_LOG_OBJECT (src, "samplerate %d", samplerate);
   GST_LOG_OBJECT (src, "next_sample %" G_GINT64_FORMAT ", ts %" GST_TIME_FORMAT,
       next_sample, GST_TIME_ARGS (next_time));
+
+  gst_buffer_set_size (buffer, bytes);
 
   GST_BUFFER_OFFSET (buffer) = src->next_sample;
   GST_BUFFER_OFFSET_END (buffer) = next_sample;
@@ -1211,7 +1263,24 @@ gst_audio_test_src_fill (GstBaseSrc * basesrc, guint64 offset,
       GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buffer)));
 
   gst_buffer_map (buffer, &map, GST_MAP_WRITE);
-  src->process (src, map.data);
+  if (src->pack_func) {
+    gsize tmpsize;
+
+    tmpsize =
+        src->generate_samples_per_buffer * GST_AUDIO_INFO_CHANNELS (&src->info)
+        * src->pack_size;
+
+    if (tmpsize > src->tmpsize) {
+      src->tmp = g_realloc (src->tmp, tmpsize);
+      src->tmpsize = tmpsize;
+    }
+    src->process (src, src->tmp);
+    src->pack_func (src->info.finfo, 0, src->tmp, map.data,
+        src->generate_samples_per_buffer *
+        GST_AUDIO_INFO_CHANNELS (&src->info));
+  } else {
+    src->process (src, map.data);
+  }
   gst_buffer_unmap (buffer, &map);
 
   if (G_UNLIKELY ((src->wave == GST_AUDIO_TEST_SRC_WAVE_SILENCE)

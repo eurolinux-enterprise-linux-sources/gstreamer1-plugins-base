@@ -2,7 +2,7 @@ GObject
   GInitiallyUnowned
     GstObject
       GstAllocator
-        GstDefaultAllocator
+        GstAllocatorSysmem
       GstAudioRingBuffer
         GstAudioSinkRingBuffer
         GstAudioSrcRingBuffer
@@ -15,12 +15,13 @@ GObject
       GstElement
         GstAdder
         GstAudioDecoder
-          GstIVorbisDec
+          GstOpusDec
           GstVorbisDec
         GstAudioEncoder
+          GstOpusEnc
           GstVorbisEnc
         GstAudioRate
-        GstAudioVisualizer-BaseExtVisual
+        GstAudioVisualizer
           GstVisual
             GstVisualbumpscope
             GstVisualcorona
@@ -53,11 +54,13 @@ GObject
             GstGioSrc
             GstGioStreamSrc
           GstPushSrc
+            GstAlsaMidiSrc
             GstAudioBaseSrc
               GstAudioSrc
                 GstAlsaSrc
             GstAudioCdSrc
               GstCdParanoiaSrc
+            GstSocketSrc
             GstTCPClientSrc
             GstTCPServerSrc
             GstVideoTestSrc
@@ -76,12 +79,16 @@ GObject
           GstVideoRate
         GstBin
           GstDecodeBin
+          GstDecodebin3
           GstEncodeBin
+          GstParseBin
           GstPipeline
             GstPlayBin
+            GstPlayBin3
           GstPlaySink
           GstSubtitleOverlay
           GstURIDecodeBin
+          GstURISourceBin
         GstOggAviParse
         GstOggDemux
         GstOggMux
@@ -105,12 +112,17 @@ GObject
         GstProxyPad
           GstGhostPad
             GstDecodePad
+            GstParsePad
       GstPadTemplate
       GstPlugin
       GstPluginFeature
+        GstDeviceProviderFactory
         GstElementFactory
+        GstTracerFactory
         GstTypeFindFactory
       GstRegistry
+      GstStream
+      GstStreamCollection
       GstTask
       GstTaskPool
   GInputStream
@@ -123,6 +135,7 @@ GObject
     PangoFcFontMap
       PangoCairoFcFontMap
 GInterface
+  GDatagramBased
   GFile
   GInitable
   GTypePlugin

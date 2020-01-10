@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include "gstplay-enum.h"
@@ -67,6 +67,8 @@ gst_play_flags_get_type (void)
         "deinterlace"},
     {C_FLAGS (GST_PLAY_FLAG_SOFT_COLORBALANCE), "Use software color balance",
         "soft-colorbalance"},
+    {C_FLAGS (GST_PLAY_FLAG_FORCE_FILTERS),
+        "Force audio/video filter(s) to be applied", "force-filters"},
     {0, NULL, NULL}
   };
   static volatile GType id = 0;

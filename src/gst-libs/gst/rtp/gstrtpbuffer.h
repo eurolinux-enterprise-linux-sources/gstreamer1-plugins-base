@@ -17,8 +17,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_RTPBUFFER_H__
@@ -94,6 +94,7 @@ gboolean        gst_rtp_buffer_get_extension         (GstRTPBuffer *rtp);
 void            gst_rtp_buffer_set_extension         (GstRTPBuffer *rtp, gboolean extension);
 gboolean        gst_rtp_buffer_get_extension_data    (GstRTPBuffer *rtp, guint16 *bits,
                                                       gpointer *data, guint *wordlen);
+GBytes*         gst_rtp_buffer_get_extension_bytes   (GstRTPBuffer *rtp, guint16 *bits);
 gboolean        gst_rtp_buffer_set_extension_data    (GstRTPBuffer *rtp, guint16 bits, guint16 length);
 
 guint32         gst_rtp_buffer_get_ssrc              (GstRTPBuffer *rtp);
@@ -120,6 +121,7 @@ GstBuffer*      gst_rtp_buffer_get_payload_subbuffer (GstRTPBuffer *rtp, guint o
 
 guint           gst_rtp_buffer_get_payload_len       (GstRTPBuffer *rtp);
 gpointer        gst_rtp_buffer_get_payload           (GstRTPBuffer *rtp);
+GBytes*         gst_rtp_buffer_get_payload_bytes     (GstRTPBuffer *rtp);
 
 /* some helpers */
 guint32         gst_rtp_buffer_default_clock_rate    (guint8 payload_type);
@@ -140,14 +142,49 @@ gboolean        gst_rtp_buffer_get_extension_twobytes_header (GstRTPBuffer *rtp,
 
 gboolean       gst_rtp_buffer_add_extension_onebyte_header  (GstRTPBuffer *rtp,
                                                              guint8 id,
-                                                             gpointer data,
+                                                             gconstpointer data,
                                                              guint size);
 gboolean       gst_rtp_buffer_add_extension_twobytes_header (GstRTPBuffer *rtp,
                                                              guint8 appbits,
                                                              guint8 id,
-                                                             gpointer data,
+                                                             gconstpointer data,
                                                              guint size);
 
+/**
+ * GstRTPBufferFlags:
+ * @GST_RTP_BUFFER_FLAG_RETRANSMISSION: The #GstBuffer was once wrapped
+ *           in a retransmitted packet as specified by RFC 4588.
+ * @GST_RTP_BUFFER_FLAG_LAST:           Offset to define more flags.
+ *
+ * Additional RTP buffer flags. These flags can potentially be used on any
+ * buffers carrying RTP packets.
+ *
+ * Note that these are only valid for #GstCaps of type: application/x-rtp (x-rtcp).
+ * They can conflict with other extended buffer flags.
+ *
+ * Since: 1.10
+ */
+typedef enum {
+  GST_RTP_BUFFER_FLAG_RETRANSMISSION = (GST_BUFFER_FLAG_LAST << 0),
+  GST_RTP_BUFFER_FLAG_LAST           = (GST_BUFFER_FLAG_LAST << 8)
+} GstRTPBufferFlags;
+
+/**
+ * GstRTPBufferMapFlags:
+ * @GST_RTP_BUFFER_MAP_FLAG_SKIP_PADDING: Skip mapping and validation of RTP
+ *           padding and RTP pad count when present. Useful for buffers where
+ *           the padding may be encrypted.
+ * @GST_RTP_BUFFER_MAP_FLAG_LAST: Offset to define more flags
+ *
+ * Additional mapping flags for gst_rtp_buffer_map().
+ *
+ * Since: 1.6.1
+ */
+typedef enum {
+  GST_RTP_BUFFER_MAP_FLAG_SKIP_PADDING = (GST_MAP_FLAG_LAST << 0),
+  GST_RTP_BUFFER_MAP_FLAG_LAST         = (GST_MAP_FLAG_LAST << 8)
+  /* 8 more flags possible afterwards */
+} GstRTPBufferMapFlags;
 
 G_END_DECLS
 

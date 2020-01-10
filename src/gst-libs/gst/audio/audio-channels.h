@@ -15,16 +15,16 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
+
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
 
 #ifndef __GST_AUDIO_CHANNELS_H__
 #define __GST_AUDIO_CHANNELS_H__
-
-#include <gst/gst.h>
-
-#include <gst/audio/audio-format.h>
 
 G_BEGIN_DECLS
 
@@ -160,6 +160,10 @@ gboolean       gst_audio_get_channel_reorder_map (gint channels,
                                                   const GstAudioChannelPosition * from,
                                                   const GstAudioChannelPosition * to,
                                                   gint *reorder_map);
+guint64        gst_audio_channel_get_fallback_mask (gint channels);
+
+gchar*         gst_audio_channel_positions_to_string (const GstAudioChannelPosition * position,
+                                                      gint channels);
 
 G_END_DECLS
 

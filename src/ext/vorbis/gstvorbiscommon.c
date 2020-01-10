@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -134,8 +134,8 @@ const gint gst_vorbis_reorder_map[][8] = {
   {0, 2, 1},
   {0, 1, 2, 3},
   {0, 2, 1, 3, 4},
-  {0, 2, 1, 4, 5, 3},
-  {0, 2, 1, 5, 6, 4, 3},
-  {0, 2, 1, 6, 7, 4, 5, 3}
+  {0, 2, 1, 5, 3, 4},
+  {0, 2, 1, 6, 5, 3, 4},
+  {0, 2, 1, 7, 5, 6, 3, 4}
 };
 #endif

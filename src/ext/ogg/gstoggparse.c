@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* This ogg parser is essentially a subset of the ogg demuxer - rather than
@@ -148,16 +148,19 @@ gst_ogg_parse_new_stream (GstOggParse * parser, ogg_page * page)
   if (ogg_stream_init (&stream->stream, serialno) != 0) {
     GST_ERROR ("Could not initialize ogg_stream struct for serial %08x.",
         serialno);
-    return NULL;
+    goto failure;
   }
 
-  /* FIXME check return */
-  ogg_stream_pagein (&stream->stream, page);
+  if (ogg_stream_pagein (&stream->stream, page) != 0)
+    goto failure;
 
-  /* FIXME check return */
   ret = ogg_stream_packetout (&stream->stream, &packet);
   if (ret == 1) {
-    gst_ogg_stream_setup_map (stream, &packet);
+    if (!gst_ogg_stream_setup_map (stream, &packet)) {
+      GST_ERROR ("Could not setup map for ogg packet.");
+      goto failure;
+    }
+
     if (stream->is_video) {
       parser->video_stream = stream;
     }
@@ -166,6 +169,10 @@ gst_ogg_parse_new_stream (GstOggParse * parser, ogg_page * page)
   parser->oggstreams = g_slist_append (parser->oggstreams, stream);
 
   return stream;
+
+failure:
+  free_stream (stream);
+  return NULL;
 }
 
 static GstOggStream *
@@ -225,10 +232,10 @@ gst_ogg_parse_base_init (gpointer g_class)
       "parse ogg streams into pages (info about ogg: http://xiph.org)",
       "Michael Smith <msmith@fluendo.com>");
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&ogg_parse_sink_template_factory));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&ogg_parse_src_template_factory));
+  gst_element_class_add_static_pad_template (element_class,
+      &ogg_parse_sink_template_factory);
+  gst_element_class_add_static_pad_template (element_class,
+      &ogg_parse_src_template_factory);
 }
 
 static void
@@ -477,6 +484,10 @@ gst_ogg_parse_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
         }
 
         stream = gst_ogg_parse_new_stream (ogg, &page);
+        if (!stream) {
+          GST_LOG_OBJECT (ogg, "Incorrect page");
+          goto failure;
+        }
 
         ogg->last_page_not_bos = FALSE;
 
@@ -585,11 +596,9 @@ gst_ogg_parse_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
             caps = gst_caps_make_writable (caps);
 
             structure = gst_caps_get_structure (caps, 0);
-            gst_structure_set_value (structure, "streamheader", &array);
+            gst_structure_take_value (structure, "streamheader", &array);
 
             gst_pad_set_caps (ogg->srcpad, caps);
-
-            g_value_unset (&array);
 
             if (ogg->caps)
               gst_caps_unref (ogg->caps);

@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -186,6 +186,19 @@ gst_video_overlay_get_seqnum (void)
   return (guint) g_atomic_int_add (&seqnum, 1);
 }
 
+static gboolean
+gst_video_overlay_composition_meta_init (GstMeta * meta, gpointer params,
+    GstBuffer * buf)
+{
+  GstVideoOverlayCompositionMeta *ometa;
+
+  ometa = (GstVideoOverlayCompositionMeta *) meta;
+
+  ometa->overlay = NULL;
+
+  return TRUE;
+}
+
 static void
 gst_video_overlay_composition_meta_free (GstMeta * meta, GstBuffer * buf)
 {
@@ -215,8 +228,14 @@ gst_video_overlay_composition_meta_transform (GstBuffer * dest, GstMeta * meta,
       dmeta =
           (GstVideoOverlayCompositionMeta *) gst_buffer_add_meta (dest,
           GST_VIDEO_OVERLAY_COMPOSITION_META_INFO, NULL);
+      if (!dmeta)
+        return FALSE;
+
       dmeta->overlay = gst_video_overlay_composition_ref (smeta->overlay);
     }
+  } else {
+    /* return FALSE, if transform type is not supported */
+    return FALSE;
   }
   return TRUE;
 }
@@ -245,7 +264,8 @@ gst_video_overlay_composition_meta_get_info (void)
     const GstMetaInfo *meta =
         gst_meta_register (GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE,
         "GstVideoOverlayCompositionMeta",
-        sizeof (GstVideoOverlayCompositionMeta), (GstMetaInitFunction) NULL,
+        sizeof (GstVideoOverlayCompositionMeta),
+        (GstMetaInitFunction) gst_video_overlay_composition_meta_init,
         (GstMetaFreeFunction) gst_video_overlay_composition_meta_free,
         (GstMetaTransformFunction)
         gst_video_overlay_composition_meta_transform);
@@ -262,6 +282,8 @@ gst_video_overlay_composition_meta_get_info (void)
  * Sets an overlay composition on a buffer. The buffer will obtain its own
  * reference to the composition, meaning this function does not take ownership
  * of @comp.
+ *
+ * Returns: (transfer none): a #GstVideoOverlayCompositionMeta
  */
 GstVideoOverlayCompositionMeta *
 gst_buffer_add_video_overlay_composition_meta (GstBuffer * buf,
@@ -432,11 +454,19 @@ gst_video_overlay_rectangle_needs_scaling (GstVideoOverlayRectangle * r)
 /**
  * gst_video_overlay_composition_blend:
  * @comp: a #GstVideoOverlayComposition
- * @video_buf: a #GstVideoFrame containing raw video data in a supported format
+ * @video_buf: a #GstVideoFrame containing raw video data in a
+ *             supported format. It should be mapped using GST_MAP_READWRITE
  *
  * Blends the overlay rectangles in @comp on top of the raw video data
  * contained in @video_buf. The data in @video_buf must be writable and
  * mapped appropriately.
+ *
+ * Since @video_buf data is read and will be modified, it ought be
+ * mapped with flag GST_MAP_READWRITE.
+ */
+/* FIXME: formats with more than 8 bit per component which get unpacked into
+ * ARGB64 or AYUV64 (such as v210, v216, UYVP, GRAY16_LE and GRAY16_BE)
+ * are not supported yet by the code in video-blend.c.
  */
 gboolean
 gst_video_overlay_composition_blend (GstVideoOverlayComposition * comp,
@@ -957,9 +987,13 @@ gst_video_overlay_rectangle_apply_global_alpha (GstVideoOverlayRectangle * rect,
   GstVideoFrame frame;
   gint i, j, w, h, stride;
   gint argb_a, argb_r, argb_g, argb_b;
+  gint alpha_offset;
 
   g_assert (!(rect->applied_global_alpha != 1.0
           && rect->initial_alpha == NULL));
+
+  alpha_offset = GST_VIDEO_INFO_COMP_POFFSET (&rect->info, 3);
+  g_return_if_fail (alpha_offset == 0 || alpha_offset == 3);
 
   if (global_alpha == rect->applied_global_alpha)
     return;
@@ -1056,7 +1090,7 @@ gst_video_overlay_rectangle_convert (GstVideoInfo * src, GstBuffer * src_buffer,
         b = CLAMP (b, 0, 255);
 
         /* native endian ARGB */
-        *ddata = ((a << 24) | (r << 16) | (g << 8) | b);
+        *(guint32 *) ddata = ((a << 24) | (r << 16) | (g << 8) | b);
 
         sdata += 4;
         ddata += 4;
@@ -1071,7 +1105,7 @@ gst_video_overlay_rectangle_convert (GstVideoInfo * src, GstBuffer * src_buffer,
     for (k = 0; k < height; k++) {
       for (l = 0; l < width; l++) {
         /* native endian ARGB */
-        argb = *sdata;
+        argb = *(guint32 *) sdata;
         a = argb >> 24;
         r = (argb >> 16) & 0xff;
         g = (argb >> 8) & 0xff;
@@ -1477,12 +1511,13 @@ gst_video_overlay_rectangle_get_global_alpha (GstVideoOverlayRectangle *
 /**
  * gst_video_overlay_rectangle_set_global_alpha:
  * @rectangle: a #GstVideoOverlayRectangle
+ * @global_alpha: Global alpha value (0 to 1.0)
  *
  * Sets the global alpha value associated with a #GstVideoOverlayRectangle. Per-
  * pixel alpha values are multiplied with this value. Valid
  * values: 0 <= global_alpha <= 1; 1 to deactivate.
  *
- # @rectangle must be writable, meaning its refcount must be 1. You can
+ * @rectangle must be writable, meaning its refcount must be 1. You can
  * make the rectangles inside a #GstVideoOverlayComposition writable using
  * gst_video_overlay_composition_make_writable() or
  * gst_video_overlay_composition_copy().

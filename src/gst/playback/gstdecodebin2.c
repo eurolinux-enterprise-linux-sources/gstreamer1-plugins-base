@@ -3,6 +3,8 @@
  * Copyright (C) <2009> Sebastian Dröge <sebastian.droege@collabora.co.uk>
  * Copyright (C) <2011> Hewlett-Packard Development Company, L.P.
  *   Author: Sebastian Dröge <sebastian.droege@collabora.co.uk>, Collabora Ltd.
+ * Copyright (C) <2013> Collabora Ltd.
+ *   Author: Sebastian Dröge <sebastian.droege@collabora.co.uk>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -16,8 +18,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -98,9 +100,7 @@
 #include "gstplay-enum.h"
 #include "gstplayback.h"
 #include "gstrawcaps.h"
-
-/* Also used by gsturidecodebin.c */
-gint _decode_bin_compare_factories_func (gconstpointer p1, gconstpointer p2);
+#include "gstplaybackutils.h"
 
 /* generic templates */
 static GstStaticPadTemplate decoder_bin_sink_template =
@@ -157,15 +157,15 @@ struct _GstDecodeBin
 
   GstElement *typefind;         /* this holds the typefind object */
 
-  GMutex *expose_lock;          /* Protects exposal and removal of groups */
+  GMutex expose_lock;           /* Protects exposal and removal of groups */
   GstDecodeChain *decode_chain; /* Top level decode chain */
   guint nbpads;                 /* unique identifier for source pads */
 
-  GMutex *factories_lock;
+  GMutex factories_lock;
   guint32 factories_cookie;     /* Cookie from last time when factories was updated */
   GList *factories;             /* factories we can use for selecting elements */
 
-  GMutex *subtitle_lock;        /* Protects changes to subtitles and encoding */
+  GMutex subtitle_lock;         /* Protects changes to subtitles and encoding */
   GList *subtitles;             /* List of elements with subtitle-encoding,
                                  * protected by above mutex! */
 
@@ -174,13 +174,18 @@ struct _GstDecodeBin
 
   gboolean async_pending;       /* async-start has been emitted */
 
-  GMutex *dyn_lock;             /* lock protecting pad blocking */
+  GMutex dyn_lock;              /* lock protecting pad blocking */
   gboolean shutdown;            /* if we are shutting down */
   GList *blocked_pads;          /* pads that have set to block */
 
   gboolean expose_allstreams;   /* Whether to expose unknow type streams or not */
 
   GList *filtered;              /* elements for which error messages are filtered */
+  GList *filtered_errors;       /* filtered error messages */
+
+  GList *buffering_status;      /* element currently buffering messages */
+  GMutex buffering_lock;
+  GMutex buffering_post_lock;
 };
 
 struct _GstDecodeBinClass
@@ -202,6 +207,10 @@ struct _GstDecodeBinClass
   /* signal fired to select from the proposed list of factories */
     GstAutoplugSelectResult (*autoplug_select) (GstElement * element,
       GstPad * pad, GstCaps * caps, GstElementFactory * factory);
+  /* signal fired when a autoplugged element that is not linked downstream
+   * or exposed wants to query something */
+    gboolean (*autoplug_query) (GstElement * element, GstPad * pad,
+      GstQuery * query);
 
   /* fired when the last group is drained */
   void (*drained) (GstElement * element);
@@ -215,6 +224,7 @@ enum
   SIGNAL_AUTOPLUG_FACTORIES,
   SIGNAL_AUTOPLUG_SELECT,
   SIGNAL_AUTOPLUG_SORT,
+  SIGNAL_AUTOPLUG_QUERY,
   SIGNAL_DRAINED,
   LAST_SIGNAL
 };
@@ -226,7 +236,7 @@ enum
 #define AUTO_PREROLL_NOT_SEEKABLE_SIZE_TIME      10 * GST_SECOND
 #define AUTO_PREROLL_SEEKABLE_SIZE_TIME          0
 
-/* whan playing, keep a max of 2MB of data but try to keep the number of buffers
+/* when playing, keep a max of 2MB of data but try to keep the number of buffers
  * as low as possible (try to aim for 5 buffers) */
 #define AUTO_PLAY_SIZE_BYTES        2 * 1024 * 1024
 #define AUTO_PLAY_SIZE_BUFFERS      5
@@ -259,8 +269,7 @@ enum
   PROP_MAX_SIZE_TIME,
   PROP_POST_STREAM_TOPOLOGY,
   PROP_EXPOSE_ALL_STREAMS,
-  PROP_CONNECTION_SPEED,
-  PROP_LAST
+  PROP_CONNECTION_SPEED
 };
 
 static GstBinClass *parent_class;
@@ -276,6 +285,9 @@ static void type_found (GstElement * typefind, guint probability,
 
 static void decodebin_set_queue_size (GstDecodeBin * dbin,
     GstElement * multiqueue, gboolean preroll, gboolean seekable);
+static void decodebin_set_queue_size_full (GstDecodeBin * dbin,
+    GstElement * multiqueue, gboolean use_buffering, gboolean preroll,
+    gboolean seekable);
 
 static gboolean gst_decode_bin_autoplug_continue (GstElement * element,
     GstPad * pad, GstCaps * caps);
@@ -285,6 +297,8 @@ static GValueArray *gst_decode_bin_autoplug_sort (GstElement * element,
     GstPad * pad, GstCaps * caps, GValueArray * factories);
 static GstAutoplugSelectResult gst_decode_bin_autoplug_select (GstElement *
     element, GstPad * pad, GstCaps * caps, GstElementFactory * factory);
+static gboolean gst_decode_bin_autoplug_query (GstElement * element,
+    GstPad * pad, GstQuery * query);
 
 static void gst_decode_bin_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
@@ -295,18 +309,24 @@ static GstCaps *gst_decode_bin_get_caps (GstDecodeBin * dbin);
 static void caps_notify_cb (GstPad * pad, GParamSpec * unused,
     GstDecodeChain * chain);
 
+static void flush_chain (GstDecodeChain * chain, gboolean flushing);
+static void flush_group (GstDecodeGroup * group, gboolean flushing);
 static GstPad *find_sink_pad (GstElement * element);
 static GstStateChangeReturn gst_decode_bin_change_state (GstElement * element,
     GstStateChange transition);
 static void gst_decode_bin_handle_message (GstBin * bin, GstMessage * message);
+static gboolean gst_decode_bin_remove_element (GstBin * bin,
+    GstElement * element);
 
 static gboolean check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad);
+
+static GstCaps *get_pad_caps (GstPad * pad);
 
 #define EXPOSE_LOCK(dbin) G_STMT_START {				\
     GST_LOG_OBJECT (dbin,						\
 		    "expose locking from thread %p",			\
 		    g_thread_self ());					\
-    g_mutex_lock (GST_DECODE_BIN_CAST(dbin)->expose_lock);		\
+    g_mutex_lock (&GST_DECODE_BIN_CAST(dbin)->expose_lock);		\
     GST_LOG_OBJECT (dbin,						\
 		    "expose locked from thread %p",			\
 		    g_thread_self ());					\
@@ -316,14 +336,14 @@ static gboolean check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad);
     GST_LOG_OBJECT (dbin,						\
 		    "expose unlocking from thread %p",			\
 		    g_thread_self ());					\
-    g_mutex_unlock (GST_DECODE_BIN_CAST(dbin)->expose_lock);		\
+    g_mutex_unlock (&GST_DECODE_BIN_CAST(dbin)->expose_lock);		\
 } G_STMT_END
 
 #define DYN_LOCK(dbin) G_STMT_START {			\
     GST_LOG_OBJECT (dbin,						\
 		    "dynlocking from thread %p",			\
 		    g_thread_self ());					\
-    g_mutex_lock (GST_DECODE_BIN_CAST(dbin)->dyn_lock);			\
+    g_mutex_lock (&GST_DECODE_BIN_CAST(dbin)->dyn_lock);			\
     GST_LOG_OBJECT (dbin,						\
 		    "dynlocked from thread %p",				\
 		    g_thread_self ());					\
@@ -333,14 +353,14 @@ static gboolean check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad);
     GST_LOG_OBJECT (dbin,						\
 		    "dynunlocking from thread %p",			\
 		    g_thread_self ());					\
-    g_mutex_unlock (GST_DECODE_BIN_CAST(dbin)->dyn_lock);		\
+    g_mutex_unlock (&GST_DECODE_BIN_CAST(dbin)->dyn_lock);		\
 } G_STMT_END
 
 #define SUBTITLE_LOCK(dbin) G_STMT_START {				\
     GST_LOG_OBJECT (dbin,						\
 		    "subtitle locking from thread %p",			\
 		    g_thread_self ());					\
-    g_mutex_lock (GST_DECODE_BIN_CAST(dbin)->subtitle_lock);		\
+    g_mutex_lock (&GST_DECODE_BIN_CAST(dbin)->subtitle_lock);		\
     GST_LOG_OBJECT (dbin,						\
 		    "subtitle lock from thread %p",			\
 		    g_thread_self ());					\
@@ -350,7 +370,24 @@ static gboolean check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad);
     GST_LOG_OBJECT (dbin,						\
 		    "subtitle unlocking from thread %p",		\
 		    g_thread_self ());					\
-    g_mutex_unlock (GST_DECODE_BIN_CAST(dbin)->subtitle_lock);		\
+    g_mutex_unlock (&GST_DECODE_BIN_CAST(dbin)->subtitle_lock);		\
+} G_STMT_END
+
+#define BUFFERING_LOCK(dbin) G_STMT_START {				\
+    GST_LOG_OBJECT (dbin,						\
+		    "buffering locking from thread %p",			\
+		    g_thread_self ());					\
+    g_mutex_lock (&GST_DECODE_BIN_CAST(dbin)->buffering_lock);		\
+    GST_LOG_OBJECT (dbin,						\
+		    "buffering lock from thread %p",			\
+		    g_thread_self ());					\
+} G_STMT_END
+
+#define BUFFERING_UNLOCK(dbin) G_STMT_START {				\
+    GST_LOG_OBJECT (dbin,						\
+		    "buffering unlocking from thread %p",		\
+		    g_thread_self ());					\
+    g_mutex_unlock (&GST_DECODE_BIN_CAST(dbin)->buffering_lock);		\
 } G_STMT_END
 
 struct _GstPendingPad
@@ -358,12 +395,16 @@ struct _GstPendingPad
   GstPad *pad;
   GstDecodeChain *chain;
   gulong event_probe_id;
+  gulong notify_caps_id;
 };
 
 struct _GstDecodeElement
 {
   GstElement *element;
   GstElement *capsfilter;       /* Optional capsfilter for Parser/Convert */
+  gulong pad_added_id;
+  gulong pad_removed_id;
+  gulong no_more_pads_id;
 };
 
 /* GstDecodeGroup
@@ -397,12 +438,15 @@ struct _GstDecodeChain
   GstDecodeGroup *parent;
   GstDecodeBin *dbin;
 
-  GMutex *lock;                 /* Protects this chain and its groups */
+  gint refs;                    /* Number of references to this object */
+
+  GMutex lock;                  /* Protects this chain and its groups */
 
   GstPad *pad;                  /* srcpad that caused creation of this chain */
 
   gboolean drained;             /* TRUE if the all children are drained */
   gboolean demuxer;             /* TRUE if elements->data is a demuxer */
+  gboolean adaptive_demuxer;    /* TRUE if elements->data is an adaptive streaming demuxer */
   gboolean seekable;            /* TRUE if this chain ends on a demuxer and is seekable */
   GList *elements;              /* All elements in this group, first
                                    is the latest and most downstream element */
@@ -419,11 +463,15 @@ struct _GstDecodeChain
                                    all new pads will be ignored! */
   GList *pending_pads;          /* Pads that have no fixed caps yet */
 
+  GstDecodePad *current_pad;    /* Current ending pad of the chain that can't
+                                 * be exposed yet but would be the same as endpad
+                                 * once it can be exposed */
   GstDecodePad *endpad;         /* Pad of this chain that could be exposed */
   gboolean deadend;             /* This chain is incomplete and can't be completed,
                                    e.g. no suitable decoder could be found
                                    e.g. stream got EOS without buffers
                                  */
+  gchar *deadend_details;
   GstCaps *endcaps;             /* Caps that were used when linking to the endpad
                                    or that resulted in the deadend
                                  */
@@ -432,6 +480,8 @@ struct _GstDecodeChain
   GList *old_groups;            /* Groups that should be freed later */
 };
 
+static GstDecodeChain *gst_decode_chain_ref (GstDecodeChain * chain);
+static void gst_decode_chain_unref (GstDecodeChain * chain);
 static void gst_decode_chain_free (GstDecodeChain * chain);
 static GstDecodeChain *gst_decode_chain_new (GstDecodeBin * dbin,
     GstDecodeGroup * group, GstPad * pad);
@@ -441,20 +491,24 @@ static GstDecodeGroup *gst_decode_group_new (GstDecodeBin * dbin,
     GstDecodeChain * chain);
 static gboolean gst_decode_chain_is_complete (GstDecodeChain * chain);
 static gboolean gst_decode_chain_expose (GstDecodeChain * chain,
-    GList ** endpads, gboolean * missing_plugin);
+    GList ** endpads, gboolean * missing_plugin,
+    GString * missing_plugin_details, gboolean * last_group);
 static gboolean gst_decode_chain_is_drained (GstDecodeChain * chain);
+static gboolean gst_decode_chain_reset_buffering (GstDecodeChain * chain);
 static gboolean gst_decode_group_is_complete (GstDecodeGroup * group);
 static GstPad *gst_decode_group_control_demuxer_pad (GstDecodeGroup * group,
     GstPad * pad);
 static gboolean gst_decode_group_is_drained (GstDecodeGroup * group);
+static gboolean gst_decode_group_reset_buffering (GstDecodeGroup * group);
 
 static gboolean gst_decode_bin_expose (GstDecodeBin * dbin);
+static void gst_decode_bin_reset_buffering (GstDecodeBin * dbin);
 
 #define CHAIN_MUTEX_LOCK(chain) G_STMT_START {				\
     GST_LOG_OBJECT (chain->dbin,					\
 		    "locking chain %p from thread %p",			\
 		    chain, g_thread_self ());				\
-    g_mutex_lock (chain->lock);						\
+    g_mutex_lock (&chain->lock);						\
     GST_LOG_OBJECT (chain->dbin,					\
 		    "locked chain %p from thread %p",			\
 		    chain, g_thread_self ());				\
@@ -464,7 +518,7 @@ static gboolean gst_decode_bin_expose (GstDecodeBin * dbin);
     GST_LOG_OBJECT (chain->dbin,					\
 		    "unlocking chain %p from thread %p",		\
 		    chain, g_thread_self ());				\
-    g_mutex_unlock (chain->lock);					\
+    g_mutex_unlock (&chain->lock);					\
 } G_STMT_END
 
 /* GstDecodePad
@@ -489,12 +543,15 @@ G_DEFINE_TYPE (GstDecodePad, gst_decode_pad, GST_TYPE_GHOST_PAD);
 #define GST_TYPE_DECODE_PAD (gst_decode_pad_get_type ())
 #define GST_DECODE_PAD(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DECODE_PAD,GstDecodePad))
 
-static GstDecodePad *gst_decode_pad_new (GstDecodeBin * dbin, GstPad * pad,
+static GstDecodePad *gst_decode_pad_new (GstDecodeBin * dbin,
     GstDecodeChain * chain);
 static void gst_decode_pad_activate (GstDecodePad * dpad,
     GstDecodeChain * chain);
 static void gst_decode_pad_unblock (GstDecodePad * dpad);
 static void gst_decode_pad_set_blocked (GstDecodePad * dpad, gboolean blocked);
+static gboolean gst_decode_pad_query (GstPad * pad, GstObject * parent,
+    GstQuery * query);
+static gboolean gst_decode_pad_is_exposable (GstDecodePad * endpad);
 
 static void gst_pending_pad_free (GstPendingPad * ppad);
 static GstPadProbeReturn pad_event_cb (GstPad * pad, GstPadProbeInfo * info,
@@ -550,6 +607,22 @@ _gst_boolean_accumulator (GSignalInvocationHint * ihint,
   return myboolean;
 }
 
+static gboolean
+_gst_boolean_or_accumulator (GSignalInvocationHint * ihint,
+    GValue * return_accu, const GValue * handler_return, gpointer dummy)
+{
+  gboolean myboolean;
+  gboolean retboolean;
+
+  myboolean = g_value_get_boolean (handler_return);
+  retboolean = g_value_get_boolean (return_accu);
+
+  if (!(ihint->run_type & G_SIGNAL_RUN_CLEANUP))
+    g_value_set_boolean (return_accu, myboolean || retboolean);
+
+  return TRUE;
+}
+
 /* we collect the first result */
 static gboolean
 _gst_array_accumulator (GSignalInvocationHint * ihint,
@@ -573,6 +646,13 @@ _gst_select_accumulator (GSignalInvocationHint * ihint,
   res = g_value_get_enum (handler_return);
   if (!(ihint->run_type & G_SIGNAL_RUN_CLEANUP))
     g_value_set_enum (return_accu, res);
+
+  /* Call the next handler in the chain (if any) when the current callback
+   * returns TRY. This makes it possible to register separate autoplug-select
+   * handlers that implement different TRY/EXPOSE/SKIP strategies.
+   */
+  if (res == GST_AUTOPLUG_SELECT_TRY)
+    return TRUE;
 
   return FALSE;
 }
@@ -741,9 +821,11 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * next factory.
    *
    * <note>
-   *   Only the signal handler that is connected first will ever by invoked.
-   *   Don't connect signal handlers with the #G_CONNECT_AFTER flag to this
-   *   signal, they will never be invoked!
+   *   The signal handler will not be invoked if any of the previously
+   *   registered signal handlers (if any) return a value other than
+   *   GST_AUTOPLUG_SELECT_TRY. Which also means that if you return
+   *   GST_AUTOPLUG_SELECT_TRY from one signal handler, handlers that get
+   *   registered next (again, if any) can override that decision.
    * </note>
    *
    * Returns: a #GST_TYPE_AUTOPLUG_SELECT_RESULT that indicates the required
@@ -759,12 +841,31 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
       GST_TYPE_ELEMENT_FACTORY);
 
   /**
+   * GstDecodeBin::autoplug-query:
+   * @bin: The decodebin.
+   * @pad: The #GstPad.
+   * @child: The child element doing the query
+   * @query: The #GstQuery.
+   *
+   * This signal is emitted whenever an autoplugged element that is
+   * not linked downstream yet and not exposed does a query. It can
+   * be used to tell the element about the downstream supported caps
+   * for example.
+   *
+   * Returns: #TRUE if the query was handled, #FALSE otherwise.
+   */
+  gst_decode_bin_signals[SIGNAL_AUTOPLUG_QUERY] =
+      g_signal_new ("autoplug-query", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstDecodeBinClass, autoplug_query),
+      _gst_boolean_or_accumulator, NULL, g_cclosure_marshal_generic,
+      G_TYPE_BOOLEAN, 3, GST_TYPE_PAD, GST_TYPE_ELEMENT,
+      GST_TYPE_QUERY | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+  /**
    * GstDecodeBin::drained
    * @bin: The decodebin
    *
    * This signal is emitted once decodebin has finished decoding all the data.
-   *
-   * Since: 0.10.16
    */
   gst_decode_bin_signals[SIGNAL_DRAINED] =
       g_signal_new ("drained", G_TYPE_FROM_CLASS (klass),
@@ -793,8 +894,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    *
    * Activate buffering in decodebin. This will instruct the multiqueues behind
    * decoders to emit BUFFERING messages.
-
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_USE_BUFFERING,
       g_param_spec_boolean ("use-buffering", "Use Buffering",
@@ -805,8 +904,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin:low-percent
    *
    * Low threshold percent for buffering to start.
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_LOW_PERCENT,
       g_param_spec_int ("low-percent", "Low percent",
@@ -816,8 +913,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin:high-percent
    *
    * High threshold percent for buffering to finish.
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_HIGH_PERCENT,
       g_param_spec_int ("high-percent", "High percent",
@@ -828,8 +923,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin:max-size-bytes
    *
    * Max amount of bytes in the queue (0=automatic).
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_MAX_SIZE_BYTES,
       g_param_spec_uint ("max-size-bytes", "Max. size (bytes)",
@@ -840,8 +933,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin:max-size-buffers
    *
    * Max amount of buffers in the queue (0=automatic).
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_MAX_SIZE_BUFFERS,
       g_param_spec_uint ("max-size-buffers", "Max. size (buffers)",
@@ -852,8 +943,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin:max-size-time
    *
    * Max amount of time in the queue (in ns, 0=automatic).
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_MAX_SIZE_TIME,
       g_param_spec_uint64 ("max-size-time", "Max. size (ns)",
@@ -865,8 +954,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin::post-stream-topology
    *
    * Post stream-topology messages on the bus every time the topology changes.
-   *
-   * Since: 0.10.26
    */
   g_object_class_install_property (gobject_klass, PROP_POST_STREAM_TOPOLOGY,
       g_param_spec_boolean ("post-stream-topology", "Post Stream Topology",
@@ -883,8 +970,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * caps (see 'caps' property) will have a pad exposed. Streams that do not
    * match those caps but could have been decoded will not have decoder plugged
    * in internally and will not have a pad exposed.
-   *
-   * Since: 0.10.30
    */
   g_object_class_install_property (gobject_klass, PROP_EXPOSE_ALL_STREAMS,
       g_param_spec_boolean ("expose-all-streams", "Expose All Streams",
@@ -896,8 +981,6 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
    * GstDecodeBin2::connection-speed
    *
    * Network connection speed in kbps (0 = unknownw)
-   *
-   * Since: 0.10.XX
    */
   g_object_class_install_property (gobject_klass, PROP_CONNECTION_SPEED,
       g_param_spec_uint64 ("connection-speed", "Connection Speed",
@@ -913,11 +996,12 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
       GST_DEBUG_FUNCPTR (gst_decode_bin_autoplug_factories);
   klass->autoplug_sort = GST_DEBUG_FUNCPTR (gst_decode_bin_autoplug_sort);
   klass->autoplug_select = GST_DEBUG_FUNCPTR (gst_decode_bin_autoplug_select);
+  klass->autoplug_query = GST_DEBUG_FUNCPTR (gst_decode_bin_autoplug_query);
 
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&decoder_bin_sink_template));
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&decoder_bin_src_template));
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &decoder_bin_sink_template);
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &decoder_bin_src_template);
 
   gst_element_class_set_static_metadata (gstelement_klass,
       "Decoder Bin", "Generic/Bin/Decoder",
@@ -931,41 +1015,10 @@ gst_decode_bin_class_init (GstDecodeBinClass * klass)
   gstbin_klass->handle_message =
       GST_DEBUG_FUNCPTR (gst_decode_bin_handle_message);
 
+  gstbin_klass->remove_element =
+      GST_DEBUG_FUNCPTR (gst_decode_bin_remove_element);
+
   g_type_class_ref (GST_TYPE_DECODE_PAD);
-}
-
-gint
-_decode_bin_compare_factories_func (gconstpointer p1, gconstpointer p2)
-{
-  GstPluginFeature *f1, *f2;
-  gint diff;
-  gboolean is_parser1, is_parser2;
-
-  f1 = (GstPluginFeature *) p1;
-  f2 = (GstPluginFeature *) p2;
-
-  is_parser1 = gst_element_factory_list_is_type (GST_ELEMENT_FACTORY_CAST (f1),
-      GST_ELEMENT_FACTORY_TYPE_PARSER);
-  is_parser2 = gst_element_factory_list_is_type (GST_ELEMENT_FACTORY_CAST (f2),
-      GST_ELEMENT_FACTORY_TYPE_PARSER);
-
-
-  /* We want all parsers first as we always want to plug parsers
-   * before decoders */
-  if (is_parser1 && !is_parser2)
-    return -1;
-  else if (!is_parser1 && is_parser2)
-    return 1;
-
-  /* And if it's a both a parser we first sort by rank
-   * and then by factory name */
-  diff = gst_plugin_feature_get_rank (f2) - gst_plugin_feature_get_rank (f1);
-  if (diff != 0)
-    return diff;
-
-  diff = strcmp (GST_OBJECT_NAME (f2), GST_OBJECT_NAME (f1));
-
-  return diff;
 }
 
 /* Must be called with factories lock! */
@@ -982,7 +1035,8 @@ gst_decode_bin_update_factories_list (GstDecodeBin * dbin)
         gst_element_factory_list_get_elements
         (GST_ELEMENT_FACTORY_TYPE_DECODABLE, GST_RANK_MARGINAL);
     dbin->factories =
-        g_list_sort (dbin->factories, _decode_bin_compare_factories_func);
+        g_list_sort (dbin->factories,
+        gst_playback_utils_compare_factories_func);
     dbin->factories_cookie = cookie;
   }
 }
@@ -990,10 +1044,8 @@ gst_decode_bin_update_factories_list (GstDecodeBin * dbin)
 static void
 gst_decode_bin_init (GstDecodeBin * decode_bin)
 {
-  GST_OBJECT_FLAG_SET (decode_bin, GST_BIN_FLAG_NO_RESYNC);
-
   /* first filter out the interesting element factories */
-  decode_bin->factories_lock = g_mutex_new ();
+  g_mutex_init (&decode_bin->factories_lock);
 
   /* we create the typefind element only once */
   decode_bin->typefind = gst_element_factory_make ("typefind", "typefind");
@@ -1024,22 +1076,18 @@ gst_decode_bin_init (GstDecodeBin * decode_bin)
 
     gst_object_unref (pad_tmpl);
     gst_object_unref (pad);
-
-    /* connect a signal to find out when the typefind element found
-     * a type */
-    decode_bin->have_type_id =
-        g_signal_connect (G_OBJECT (decode_bin->typefind), "have-type",
-        G_CALLBACK (type_found), decode_bin);
   }
 
-  decode_bin->expose_lock = g_mutex_new ();
+  g_mutex_init (&decode_bin->expose_lock);
   decode_bin->decode_chain = NULL;
 
-  decode_bin->dyn_lock = g_mutex_new ();
+  g_mutex_init (&decode_bin->dyn_lock);
   decode_bin->shutdown = FALSE;
   decode_bin->blocked_pads = NULL;
 
-  decode_bin->subtitle_lock = g_mutex_new ();
+  g_mutex_init (&decode_bin->subtitle_lock);
+  g_mutex_init (&decode_bin->buffering_lock);
+  g_mutex_init (&decode_bin->buffering_post_lock);
 
   decode_bin->encoding = g_strdup (DEFAULT_SUBTITLE_ENCODING);
   decode_bin->caps = gst_static_caps_get (&default_raw_caps);
@@ -1090,25 +1138,12 @@ gst_decode_bin_finalize (GObject * object)
 
   decode_bin = GST_DECODE_BIN (object);
 
-  if (decode_bin->expose_lock) {
-    g_mutex_free (decode_bin->expose_lock);
-    decode_bin->expose_lock = NULL;
-  }
-
-  if (decode_bin->dyn_lock) {
-    g_mutex_free (decode_bin->dyn_lock);
-    decode_bin->dyn_lock = NULL;
-  }
-
-  if (decode_bin->subtitle_lock) {
-    g_mutex_free (decode_bin->subtitle_lock);
-    decode_bin->subtitle_lock = NULL;
-  }
-
-  if (decode_bin->factories_lock) {
-    g_mutex_free (decode_bin->factories_lock);
-    decode_bin->factories_lock = NULL;
-  }
+  g_mutex_clear (&decode_bin->expose_lock);
+  g_mutex_clear (&decode_bin->dyn_lock);
+  g_mutex_clear (&decode_bin->subtitle_lock);
+  g_mutex_clear (&decode_bin->buffering_lock);
+  g_mutex_clear (&decode_bin->buffering_post_lock);
+  g_mutex_clear (&decode_bin->factories_lock);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -1336,12 +1371,12 @@ gst_decode_bin_autoplug_factories (GstElement * element, GstPad * pad,
   GST_DEBUG_OBJECT (element, "finding factories");
 
   /* return all compatible factories for caps */
-  g_mutex_lock (dbin->factories_lock);
+  g_mutex_lock (&dbin->factories_lock);
   gst_decode_bin_update_factories_list (dbin);
   list =
       gst_element_factory_list_filter (dbin->factories, caps, GST_PAD_SINK,
-      FALSE);
-  g_mutex_unlock (dbin->factories_lock);
+      gst_caps_is_fixed (caps));
+  g_mutex_unlock (&dbin->factories_lock);
 
   result = g_value_array_new (g_list_length (list));
   for (tmp = list; tmp; tmp = tmp->next) {
@@ -1377,17 +1412,26 @@ gst_decode_bin_autoplug_select (GstElement * element, GstPad * pad,
   return GST_AUTOPLUG_SELECT_TRY;
 }
 
+static gboolean
+gst_decode_bin_autoplug_query (GstElement * element, GstPad * pad,
+    GstQuery * query)
+{
+  /* No query handled here */
+  return FALSE;
+}
+
 /********
  * Discovery methods
  *****/
 
 static gboolean are_final_caps (GstDecodeBin * dbin, GstCaps * caps);
 static gboolean is_demuxer_element (GstElement * srcelement);
+static gboolean is_adaptive_demuxer_element (GstElement * srcelement);
 
 static gboolean connect_pad (GstDecodeBin * dbin, GstElement * src,
     GstDecodePad * dpad, GstPad * pad, GstCaps * caps, GValueArray * factories,
-    GstDecodeChain * chain);
-static gboolean connect_element (GstDecodeBin * dbin, GstElement * element,
+    GstDecodeChain * chain, gchar ** deadend_details);
+static GList *connect_element (GstDecodeBin * dbin, GstDecodeElement * delem,
     GstDecodeChain * chain);
 static void expose_pad (GstDecodeBin * dbin, GstElement * src,
     GstDecodePad * dpad, GstPad * pad, GstCaps * caps, GstDecodeChain * chain);
@@ -1401,6 +1445,37 @@ static void no_more_pads_cb (GstElement * element, GstDecodeChain * chain);
 static GstDecodeGroup *gst_decode_chain_get_current_group (GstDecodeChain *
     chain);
 
+static gboolean
+clear_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  GST_DEBUG_OBJECT (pad, "clearing sticky event %" GST_PTR_FORMAT, *event);
+  gst_event_unref (*event);
+  *event = NULL;
+  return TRUE;
+}
+
+static gboolean
+copy_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  GstPad *gpad = GST_PAD_CAST (user_data);
+
+  GST_DEBUG_OBJECT (gpad, "store sticky event %" GST_PTR_FORMAT, *event);
+  gst_pad_store_sticky_event (gpad, *event);
+
+  return TRUE;
+}
+
+static void
+decode_pad_set_target (GstDecodePad * dpad, GstPad * target)
+{
+  gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), target);
+  if (target == NULL)
+    gst_pad_sticky_events_foreach (GST_PAD_CAST (dpad), clear_sticky_events,
+        NULL);
+  else
+    gst_pad_sticky_events_foreach (target, copy_sticky_events, dpad);
+}
+
 /* called when a new pad is discovered. It will perform some basic actions
  * before trying to link something to it.
  *
@@ -1413,9 +1488,10 @@ static GstDecodeGroup *gst_decode_chain_get_current_group (GstDecodeChain *
  *  - get list of factories to autoplug.
  *  - continue autoplugging to one of the factories.
  */
-static void
+/* returns whether to expose the pad */
+static gboolean
 analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
-    GstCaps * caps, GstDecodeChain * chain)
+    GstCaps * caps, GstDecodeChain * chain, GstDecodeChain ** new_chain)
 {
   gboolean apcontinue = TRUE;
   GValueArray *factories = NULL, *result = NULL;
@@ -1424,40 +1500,62 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
   const gchar *classification;
   gboolean is_parser_converter = FALSE;
   gboolean res;
+  gchar *deadend_details = NULL;
 
   GST_DEBUG_OBJECT (dbin, "Pad %s:%s caps:%" GST_PTR_FORMAT,
       GST_DEBUG_PAD_NAME (pad), caps);
+
+  if (new_chain)
+    *new_chain = chain;
 
   if (chain->elements
       && src != ((GstDecodeElement *) chain->elements->data)->element
       && src != ((GstDecodeElement *) chain->elements->data)->capsfilter) {
     GST_ERROR_OBJECT (dbin, "New pad from not the last element in this chain");
-    return;
+    return FALSE;
   }
 
   if (chain->endpad) {
     GST_ERROR_OBJECT (dbin, "New pad in a chain that is already complete");
-    return;
+    return FALSE;
   }
 
   if (chain->demuxer) {
     GstDecodeGroup *group;
     GstDecodeChain *oldchain = chain;
+    GstDecodeElement *demux = (chain->elements ? chain->elements->data : NULL);
+
+    if (chain->current_pad)
+      gst_object_unref (chain->current_pad);
+    chain->current_pad = NULL;
 
     /* we are adding a new pad for a demuxer (see is_demuxer_element(),
      * start a new chain for it */
     CHAIN_MUTEX_LOCK (oldchain);
     group = gst_decode_chain_get_current_group (chain);
-    if (group) {
-      chain = gst_decode_chain_new (dbin, group, pad);
+    if (group && !g_list_find (group->children, chain)) {
+      g_assert (new_chain != NULL);
+      *new_chain = chain = gst_decode_chain_new (dbin, group, pad);
       group->children = g_list_prepend (group->children, chain);
     }
     CHAIN_MUTEX_UNLOCK (oldchain);
     if (!group) {
       GST_WARNING_OBJECT (dbin, "No current group");
-      return;
+      return FALSE;
     }
+
+    /* If this is not a dynamic pad demuxer, we're no-more-pads
+     * already before anything else happens
+     */
+    if (demux == NULL || !demux->no_more_pads_id)
+      group->no_more_pads = TRUE;
   }
+
+  /* From here on we own a reference to the caps as
+   * we might create new caps below and would need
+   * to unref them later */
+  if (caps)
+    gst_caps_ref (caps);
 
   if ((caps == NULL) || gst_caps_is_empty (caps))
     goto unknown_type;
@@ -1465,12 +1563,17 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
   if (gst_caps_is_any (caps))
     goto any_caps;
 
-  dpad = gst_decode_pad_new (dbin, pad, chain);
+  if (!chain->current_pad)
+    chain->current_pad = gst_decode_pad_new (dbin, chain);
+
+  dpad = gst_object_ref (chain->current_pad);
+  gst_pad_set_active (GST_PAD_CAST (dpad), TRUE);
+  decode_pad_set_target (dpad, pad);
 
   /* 1. Emit 'autoplug-continue' the result will tell us if this pads needs
    * further autoplugging. Only do this for fixed caps, for unfixed caps
    * we will later come here again from the notify::caps handler. The
-   * problem with unfixed caps is that we can reliably tell if the output
+   * problem with unfixed caps is that, we can't reliably tell if the output
    * is e.g. accepted by a sink because only parts of the possible final
    * caps might be accepted by the sink. */
   if (gst_caps_is_fixed (caps))
@@ -1495,8 +1598,17 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
 
   /* 1.c when the caps are not fixed yet, we can't be sure what element to
    * connect. We delay autoplugging until the caps are fixed */
-  if (!is_parser_converter && !gst_caps_is_fixed (caps))
+  if (!is_parser_converter && !gst_caps_is_fixed (caps)) {
     goto non_fixed;
+  } else if (!is_parser_converter) {
+    gst_caps_unref (caps);
+    caps = gst_pad_get_current_caps (pad);
+    if (!caps) {
+      GST_DEBUG_OBJECT (dbin, "No final caps set yet, delaying autoplugging");
+      gst_object_unref (dpad);
+      goto setup_caps_delay;
+    }
+  }
 
   /* 1.d else get the factories and if there's no compatible factory goto
    * unknown_type */
@@ -1514,7 +1626,7 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
       GstCaps *raw = gst_static_caps_get (&default_raw_caps);
 
       /* If the caps are raw, this just means we don't want to expose them */
-      if (gst_caps_can_intersect (raw, caps)) {
+      if (gst_caps_is_subset (caps, raw)) {
         g_value_array_free (factories);
         gst_caps_unref (raw);
         gst_object_unref (dpad);
@@ -1600,11 +1712,9 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
   if (is_parser_converter) {
     GstCaps *filter_caps;
     gint i;
+    GstElement *capsfilter;
     GstPad *p;
     GstDecodeElement *delem;
-
-    g_assert (chain->elements != NULL);
-    delem = (GstDecodeElement *) chain->elements->data;
 
     filter_caps = gst_caps_new_empty ();
     for (i = 0; i < factories->n_values; i++) {
@@ -1616,7 +1726,9 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
       GST_DEBUG ("Trying factory %s",
           gst_plugin_feature_get_name (GST_PLUGIN_FEATURE (factory)));
 
-      if (gst_element_get_factory (src) == factory) {
+      if (gst_element_get_factory (src) == factory ||
+          gst_element_factory_list_is_type (factory,
+              GST_ELEMENT_FACTORY_TYPE_PARSER)) {
         GST_DEBUG ("Skipping factory");
         continue;
       }
@@ -1637,29 +1749,47 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
     /* Append the parser caps to prevent any not-negotiated errors */
     filter_caps = gst_caps_merge (filter_caps, gst_caps_ref (caps));
 
-    delem->capsfilter = gst_element_factory_make ("capsfilter", NULL);
-    g_object_set (G_OBJECT (delem->capsfilter), "caps", filter_caps, NULL);
-    gst_caps_unref (filter_caps);
-    gst_element_set_state (delem->capsfilter, GST_STATE_PAUSED);
-    gst_bin_add (GST_BIN_CAST (dbin), gst_object_ref (delem->capsfilter));
+    if (chain->elements) {
+      delem = (GstDecodeElement *) chain->elements->data;
+      capsfilter = delem->capsfilter =
+          gst_element_factory_make ("capsfilter", NULL);
+    } else {
+      delem = g_slice_new0 (GstDecodeElement);
+      capsfilter = delem->element =
+          gst_element_factory_make ("capsfilter", NULL);
+      delem->capsfilter = NULL;
+      chain->elements = g_list_prepend (chain->elements, delem);
+    }
 
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), NULL);
-    p = gst_element_get_static_pad (delem->capsfilter, "sink");
+    g_object_set (G_OBJECT (capsfilter), "caps", filter_caps, NULL);
+    gst_caps_unref (filter_caps);
+    gst_element_set_state (capsfilter, GST_STATE_PAUSED);
+    gst_bin_add (GST_BIN_CAST (dbin), gst_object_ref (capsfilter));
+
+    decode_pad_set_target (dpad, NULL);
+    p = gst_element_get_static_pad (capsfilter, "sink");
     gst_pad_link_full (pad, p, GST_PAD_LINK_CHECK_NOTHING);
     gst_object_unref (p);
-    p = gst_element_get_static_pad (delem->capsfilter, "src");
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), p);
+    p = gst_element_get_static_pad (capsfilter, "src");
+    decode_pad_set_target (dpad, p);
     pad = p;
 
-    if (!gst_caps_is_fixed (caps)) {
+    gst_caps_unref (caps);
+
+    caps = gst_pad_get_current_caps (pad);
+    if (!caps) {
+      GST_DEBUG_OBJECT (dbin, "No final caps set yet, delaying autoplugging");
+      gst_object_unref (dpad);
       g_value_array_free (factories);
-      goto non_fixed;
+      goto setup_caps_delay;
     }
   }
 
   /* 1.h else continue autoplugging something from the list. */
   GST_LOG_OBJECT (pad, "Let's continue discovery on this pad");
-  res = connect_pad (dbin, src, dpad, pad, caps, factories, chain);
+  res =
+      connect_pad (dbin, src, dpad, pad, caps, factories, chain,
+      &deadend_details);
 
   /* Need to unref the capsfilter srcpad here if
    * we inserted a capsfilter */
@@ -1672,39 +1802,47 @@ analyze_new_pad (GstDecodeBin * dbin, GstElement * src, GstPad * pad,
   if (!res)
     goto unknown_type;
 
-  return;
+  gst_caps_unref (caps);
+
+  return FALSE;
 
 expose_pad:
   {
-    GST_LOG_OBJECT (dbin, "Pad is final. autoplug-continue:%d", apcontinue);
-    expose_pad (dbin, src, dpad, pad, caps, chain);
+    GST_LOG_OBJECT (dbin, "Pad is final and should expose the pad. "
+        "autoplug-continue:%d", apcontinue);
     gst_object_unref (dpad);
-    return;
+    gst_caps_unref (caps);
+    return TRUE;
   }
 
 discarded_type:
   {
     GST_LOG_OBJECT (pad, "Known type, but discarded because not final caps");
     chain->deadend = TRUE;
-    chain->endcaps = gst_caps_ref (caps);
+    chain->endcaps = caps;
+    gst_object_replace ((GstObject **) & chain->current_pad, NULL);
 
     /* Try to expose anything */
     EXPOSE_LOCK (dbin);
-    if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-      gst_decode_bin_expose (dbin);
+    if (dbin->decode_chain) {
+      if (gst_decode_chain_is_complete (dbin->decode_chain)) {
+        gst_decode_bin_expose (dbin);
+      }
     }
     EXPOSE_UNLOCK (dbin);
     do_async_done (dbin);
 
-    return;
+    return FALSE;
   }
 
 unknown_type:
   {
     GST_LOG_OBJECT (pad, "Unknown type, posting message and firing signal");
 
+    chain->deadend_details = deadend_details;
     chain->deadend = TRUE;
-    chain->endcaps = gst_caps_ref (caps);
+    chain->endcaps = caps;
+    gst_object_replace ((GstObject **) & chain->current_pad, NULL);
 
     gst_element_post_message (GST_ELEMENT_CAST (dbin),
         gst_missing_decoder_message_new (GST_ELEMENT_CAST (dbin), caps));
@@ -1714,30 +1852,21 @@ unknown_type:
 
     /* Try to expose anything */
     EXPOSE_LOCK (dbin);
-    if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-      gst_decode_bin_expose (dbin);
+    if (dbin->decode_chain) {
+      if (gst_decode_chain_is_complete (dbin->decode_chain)) {
+        gst_decode_bin_expose (dbin);
+      }
     }
     EXPOSE_UNLOCK (dbin);
 
     if (src == dbin->typefind) {
-      gchar *desc;
-
-      if (caps && !gst_caps_is_empty (caps)) {
-        desc = gst_pb_utils_get_decoder_description (caps);
-        GST_ELEMENT_ERROR (dbin, STREAM, CODEC_NOT_FOUND,
-            (_("A %s plugin is required to play this stream, "
-                    "but not installed."), desc),
-            ("No decoder to handle media type '%s'",
-                gst_structure_get_name (gst_caps_get_structure (caps, 0))));
-        g_free (desc);
-      } else {
+      if (!caps || gst_caps_is_empty (caps)) {
         GST_ELEMENT_ERROR (dbin, STREAM, TYPE_NOT_FOUND,
-            (_("Could not determine type of stream")),
-            ("Stream caps %" GST_PTR_FORMAT, caps));
+            (_("Could not determine type of stream")), (NULL));
       }
       do_async_done (dbin);
     }
-    return;
+    return FALSE;
   }
 non_fixed:
   {
@@ -1765,7 +1894,7 @@ setup_caps_delay:
         gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
         pad_event_cb, ppad, NULL);
     chain->pending_pads = g_list_prepend (chain->pending_pads, ppad);
-    g_signal_connect (G_OBJECT (pad), "notify::caps",
+    ppad->notify_caps_id = g_signal_connect (pad, "notify::caps",
         G_CALLBACK (caps_notify_cb), chain);
     CHAIN_MUTEX_UNLOCK (chain);
 
@@ -1773,8 +1902,10 @@ setup_caps_delay:
      * we have to unref the pad */
     if (is_parser_converter)
       gst_object_unref (pad);
+    if (caps)
+      gst_caps_unref (caps);
 
-    return;
+    return FALSE;
   }
 }
 
@@ -1787,12 +1918,143 @@ add_error_filter (GstDecodeBin * dbin, GstElement * element)
 }
 
 static void
-remove_error_filter (GstDecodeBin * dbin, GstElement * element)
+remove_error_filter (GstDecodeBin * dbin, GstElement * element,
+    GstMessage ** error)
 {
+  GList *l;
+
   GST_OBJECT_LOCK (dbin);
   dbin->filtered = g_list_remove (dbin->filtered, element);
+
+  if (error)
+    *error = NULL;
+
+  l = dbin->filtered_errors;
+  while (l) {
+    GstMessage *msg = l->data;
+
+    if (GST_MESSAGE_SRC (msg) == GST_OBJECT_CAST (element)) {
+      /* Get the last error of this element, i.e. the earliest */
+      if (error)
+        gst_message_replace (error, msg);
+      gst_message_unref (msg);
+      l = dbin->filtered_errors = g_list_delete_link (dbin->filtered_errors, l);
+    } else {
+      l = l->next;
+    }
+  }
   GST_OBJECT_UNLOCK (dbin);
 }
+
+typedef struct
+{
+  gboolean ret;
+  GstPad *peer;
+} SendStickyEventsData;
+
+static gboolean
+send_sticky_event (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  SendStickyEventsData *data = user_data;
+  gboolean ret;
+
+  ret = gst_pad_send_event (data->peer, gst_event_ref (*event));
+  if (!ret)
+    data->ret = FALSE;
+
+  return data->ret;
+}
+
+static gboolean
+send_sticky_events (GstDecodeBin * dbin, GstPad * pad)
+{
+  SendStickyEventsData data;
+
+  data.ret = TRUE;
+  data.peer = gst_pad_get_peer (pad);
+
+  gst_pad_sticky_events_foreach (pad, send_sticky_event, &data);
+
+  gst_object_unref (data.peer);
+
+  return data.ret;
+}
+
+static gchar *
+error_message_to_string (GstMessage * msg)
+{
+  GError *err;
+  gchar *debug, *message, *full_message;
+
+  gst_message_parse_error (msg, &err, &debug);
+
+  message = gst_error_get_message (err->domain, err->code);
+
+  if (debug)
+    full_message = g_strdup_printf ("%s\n%s\n%s", message, err->message, debug);
+  else
+    full_message = g_strdup_printf ("%s\n%s", message, err->message);
+
+  g_free (message);
+  g_free (debug);
+  g_clear_error (&err);
+
+  return full_message;
+}
+
+static GstPadProbeReturn
+demuxer_source_pad_probe (GstPad * pad, GstPadProbeInfo * info,
+    gpointer user_data)
+{
+  GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+  GstDecodeGroup *group = (GstDecodeGroup *) user_data;
+  GstDecodeChain *parent_chain = group->parent;
+
+  GST_DEBUG_OBJECT (pad, "Saw event %s", GST_EVENT_TYPE_NAME (event));
+  /* Check if we are the active group, if not we need to proxy the flush
+   * events to the other groups (of which at least one is exposed, ensuring
+   * flushing properly propagates downstream of decodebin */
+  if (parent_chain->active_group == group)
+    return GST_PAD_PROBE_OK;
+
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
+    {
+      GList *tmp;
+      GST_DEBUG_OBJECT (pad, "Proxying flush events to inactive groups");
+      /* Proxy to active group */
+      for (tmp = parent_chain->active_group->reqpads; tmp; tmp = tmp->next) {
+        GstPad *reqpad = (GstPad *) tmp->data;
+        gst_pad_send_event (reqpad, gst_event_ref (event));
+      }
+      /* Proxy to other non-active groups (except ourself) */
+      for (tmp = parent_chain->next_groups; tmp; tmp = tmp->next) {
+        GList *tmp2;
+        GstDecodeGroup *tmpgroup = (GstDecodeGroup *) tmp->data;
+        if (tmpgroup != group) {
+          for (tmp2 = tmpgroup->reqpads; tmp2; tmp2 = tmp2->next) {
+            GstPad *reqpad = (GstPad *) tmp2->data;
+            gst_pad_send_event (reqpad, gst_event_ref (event));
+          }
+        }
+      }
+      flush_chain (parent_chain,
+          GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_START);
+    }
+      break;
+    default:
+      break;
+  }
+
+  return GST_PAD_PROBE_OK;
+}
+
+typedef struct
+{
+  GstDecodeChain *chain;
+  GstPad *pad;
+} PadExposeData;
 
 /* connect_pad:
  *
@@ -1807,11 +2069,12 @@ remove_error_filter (GstDecodeBin * dbin, GstElement * element)
 static gboolean
 connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     GstPad * pad, GstCaps * caps, GValueArray * factories,
-    GstDecodeChain * chain)
+    GstDecodeChain * chain, gchar ** deadend_details)
 {
   gboolean res = FALSE;
   GstPad *mqpad = NULL;
   gboolean is_demuxer = chain->parent && !chain->elements;      /* First pad after the demuxer */
+  GString *error_details = NULL;
 
   g_return_val_if_fail (factories != NULL, FALSE);
   g_return_val_if_fail (factories->n_values > 0, FALSE);
@@ -1826,13 +2089,21 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
         "is a demuxer, connecting the pad through multiqueue '%s'",
         GST_OBJECT_NAME (chain->parent->multiqueue));
 
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), NULL);
+    /* Set a flush-start/-stop probe on the downstream events */
+    gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_FLUSH,
+        demuxer_source_pad_probe, chain->parent, NULL);
+
+    decode_pad_set_target (dpad, NULL);
     if (!(mqpad = gst_decode_group_control_demuxer_pad (chain->parent, pad)))
       goto beach;
     src = chain->parent->multiqueue;
+    /* Forward sticky events to mq src pad to allow factory initialization */
+    gst_pad_sticky_events_foreach (pad, copy_sticky_events, mqpad);
     pad = mqpad;
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), pad);
+    decode_pad_set_target (dpad, pad);
   }
+
+  error_details = g_string_new ("");
 
   /* 2. Try to create an element and link to it */
   while (factories->n_values > 0) {
@@ -1843,11 +2114,15 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     GstPad *sinkpad;
     GParamSpec *pspec;
     gboolean subtitle;
+    GList *to_connect = NULL;
+    GList *to_expose = NULL;
+    gboolean is_parser = FALSE;
+    gboolean is_decoder = FALSE;
 
     /* Set dpad target to pad again, it might've been unset
      * below but we came back here because something failed
      */
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), pad);
+    decode_pad_set_target (dpad, pad);
 
     /* take first factory */
     factory = g_value_get_object (g_value_array_get_nth (factories, 0));
@@ -1908,8 +2183,10 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
      * parser is the only one that does not change the data. A
      * valid example for this would be multiple id3demux in a row.
      */
-    if (strstr (gst_element_factory_get_metadata (factory,
-                GST_ELEMENT_METADATA_KLASS), "Parser")) {
+    is_parser = strstr (gst_element_factory_get_metadata (factory,
+            GST_ELEMENT_METADATA_KLASS), "Parser") != NULL;
+
+    if (is_parser) {
       gboolean skip = FALSE;
       GList *l;
 
@@ -1923,6 +2200,15 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
           break;
         }
       }
+
+      if (!skip && chain->parent && chain->parent->parent) {
+        GstDecodeChain *parent_chain = chain->parent->parent;
+        GstDecodeElement *pelem =
+            parent_chain->elements ? parent_chain->elements->data : NULL;
+
+        if (pelem && gst_element_get_factory (pelem->element) == factory)
+          skip = TRUE;
+      }
       CHAIN_MUTEX_UNLOCK (chain);
       if (skip) {
         GST_DEBUG_OBJECT (dbin,
@@ -1930,6 +2216,7 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
             gst_plugin_feature_get_name (GST_PLUGIN_FEATURE_CAST (factory)));
         continue;
       }
+
     }
 
     /* emit autoplug-select to see what we should do with it. */
@@ -1956,11 +2243,14 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     }
 
     /* 2.0. Unlink pad */
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), NULL);
+    decode_pad_set_target (dpad, NULL);
 
     /* 2.1. Try to create an element */
     if ((element = gst_element_factory_create (factory, NULL)) == NULL) {
       GST_WARNING_OBJECT (dbin, "Could not create an element from %s",
+          gst_plugin_feature_get_name (GST_PLUGIN_FEATURE (factory)));
+      g_string_append_printf (error_details,
+          "Could not create an element from %s\n",
           gst_plugin_feature_get_name (GST_PLUGIN_FEATURE (factory)));
       continue;
     }
@@ -1969,11 +2259,16 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
      * to error while we test it using READY state. */
     add_error_filter (dbin, element);
 
+    /* We don't yet want the bin to control the element's state */
+    gst_element_set_locked_state (element, TRUE);
+
     /* ... add it ... */
     if (!(gst_bin_add (GST_BIN_CAST (dbin), element))) {
       GST_WARNING_OBJECT (dbin, "Couldn't add %s to the bin",
           GST_ELEMENT_NAME (element));
-      remove_error_filter (dbin, element);
+      remove_error_filter (dbin, element, NULL);
+      g_string_append_printf (error_details, "Couldn't add %s to the bin\n",
+          GST_ELEMENT_NAME (element));
       gst_object_unref (element);
       continue;
     }
@@ -1982,16 +2277,21 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     if (!(sinkpad = find_sink_pad (element))) {
       GST_WARNING_OBJECT (dbin, "Element %s doesn't have a sink pad",
           GST_ELEMENT_NAME (element));
-      remove_error_filter (dbin, element);
+      remove_error_filter (dbin, element, NULL);
+      g_string_append_printf (error_details,
+          "Element %s doesn't have a sink pad", GST_ELEMENT_NAME (element));
       gst_bin_remove (GST_BIN (dbin), element);
       continue;
     }
 
     /* ... and try to link */
-    if ((gst_pad_link (pad, sinkpad)) != GST_PAD_LINK_OK) {
+    if ((gst_pad_link_full (pad, sinkpad,
+                GST_PAD_LINK_CHECK_NOTHING)) != GST_PAD_LINK_OK) {
       GST_WARNING_OBJECT (dbin, "Link failed on pad %s:%s",
           GST_DEBUG_PAD_NAME (sinkpad));
-      remove_error_filter (dbin, element);
+      remove_error_filter (dbin, element, NULL);
+      g_string_append_printf (error_details, "Link failed on pad %s:%s",
+          GST_DEBUG_PAD_NAME (sinkpad));
       gst_object_unref (sinkpad);
       gst_bin_remove (GST_BIN (dbin), element);
       continue;
@@ -2000,30 +2300,107 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
     /* ... activate it ... */
     if ((gst_element_set_state (element,
                 GST_STATE_READY)) == GST_STATE_CHANGE_FAILURE) {
+      GstMessage *error_msg;
+
       GST_WARNING_OBJECT (dbin, "Couldn't set %s to READY",
           GST_ELEMENT_NAME (element));
-      remove_error_filter (dbin, element);
+      remove_error_filter (dbin, element, &error_msg);
+
+      if (error_msg) {
+        gchar *error_string = error_message_to_string (error_msg);
+        g_string_append_printf (error_details, "Couldn't set %s to READY:\n%s",
+            GST_ELEMENT_NAME (element), error_string);
+        gst_message_unref (error_msg);
+        g_free (error_string);
+      } else {
+        g_string_append_printf (error_details, "Couldn't set %s to READY",
+            GST_ELEMENT_NAME (element));
+      }
       gst_object_unref (sinkpad);
       gst_bin_remove (GST_BIN (dbin), element);
       continue;
     }
 
-    /* Stop filtering errors. */
-    remove_error_filter (dbin, element);
+    /* check if we still accept the caps on the pad after setting
+     * the element to READY */
+    if (!gst_pad_query_accept_caps (sinkpad, caps)) {
+      GstMessage *error_msg;
+
+      GST_WARNING_OBJECT (dbin, "Element %s does not accept caps",
+          GST_ELEMENT_NAME (element));
+
+      remove_error_filter (dbin, element, &error_msg);
+
+      if (error_msg) {
+        gchar *error_string = error_message_to_string (error_msg);
+        g_string_append_printf (error_details,
+            "Element %s does not accept caps:\n%s", GST_ELEMENT_NAME (element),
+            error_string);
+        gst_message_unref (error_msg);
+        g_free (error_string);
+      } else {
+        g_string_append_printf (error_details,
+            "Element %s does not accept caps", GST_ELEMENT_NAME (element));
+      }
+
+      gst_element_set_state (element, GST_STATE_NULL);
+      gst_object_unref (sinkpad);
+      gst_bin_remove (GST_BIN (dbin), element);
+      continue;
+    }
 
     gst_object_unref (sinkpad);
     GST_LOG_OBJECT (dbin, "linked on pad %s:%s", GST_DEBUG_PAD_NAME (pad));
 
     CHAIN_MUTEX_LOCK (chain);
-    delem = g_slice_new (GstDecodeElement);
+    delem = g_slice_new0 (GstDecodeElement);
     delem->element = gst_object_ref (element);
     delem->capsfilter = NULL;
     chain->elements = g_list_prepend (chain->elements, delem);
     chain->demuxer = is_demuxer_element (element);
+    chain->adaptive_demuxer = is_adaptive_demuxer_element (element);
+
+    is_decoder = strstr (gst_element_factory_get_metadata (factory,
+            GST_ELEMENT_METADATA_KLASS), "Decoder") != NULL;
+
+    /* For adaptive streaming demuxer we insert a multiqueue after
+     * this demuxer.
+     * Now for the case where we have a container stream inside these
+     * buffers, another demuxer will be plugged and after this second
+     * demuxer there will be a second multiqueue. This second multiqueue
+     * will get smaller buffers and will be the one emitting buffering
+     * messages.
+     * If we don't have a container stream inside the fragment buffers,
+     * we'll insert a multiqueue below right after the next element after
+     * the adaptive streaming demuxer. This is going to be a parser or
+     * decoder, and will output smaller buffers.
+     */
+    if (chain->parent && chain->parent->parent) {
+      GstDecodeChain *parent_chain = chain->parent->parent;
+
+      if (parent_chain->adaptive_demuxer && (is_parser || is_decoder))
+        chain->demuxer = TRUE;
+    }
+
+    /* If we are configured to use buffering and there is no demuxer in the
+     * chain, we still want a multiqueue, otherwise we will ignore the
+     * use-buffering property. In that case, we will insert a multiqueue after
+     * the parser or decoder - not elsewhere, otherwise we won't have
+     * timestamps.
+     */
+
+    if (!chain->parent && (is_parser || is_decoder) && dbin->use_buffering) {
+      chain->demuxer = TRUE;
+      if (is_decoder) {
+        GST_WARNING_OBJECT (dbin,
+            "Buffering messages used for decoded and non-parsed data");
+      }
+    }
+
     CHAIN_MUTEX_UNLOCK (chain);
 
     /* Set connection-speed property if needed */
-    if (chain->demuxer == TRUE) {
+    if (chain->demuxer) {
       GParamSpec *pspec;
 
       if ((pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (element),
@@ -2055,7 +2432,7 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
           wrong_type = TRUE;
         }
 
-        if (wrong_type == FALSE) {
+        if (!wrong_type) {
           GST_DEBUG_OBJECT (dbin, "setting connection-speed=%" G_GUINT64_FORMAT
               " to demuxer element", speed);
 
@@ -2063,9 +2440,6 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
         }
       }
     }
-
-    /* link this element further */
-    connect_element (dbin, element, chain);
 
     /* try to configure the subtitle encoding property when we can */
     pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (element),
@@ -2082,14 +2456,73 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
       subtitle = FALSE;
     }
 
+    /* link this element further */
+    to_connect = connect_element (dbin, delem, chain);
+
+    while (to_connect) {
+      GstPad *opad = to_connect->data;
+      gboolean expose_pad = FALSE;
+      GstDecodeChain *new_chain;
+      GstCaps *ocaps;
+
+      ocaps = get_pad_caps (opad);
+      expose_pad =
+          analyze_new_pad (dbin, delem->element, opad, ocaps, chain,
+          &new_chain);
+
+      if (ocaps)
+        gst_caps_unref (ocaps);
+
+      if (expose_pad) {
+        PadExposeData *expose_data = g_new0 (PadExposeData, 1);
+        expose_data->chain = new_chain;
+        expose_data->pad = gst_object_ref (opad);
+        to_expose = g_list_prepend (to_expose, expose_data);
+      }
+
+      gst_object_unref (opad);
+      to_connect = g_list_delete_link (to_connect, to_connect);
+    }
+    /* any pads left in to_expose are to be exposed */
+
     /* Bring the element to the state of the parent */
+
+    /* First lock element's sinkpad stream lock so no data reaches
+     * the possible new element added when caps are sent by element
+     * while we're still sending sticky events */
+    GST_PAD_STREAM_LOCK (sinkpad);
+
     if ((gst_element_set_state (element,
-                GST_STATE_PAUSED)) == GST_STATE_CHANGE_FAILURE) {
+                GST_STATE_PAUSED)) == GST_STATE_CHANGE_FAILURE ||
+        !send_sticky_events (dbin, pad)) {
       GstDecodeElement *dtmp = NULL;
       GstElement *tmp = NULL;
+      GstMessage *error_msg;
+
+      GST_PAD_STREAM_UNLOCK (sinkpad);
 
       GST_WARNING_OBJECT (dbin, "Couldn't set %s to PAUSED",
           GST_ELEMENT_NAME (element));
+
+      while (to_expose) {
+        PadExposeData *expose_data = to_expose->data;
+        gst_object_unref (expose_data->pad);
+        g_free (expose_data);
+        to_expose = g_list_delete_link (to_expose, to_expose);
+      }
+
+      remove_error_filter (dbin, element, &error_msg);
+
+      if (error_msg) {
+        gchar *error_string = error_message_to_string (error_msg);
+        g_string_append_printf (error_details, "Couldn't set %s to PAUSED:\n%s",
+            GST_ELEMENT_NAME (element), error_string);
+        gst_message_unref (error_msg);
+        g_free (error_string);
+      } else {
+        g_string_append_printf (error_details, "Couldn't set %s to PAUSED",
+            GST_ELEMENT_NAME (element));
+      }
 
       /* Remove all elements in this chain that were just added. No
        * other thread could've added elements in the meantime */
@@ -2102,9 +2535,12 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
 
         /* Disconnect any signal handlers that might be connected
          * in connect_element() or analyze_pad() */
-        g_signal_handlers_disconnect_by_func (tmp, pad_added_cb, chain);
-        g_signal_handlers_disconnect_by_func (tmp, pad_removed_cb, chain);
-        g_signal_handlers_disconnect_by_func (tmp, no_more_pads_cb, chain);
+        if (dtmp->pad_added_id)
+          g_signal_handler_disconnect (tmp, dtmp->pad_added_id);
+        if (dtmp->pad_removed_id)
+          g_signal_handler_disconnect (tmp, dtmp->pad_removed_id);
+        if (dtmp->no_more_pads_id)
+          g_signal_handler_disconnect (tmp, dtmp->no_more_pads_id);
 
         for (l = chain->pending_pads; l;) {
           GstPendingPad *pp = l->data;
@@ -2115,10 +2551,7 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
             continue;
           }
 
-          g_signal_handlers_disconnect_by_func (pp->pad, caps_notify_cb, chain);
-          gst_pad_remove_probe (pp->pad, pp->event_probe_id);
-          gst_object_unref (pp->pad);
-          g_slice_free (GstPendingPad, pp);
+          gst_pending_pad_free (pp);
 
           /* Remove element from the list, update list head and go to the
            * next element in the list */
@@ -2144,13 +2577,40 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
       CHAIN_MUTEX_UNLOCK (chain);
 
       continue;
+    } else {
+      /* Everything went well, the spice must flow now */
+      GST_PAD_STREAM_UNLOCK (sinkpad);
     }
+
+    /* Remove error filter now, from now on we can't gracefully
+     * handle errors of the element anymore */
+    remove_error_filter (dbin, element, NULL);
+
+    /* Now let the bin handle the state */
+    gst_element_set_locked_state (element, FALSE);
+
     if (subtitle) {
       SUBTITLE_LOCK (dbin);
       /* we added the element now, add it to the list of subtitle-encoding
        * elements when we can set the property */
       dbin->subtitles = g_list_prepend (dbin->subtitles, element);
       SUBTITLE_UNLOCK (dbin);
+    }
+
+    while (to_expose) {
+      PadExposeData *expose_data = to_expose->data;
+      GstCaps *ocaps;
+
+      ocaps = get_pad_caps (expose_data->pad);
+      expose_pad (dbin, delem->element, expose_data->chain->current_pad,
+          expose_data->pad, ocaps, expose_data->chain);
+
+      if (ocaps)
+        gst_caps_unref (ocaps);
+
+      gst_object_unref (expose_data->pad);
+      g_free (expose_data);
+      to_expose = g_list_delete_link (to_expose, to_expose);
     }
 
     res = TRUE;
@@ -2160,6 +2620,12 @@ connect_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
 beach:
   if (mqpad)
     gst_object_unref (mqpad);
+
+  if (error_details)
+    *deadend_details = g_string_free (error_details, (error_details->len == 0
+            || res));
+  else
+    *deadend_details = NULL;
 
   return res;
 }
@@ -2182,12 +2648,14 @@ get_pad_caps (GstPad * pad)
   return caps;
 }
 
-static gboolean
-connect_element (GstDecodeBin * dbin, GstElement * element,
+/* Returns a list of pads that can be connected to already and
+ * connects to pad-added and related signals */
+static GList *
+connect_element (GstDecodeBin * dbin, GstDecodeElement * delem,
     GstDecodeChain * chain)
 {
+  GstElement *element = delem->element;
   GList *pads;
-  gboolean res = TRUE;
   gboolean dynamic = FALSE;
   GList *to_connect = NULL;
 
@@ -2257,29 +2725,17 @@ connect_element (GstDecodeBin * dbin, GstElement * element,
   if (dynamic) {
     GST_LOG_OBJECT (dbin, "Adding signals to element %s in chain %p",
         GST_ELEMENT_NAME (element), chain);
-    g_signal_connect (G_OBJECT (element), "pad-added",
+    delem->pad_added_id = g_signal_connect (element, "pad-added",
         G_CALLBACK (pad_added_cb), chain);
-    g_signal_connect (G_OBJECT (element), "pad-removed",
+    delem->pad_removed_id = g_signal_connect (element, "pad-removed",
         G_CALLBACK (pad_removed_cb), chain);
-    g_signal_connect (G_OBJECT (element), "no-more-pads",
+    delem->no_more_pads_id = g_signal_connect (element, "no-more-pads",
         G_CALLBACK (no_more_pads_cb), chain);
   }
 
-  /* 3. for every available pad, connect it */
-  for (pads = to_connect; pads; pads = g_list_next (pads)) {
-    GstPad *pad = GST_PAD_CAST (pads->data);
-    GstCaps *caps;
+  /* 3. return all pads that can be connected to already */
 
-    caps = get_pad_caps (pad);
-    analyze_new_pad (dbin, element, pad, caps, chain);
-    if (caps)
-      gst_caps_unref (caps);
-
-    gst_object_unref (pad);
-  }
-  g_list_free (to_connect);
-
-  return res;
+  return to_connect;
 }
 
 /* expose_pad:
@@ -2304,11 +2760,11 @@ expose_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
   if (chain->parent && !chain->elements && src != chain->parent->multiqueue) {
     GST_LOG_OBJECT (src, "connecting the pad through multiqueue");
 
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), NULL);
+    decode_pad_set_target (dpad, NULL);
     if (!(mqpad = gst_decode_group_control_demuxer_pad (chain->parent, pad)))
       goto beach;
     pad = mqpad;
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), pad);
+    decode_pad_set_target (dpad, pad);
   }
 
   gst_decode_pad_activate (dpad, chain);
@@ -2316,8 +2772,10 @@ expose_pad (GstDecodeBin * dbin, GstElement * src, GstDecodePad * dpad,
   chain->endcaps = gst_caps_ref (caps);
 
   EXPOSE_LOCK (dbin);
-  if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-    gst_decode_bin_expose (dbin);
+  if (dbin->decode_chain) {
+    if (gst_decode_chain_is_complete (dbin->decode_chain)) {
+      gst_decode_bin_expose (dbin);
+    }
   }
   EXPOSE_UNLOCK (dbin);
 
@@ -2342,13 +2800,10 @@ check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad)
   query = gst_query_new_seeking (GST_FORMAT_BYTES);
   if (!gst_pad_peer_query (pad, query)) {
     GST_DEBUG_OBJECT (dbin, "seeking query failed");
-    gst_query_unref (query);
-    return FALSE;
+    goto done;
   }
 
   gst_query_parse_seeking (query, NULL, &seekable, &start, &stop);
-
-  gst_query_unref (query);
 
   /* try harder to query upstream size if we didn't get it the first time */
   if (seekable && stop == -1) {
@@ -2360,10 +2815,13 @@ check_upstream_seekable (GstDecodeBin * dbin, GstPad * pad)
    * practice even if it technically may be seekable */
   if (seekable && (start != 0 || stop <= start)) {
     GST_DEBUG_OBJECT (dbin, "seekable but unknown start/stop -> disable");
-    return FALSE;
+    seekable = FALSE;
+  } else {
+    GST_DEBUG_OBJECT (dbin, "upstream seekable: %d", seekable);
   }
 
-  GST_DEBUG_OBJECT (dbin, "upstream seekable: %d", seekable);
+done:
+  gst_query_unref (query);
   return seekable;
 }
 
@@ -2372,6 +2830,7 @@ type_found (GstElement * typefind, guint probability,
     GstCaps * caps, GstDecodeBin * decode_bin)
 {
   GstPad *pad, *sink_pad;
+  GstDecodeChain *chain;
 
   GST_DEBUG_OBJECT (decode_bin, "typefind found caps %" GST_PTR_FORMAT, caps);
 
@@ -2385,13 +2844,6 @@ type_found (GstElement * typefind, guint probability,
     goto exit;
   }
 
-  /* FIXME: we can only deal with one type, we don't yet support dynamically changing
-   * caps from the typefind element */
-  if (decode_bin->have_type || decode_bin->decode_chain)
-    goto exit;
-
-  decode_bin->have_type = TRUE;
-
   pad = gst_element_get_static_pad (typefind, "src");
   sink_pad = gst_element_get_static_pad (typefind, "sink");
 
@@ -2400,10 +2852,24 @@ type_found (GstElement * typefind, guint probability,
    * In typical cases, STREAM_LOCK is held and handles that, it need not
    * be held (if called from a proxied setcaps), so grab it anyway */
   GST_PAD_STREAM_LOCK (sink_pad);
-  decode_bin->decode_chain = gst_decode_chain_new (decode_bin, NULL, pad);
-  analyze_new_pad (decode_bin, typefind, pad, caps, decode_bin->decode_chain);
-  GST_PAD_STREAM_UNLOCK (sink_pad);
+  /* FIXME: we can only deal with one type, we don't yet support dynamically changing
+   * caps from the typefind element */
+  if (decode_bin->have_type || decode_bin->decode_chain) {
+  } else {
+    decode_bin->have_type = TRUE;
 
+    decode_bin->decode_chain = gst_decode_chain_new (decode_bin, NULL, pad);
+    chain = gst_decode_chain_ref (decode_bin->decode_chain);
+
+    if (analyze_new_pad (decode_bin, typefind, pad, caps,
+            decode_bin->decode_chain, NULL))
+      expose_pad (decode_bin, typefind, decode_bin->decode_chain->current_pad,
+          pad, caps, decode_bin->decode_chain);
+
+    gst_decode_chain_unref (chain);
+  }
+
+  GST_PAD_STREAM_UNLOCK (sink_pad);
   gst_object_unref (sink_pad);
   gst_object_unref (pad);
 
@@ -2424,13 +2890,17 @@ pad_event_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
   g_assert (dbin);
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_EOS:
-      GST_DEBUG_OBJECT (dbin, "Received EOS on a non final pad, this stream "
+      GST_DEBUG_OBJECT (pad, "Received EOS on a non final pad, this stream "
           "ended too early");
       chain->deadend = TRUE;
+      chain->drained = TRUE;
+      gst_object_replace ((GstObject **) & chain->current_pad, NULL);
       /* we don't set the endcaps because NULL endcaps means early EOS */
+
       EXPOSE_LOCK (dbin);
-      if (gst_decode_chain_is_complete (dbin->decode_chain))
-        gst_decode_bin_expose (dbin);
+      if (dbin->decode_chain)
+        if (gst_decode_chain_is_complete (dbin->decode_chain))
+          gst_decode_bin_expose (dbin);
       EXPOSE_UNLOCK (dbin);
       break;
     default:
@@ -2444,24 +2914,103 @@ pad_added_cb (GstElement * element, GstPad * pad, GstDecodeChain * chain)
 {
   GstCaps *caps;
   GstDecodeBin *dbin;
+  GstDecodeChain *new_chain;
 
   dbin = chain->dbin;
 
   GST_DEBUG_OBJECT (pad, "pad added, chain:%p", chain);
+  GST_PAD_STREAM_LOCK (pad);
+  if (!gst_pad_is_active (pad)) {
+    GST_PAD_STREAM_UNLOCK (pad);
+    GST_DEBUG_OBJECT (pad, "Ignoring pad-added from a deactivated pad");
+    return;
+  }
 
   caps = get_pad_caps (pad);
-  analyze_new_pad (dbin, element, pad, caps, chain);
+  if (analyze_new_pad (dbin, element, pad, caps, chain, &new_chain))
+    expose_pad (dbin, element, new_chain->current_pad, pad, caps, new_chain);
   if (caps)
     gst_caps_unref (caps);
 
-  EXPOSE_LOCK (dbin);
-  if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-    GST_LOG_OBJECT (dbin,
-        "That was the last dynamic object, now attempting to expose the group");
-    if (!gst_decode_bin_expose (dbin))
-      GST_WARNING_OBJECT (dbin, "Couldn't expose group");
+  GST_PAD_STREAM_UNLOCK (pad);
+}
+
+static GstPadProbeReturn
+sink_pad_event_probe (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
+{
+  GstDecodeGroup *group = (GstDecodeGroup *) user_data;
+  GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+  GstPad *peer = gst_pad_get_peer (pad);
+  GstPadProbeReturn proberet = GST_PAD_PROBE_OK;
+
+  GST_DEBUG_OBJECT (pad, "Got upstream event %s", GST_EVENT_TYPE_NAME (event));
+
+  if (peer == NULL) {
+    GST_DEBUG_OBJECT (pad, "We are unlinked !");
+    if (group->parent && group->parent->next_groups) {
+      GstDecodeGroup *last_group =
+          g_list_last (group->parent->next_groups)->data;
+      GST_DEBUG_OBJECT (pad, "We could send the event to another group (%p)",
+          last_group);
+      /* Grab another sinkpad for that last group through which we will forward this event */
+      if (last_group->reqpads) {
+        GstPad *sinkpad = (GstPad *) last_group->reqpads->data;
+        GstPad *otherpeer = gst_pad_get_peer (sinkpad);
+        if (otherpeer) {
+          GST_DEBUG_OBJECT (otherpeer, "Attempting to forward event");
+          if (gst_pad_send_event (otherpeer, gst_event_ref (event))) {
+            gst_event_unref (event);
+            proberet = GST_PAD_PROBE_HANDLED;
+          }
+          gst_object_unref (otherpeer);
+        }
+      } else {
+        GST_DEBUG_OBJECT (pad, "No request pads, can't forward event");
+      }
+    }
+  } else {
+    gst_object_unref (peer);
   }
-  EXPOSE_UNLOCK (dbin);
+
+  return proberet;
+}
+
+static GstPadProbeReturn
+sink_pad_query_probe (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
+{
+  GstDecodeGroup *group = (GstDecodeGroup *) user_data;
+  GstPad *peer = gst_pad_get_peer (pad);
+  GstQuery *query = GST_PAD_PROBE_INFO_QUERY (info);
+  GstPadProbeReturn proberet = GST_PAD_PROBE_OK;
+
+  GST_DEBUG_OBJECT (pad, "Got upstream query %s", GST_QUERY_TYPE_NAME (query));
+
+  if (peer == NULL) {
+    GST_DEBUG_OBJECT (pad, "We are unlinked !");
+    if (group->parent && group->parent->next_groups) {
+      GstDecodeGroup *last_group =
+          g_list_last (group->parent->next_groups)->data;
+      GST_DEBUG_OBJECT (pad, "We could send the query to another group");
+      /* Grab another sinkpad for that last group through which we will forward this event */
+      if (last_group->reqpads) {
+        GstPad *sinkpad = (GstPad *) last_group->reqpads->data;
+        GstPad *otherpeer = gst_pad_get_peer (sinkpad);
+        if (otherpeer) {
+          GST_DEBUG_OBJECT (otherpeer, "Attempting to forward query");
+          if (gst_pad_query (otherpeer, query)) {
+            proberet = GST_PAD_PROBE_HANDLED;
+          } else
+            GST_DEBUG ("FAILURE");
+          gst_object_unref (otherpeer);
+        } else
+          GST_DEBUG_OBJECT (sinkpad, "request pad not connected ??");
+      } else
+        GST_DEBUG_OBJECT (pad, "No request pads ???");
+    }
+  } else
+    gst_object_unref (peer);
+
+  return proberet;
 }
 
 static void
@@ -2479,7 +3028,6 @@ pad_removed_cb (GstElement * element, GstPad * pad, GstDecodeChain * chain)
     GstPad *opad = ppad->pad;
 
     if (pad == opad) {
-      g_signal_handlers_disconnect_by_func (pad, caps_notify_cb, chain);
       gst_pending_pad_free (ppad);
       chain->pending_pads = g_list_delete_link (chain->pending_pads, l);
       break;
@@ -2513,7 +3061,12 @@ no_more_pads_cb (GstElement * element, GstDecodeChain * chain)
   if (!chain->next_groups && chain->active_group) {
     group = chain->active_group;
   } else if (chain->next_groups) {
-    group = chain->next_groups->data;
+    GList *iter;
+    for (iter = chain->next_groups; iter; iter = g_list_next (iter)) {
+      group = iter->data;
+      if (!group->no_more_pads)
+        break;
+    }
   }
   if (!group) {
     GST_ERROR_OBJECT (chain->dbin, "can't find group for element");
@@ -2533,8 +3086,10 @@ no_more_pads_cb (GstElement * element, GstDecodeChain * chain)
   CHAIN_MUTEX_UNLOCK (chain);
 
   EXPOSE_LOCK (chain->dbin);
-  if (gst_decode_chain_is_complete (chain->dbin->decode_chain)) {
-    gst_decode_bin_expose (chain->dbin);
+  if (chain->dbin->decode_chain) {
+    if (gst_decode_chain_is_complete (chain->dbin->decode_chain)) {
+      gst_decode_bin_expose (chain->dbin);
+    }
   }
   EXPOSE_UNLOCK (chain->dbin);
 }
@@ -2549,8 +3104,6 @@ caps_notify_cb (GstPad * pad, GParamSpec * unused, GstDecodeChain * chain)
 
   /* Disconnect this; if we still need it, we'll reconnect to this in
    * analyze_new_pad */
-  g_signal_handlers_disconnect_by_func (pad, caps_notify_cb, chain);
-
   element = GST_ELEMENT_CAST (gst_pad_get_parent (pad));
 
   CHAIN_MUTEX_LOCK (chain);
@@ -2620,6 +3173,23 @@ is_demuxer_element (GstElement * srcelement)
   return TRUE;
 }
 
+static gboolean
+is_adaptive_demuxer_element (GstElement * srcelement)
+{
+  GstElementFactory *srcfactory;
+  const gchar *klass;
+
+  srcfactory = gst_element_get_factory (srcelement);
+  klass =
+      gst_element_factory_get_metadata (srcfactory, GST_ELEMENT_METADATA_KLASS);
+
+  /* Can't be a demuxer unless it has Demux in the klass name */
+  if (!strstr (klass, "Demux") || !strstr (klass, "Adaptive"))
+    return FALSE;
+
+  return TRUE;
+}
+
 /* Returns TRUE if the caps are compatible with the caps specified in the 'caps'
  * property (which by default are the raw caps)
  *
@@ -2634,7 +3204,7 @@ are_final_caps (GstDecodeBin * dbin, GstCaps * caps)
 
   /* lock for getting the caps */
   GST_OBJECT_LOCK (dbin);
-  res = gst_caps_can_intersect (dbin->caps, caps);
+  res = gst_caps_is_subset (caps, dbin->caps);
   GST_OBJECT_UNLOCK (dbin);
 
   GST_LOG_OBJECT (dbin, "Caps are %sfinal caps", res ? "" : "not ");
@@ -2642,9 +3212,43 @@ are_final_caps (GstDecodeBin * dbin, GstCaps * caps)
   return res;
 }
 
+/* gst_decode_bin_reset_buffering:
+ *
+ * Enables buffering on the last multiqueue of each group only,
+ * disabling the rest
+ *
+ */
+static void
+gst_decode_bin_reset_buffering (GstDecodeBin * dbin)
+{
+  if (!dbin->use_buffering)
+    return;
+
+  GST_DEBUG_OBJECT (dbin, "Reseting multiqueues buffering");
+  if (dbin->decode_chain) {
+    CHAIN_MUTEX_LOCK (dbin->decode_chain);
+    gst_decode_chain_reset_buffering (dbin->decode_chain);
+    CHAIN_MUTEX_UNLOCK (dbin->decode_chain);
+  }
+}
+
 /****
  * GstDecodeChain functions
  ****/
+
+static gboolean
+gst_decode_chain_reset_buffering (GstDecodeChain * chain)
+{
+  GstDecodeGroup *group;
+
+  group = chain->active_group;
+  GST_LOG_OBJECT (chain->dbin, "Resetting chain %p buffering, active group: %p",
+      chain, group);
+  if (group) {
+    return gst_decode_group_reset_buffering (group);
+  }
+  return FALSE;
+}
 
 /* gst_decode_chain_get_current_group:
  *
@@ -2682,12 +3286,21 @@ gst_decode_chain_get_current_group (GstDecodeChain * chain)
   } else if (!chain->active_group->overrun
       && !chain->active_group->no_more_pads) {
     group = chain->active_group;
-  } else if (chain->next_groups && (group = chain->next_groups->data)
-      && !group->overrun && !group->no_more_pads) {
-    /* group = chain->next_groups->data */
   } else {
+    GList *iter;
+    group = NULL;
+    for (iter = chain->next_groups; iter; iter = g_list_next (iter)) {
+      GstDecodeGroup *next_group = iter->data;
+
+      if (!next_group->overrun && !next_group->no_more_pads) {
+        group = next_group;
+        break;
+      }
+    }
+  }
+  if (!group) {
     group = gst_decode_group_new (chain->dbin, chain);
-    chain->next_groups = g_list_prepend (chain->next_groups, group);
+    chain->next_groups = g_list_append (chain->next_groups, group);
   }
 
   return group;
@@ -2697,9 +3310,25 @@ static void gst_decode_group_free_internal (GstDecodeGroup * group,
     gboolean hide);
 
 static void
+gst_decode_chain_unref (GstDecodeChain * chain)
+{
+  if (g_atomic_int_dec_and_test (&chain->refs)) {
+    g_mutex_clear (&chain->lock);
+    g_slice_free (GstDecodeChain, chain);
+  }
+}
+
+static GstDecodeChain *
+gst_decode_chain_ref (GstDecodeChain * chain)
+{
+  g_atomic_int_inc (&chain->refs);
+  return chain;
+}
+
+static void
 gst_decode_chain_free_internal (GstDecodeChain * chain, gboolean hide)
 {
-  GList *l;
+  GList *l, *set_to_null = NULL;
 
   CHAIN_MUTEX_LOCK (chain);
 
@@ -2734,9 +3363,6 @@ gst_decode_chain_free_internal (GstDecodeChain * chain, gboolean hide)
 
   for (l = chain->pending_pads; l; l = l->next) {
     GstPendingPad *ppad = l->data;
-    GstPad *pad = ppad->pad;
-
-    g_signal_handlers_disconnect_by_func (pad, caps_notify_cb, chain);
     gst_pending_pad_free (ppad);
     l->data = NULL;
   }
@@ -2747,23 +3373,30 @@ gst_decode_chain_free_internal (GstDecodeChain * chain, gboolean hide)
     GstDecodeElement *delem = l->data;
     GstElement *element = delem->element;
 
-    g_signal_handlers_disconnect_by_func (element, pad_added_cb, chain);
-    g_signal_handlers_disconnect_by_func (element, pad_removed_cb, chain);
-    g_signal_handlers_disconnect_by_func (element, no_more_pads_cb, chain);
+    if (delem->pad_added_id)
+      g_signal_handler_disconnect (element, delem->pad_added_id);
+    delem->pad_added_id = 0;
+    if (delem->pad_removed_id)
+      g_signal_handler_disconnect (element, delem->pad_removed_id);
+    delem->pad_removed_id = 0;
+    if (delem->no_more_pads_id)
+      g_signal_handler_disconnect (element, delem->no_more_pads_id);
+    delem->no_more_pads_id = 0;
 
     if (delem->capsfilter) {
       if (GST_OBJECT_PARENT (delem->capsfilter) ==
           GST_OBJECT_CAST (chain->dbin))
         gst_bin_remove (GST_BIN_CAST (chain->dbin), delem->capsfilter);
       if (!hide) {
-        gst_element_set_state (delem->capsfilter, GST_STATE_NULL);
+        set_to_null =
+            g_list_append (set_to_null, gst_object_ref (delem->capsfilter));
       }
     }
 
     if (GST_OBJECT_PARENT (element) == GST_OBJECT_CAST (chain->dbin))
       gst_bin_remove (GST_BIN_CAST (chain->dbin), element);
     if (!hide) {
-      gst_element_set_state (element, GST_STATE_NULL);
+      set_to_null = g_list_append (set_to_null, gst_object_ref (element));
     }
 
     SUBTITLE_LOCK (chain->dbin);
@@ -2794,12 +3427,17 @@ gst_decode_chain_free_internal (GstDecodeChain * chain, gboolean hide)
           GST_PAD_CAST (chain->endpad));
     }
 
-    gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (chain->endpad), NULL);
+    decode_pad_set_target (chain->endpad, NULL);
     chain->endpad->exposed = FALSE;
     if (!hide) {
       gst_object_unref (chain->endpad);
       chain->endpad = NULL;
     }
+  }
+
+  if (!hide && chain->current_pad) {
+    gst_object_unref (chain->current_pad);
+    chain->current_pad = NULL;
   }
 
   if (chain->pad) {
@@ -2811,14 +3449,22 @@ gst_decode_chain_free_internal (GstDecodeChain * chain, gboolean hide)
     gst_caps_unref (chain->endcaps);
     chain->endcaps = NULL;
   }
+  g_free (chain->deadend_details);
+  chain->deadend_details = NULL;
 
   GST_DEBUG_OBJECT (chain->dbin, "%s chain %p", (hide ? "Hidden" : "Freed"),
       chain);
   CHAIN_MUTEX_UNLOCK (chain);
-  if (!hide) {
-    g_mutex_free (chain->lock);
-    g_slice_free (GstDecodeChain, chain);
+
+  while (set_to_null) {
+    GstElement *element = set_to_null->data;
+    set_to_null = g_list_delete_link (set_to_null, set_to_null);
+    gst_element_set_state (element, GST_STATE_NULL);
+    gst_object_unref (element);
   }
+
+  if (!hide)
+    gst_decode_chain_unref (chain);
 }
 
 /* gst_decode_chain_free:
@@ -2853,7 +3499,8 @@ gst_decode_chain_new (GstDecodeBin * dbin, GstDecodeGroup * parent,
 
   chain->dbin = dbin;
   chain->parent = parent;
-  chain->lock = g_mutex_new ();
+  chain->refs = 1;
+  g_mutex_init (&chain->lock);
   chain->pad = gst_object_ref (pad);
 
   return chain;
@@ -2893,11 +3540,13 @@ multi_queue_overrun_cb (GstElement * queue, GstDecodeGroup * group)
    */
 
   EXPOSE_LOCK (dbin);
-  if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-    if (!gst_decode_bin_expose (dbin))
-      GST_WARNING_OBJECT (dbin, "Couldn't expose group");
+  if (dbin->decode_chain) {
+    if (gst_decode_chain_is_complete (dbin->decode_chain)) {
+      if (!gst_decode_bin_expose (dbin))
+        GST_WARNING_OBJECT (dbin, "Couldn't expose group");
+    }
   }
-  EXPOSE_UNLOCK (group->dbin);
+  EXPOSE_UNLOCK (dbin);
 }
 
 static void
@@ -2946,7 +3595,7 @@ gst_decode_group_free_internal (GstDecodeGroup * group, gboolean hide)
     }
   }
 
-  GST_DEBUG_OBJECT (group->dbin, "%s group %p", (hide ? "Hided" : "Freed"),
+  GST_DEBUG_OBJECT (group->dbin, "%s group %p", (hide ? "Hid" : "Freed"),
       group);
   if (!hide)
     g_slice_free (GstDecodeGroup, group);
@@ -2986,36 +3635,113 @@ gst_decode_group_hide (GstDecodeGroup * group)
   gst_decode_group_free_internal (group, TRUE);
 }
 
-/* configure queue sizes, this depends on the buffering method and if we are
- * playing or prerolling. */
+/* gst_decode_chain_free_hidden_groups:
+ *
+ * Frees any decode groups that were hidden previously.
+ * This allows keeping memory use from ballooning when
+ * switching chains repeatedly.
+ *
+ * A new throwaway thread will be created to free the
+ * groups, so any delay does not block the setup of a
+ * new group.
+ *
+ * Not MT-safe, call with parent's chain lock!
+ */
+static void
+gst_decode_chain_free_hidden_groups (GList * old_groups)
+{
+  GList *l;
+
+  for (l = old_groups; l; l = l->next) {
+    GstDecodeGroup *group = l->data;
+
+    gst_decode_group_free (group);
+  }
+  g_list_free (old_groups);
+}
+
+static void
+gst_decode_chain_start_free_hidden_groups_thread (GstDecodeChain * chain)
+{
+  GThread *thread;
+  GError *error = NULL;
+  GList *old_groups;
+
+  old_groups = chain->old_groups;
+  if (!old_groups)
+    return;
+
+  chain->old_groups = NULL;
+  thread = g_thread_try_new ("free-hidden-groups",
+      (GThreadFunc) gst_decode_chain_free_hidden_groups, old_groups, &error);
+  if (!thread || error) {
+    GST_ERROR ("Failed to start free-hidden-groups thread: %s",
+        error ? error->message : "unknown reason");
+    g_clear_error (&error);
+    chain->old_groups = old_groups;
+    return;
+  }
+  GST_DEBUG_OBJECT (chain->dbin, "Started free-hidden-groups thread");
+  /* We do not need to wait for it or get any results from it */
+  g_thread_unref (thread);
+}
+
 static void
 decodebin_set_queue_size (GstDecodeBin * dbin, GstElement * multiqueue,
     gboolean preroll, gboolean seekable)
 {
+  gboolean use_buffering;
+
+  /* get the current config from the multiqueue */
+  g_object_get (multiqueue, "use-buffering", &use_buffering, NULL);
+
+  decodebin_set_queue_size_full (dbin, multiqueue, use_buffering, preroll,
+      seekable);
+}
+
+/* configure queue sizes, this depends on the buffering method and if we are
+ * playing or prerolling. */
+static void
+decodebin_set_queue_size_full (GstDecodeBin * dbin, GstElement * multiqueue,
+    gboolean use_buffering, gboolean preroll, gboolean seekable)
+{
   guint max_bytes, max_buffers;
   guint64 max_time;
 
-  if (preroll || dbin->use_buffering) {
+  GST_DEBUG_OBJECT (multiqueue, "use buffering %d", use_buffering);
+
+  if (preroll || use_buffering) {
     /* takes queue limits, initially we only queue up up to the max bytes limit,
      * with a default of 2MB. we use the same values for buffering mode. */
-    if ((max_bytes = dbin->max_size_bytes) == 0)
+    if (preroll || (max_bytes = dbin->max_size_bytes) == 0)
       max_bytes = AUTO_PREROLL_SIZE_BYTES;
-    if ((max_buffers = dbin->max_size_buffers) == 0)
+    if (preroll || (max_buffers = dbin->max_size_buffers) == 0)
       max_buffers = AUTO_PREROLL_SIZE_BUFFERS;
-    if ((max_time = dbin->max_size_time) == 0)
-      max_time = seekable ? AUTO_PREROLL_SEEKABLE_SIZE_TIME :
-          AUTO_PREROLL_NOT_SEEKABLE_SIZE_TIME;
+    if (preroll || (max_time = dbin->max_size_time) == 0) {
+      if (dbin->use_buffering && !preroll)
+        max_time = 5 * GST_SECOND;
+      else
+        max_time = seekable ? AUTO_PREROLL_SEEKABLE_SIZE_TIME :
+            AUTO_PREROLL_NOT_SEEKABLE_SIZE_TIME;
+    }
   } else {
     /* update runtime limits. At runtime, we try to keep the amount of buffers
      * in the queues as low as possible (but at least 5 buffers). */
-    if ((max_bytes = dbin->max_size_bytes) == 0)
+    if (dbin->use_buffering)
+      max_bytes = 0;
+    else if ((max_bytes = dbin->max_size_bytes) == 0)
       max_bytes = AUTO_PLAY_SIZE_BYTES;
     if ((max_buffers = dbin->max_size_buffers) == 0)
       max_buffers = AUTO_PLAY_SIZE_BUFFERS;
-    if ((max_time = dbin->max_size_time) == 0)
+    /* this is a multiqueue with disabled buffering, don't limit max_time */
+    if (dbin->use_buffering)
+      max_time = 0;
+    else if ((max_time = dbin->max_size_time) == 0)
       max_time = AUTO_PLAY_SIZE_TIME;
   }
 
+  GST_DEBUG_OBJECT (multiqueue, "setting limits %u bytes, %u buffers, "
+      "%" G_GUINT64_FORMAT " time", max_bytes, max_buffers, max_time);
   g_object_set (multiqueue,
       "max-size-bytes", max_bytes, "max-size-time", max_time,
       "max-size-buffers", max_buffers, NULL);
@@ -3045,14 +3771,6 @@ gst_decode_group_new (GstDecodeBin * dbin, GstDecodeChain * parent)
   if (G_UNLIKELY (!group->multiqueue))
     goto missing_multiqueue;
 
-  /* default is for use-buffering is FALSE */
-  if (dbin->use_buffering) {
-    g_object_set (mq,
-        "use-buffering", TRUE,
-        "low-percent", dbin->low_percent,
-        "high-percent", dbin->high_percent, NULL);
-  }
-
   /* configure queue sizes for preroll */
   seekable = FALSE;
   if (parent && parent->demuxer) {
@@ -3064,13 +3782,13 @@ gst_decode_group_new (GstDecodeBin * dbin, GstDecodeChain * parent)
       gst_object_unref (pad);
     }
   }
-  decodebin_set_queue_size (dbin, mq, TRUE, seekable);
+  decodebin_set_queue_size_full (dbin, mq, FALSE, TRUE, seekable);
 
-  group->overrunsig = g_signal_connect (G_OBJECT (mq), "overrun",
+  group->overrunsig = g_signal_connect (mq, "overrun",
       G_CALLBACK (multi_queue_overrun_cb), group);
 
-  gst_bin_add (GST_BIN (dbin), gst_object_ref (mq));
   gst_element_set_state (mq, GST_STATE_PAUSED);
+  gst_bin_add (GST_BIN (dbin), gst_object_ref (mq));
 
   return group;
 
@@ -3115,7 +3833,8 @@ gst_decode_group_control_demuxer_pad (GstDecodeGroup * group, GstPad * pad)
     return NULL;
   }
 
-  if ((gst_pad_link (pad, sinkpad) != GST_PAD_LINK_OK)) {
+  if ((gst_pad_link_full (pad, sinkpad,
+              GST_PAD_LINK_CHECK_NOTHING) != GST_PAD_LINK_OK)) {
     GST_ERROR_OBJECT (dbin, "Couldn't link demuxer and multiqueue");
     goto error;
   }
@@ -3129,12 +3848,18 @@ gst_decode_group_control_demuxer_pad (GstDecodeGroup * group, GstPad * pad)
         sinkpad);
     goto error;
   }
+  gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_EVENT_UPSTREAM,
+      sink_pad_event_probe, group, NULL);
+  gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_QUERY_UPSTREAM,
+      sink_pad_query_probe, group, NULL);
+
   CHAIN_MUTEX_LOCK (group->parent);
   group->reqpads = g_list_prepend (group->reqpads, gst_object_ref (sinkpad));
   CHAIN_MUTEX_UNLOCK (group->parent);
 
 beach:
-  g_value_unset (&item);
+  if (G_IS_VALUE (&item))
+    g_value_unset (&item);
   if (it)
     gst_iterator_free (it);
   gst_object_unref (sinkpad);
@@ -3192,12 +3917,15 @@ gst_decode_chain_is_complete (GstDecodeChain * chain)
   gboolean complete = FALSE;
 
   CHAIN_MUTEX_LOCK (chain);
+  if (chain->dbin->shutdown)
+    goto out;
+
   if (chain->deadend) {
     complete = TRUE;
     goto out;
   }
 
-  if (chain->endpad && (chain->endpad->blocked || chain->endpad->exposed)) {
+  if (chain->endpad && gst_decode_pad_is_exposable (chain->endpad)) {
     complete = TRUE;
     goto out;
   }
@@ -3214,6 +3942,68 @@ out:
   CHAIN_MUTEX_UNLOCK (chain);
   GST_DEBUG_OBJECT (chain->dbin, "Chain %p is complete: %d", chain, complete);
   return complete;
+}
+
+/* Flushing group/chains */
+static void
+flush_group (GstDecodeGroup * group, gboolean flushing)
+{
+  GList *tmp;
+
+  GST_DEBUG ("group %p flushing:%d", group, flushing);
+
+  if (group->drained == flushing)
+    return;
+  for (tmp = group->children; tmp; tmp = tmp->next) {
+    GstDecodeChain *chain = (GstDecodeChain *) tmp->data;
+    flush_chain (chain, flushing);
+  }
+  GST_DEBUG ("Setting group %p to drained:%d", group, flushing);
+  group->drained = flushing;
+}
+
+static void
+flush_chain (GstDecodeChain * chain, gboolean flushing)
+{
+  GList *tmp;
+  GstDecodeBin *dbin = chain->dbin;
+
+  GST_DEBUG_OBJECT (dbin, "chain %p (pad %s:%s) flushing:%d", chain,
+      GST_DEBUG_PAD_NAME (chain->pad), flushing);
+  if (chain->drained == flushing)
+    return;
+  /* if unflushing, check if we should switch to last group */
+  if (flushing == FALSE && chain->next_groups) {
+    GstDecodeGroup *target_group =
+        (GstDecodeGroup *) g_list_last (chain->next_groups)->data;
+    gst_decode_chain_start_free_hidden_groups_thread (chain);
+    /* Hide active group (we're sure it's not that one we'll be using) */
+    GST_DEBUG_OBJECT (dbin, "Switching from active group %p to group %p",
+        chain->active_group, target_group);
+    gst_decode_group_hide (chain->active_group);
+    chain->old_groups = g_list_prepend (chain->old_groups, chain->active_group);
+    chain->active_group = target_group;
+    /* Hide all groups but the target_group */
+    for (tmp = chain->next_groups; tmp; tmp = tmp->next) {
+      GstDecodeGroup *group = (GstDecodeGroup *) tmp->data;
+      if (group != target_group) {
+        gst_decode_group_hide (group);
+        chain->old_groups = g_list_prepend (chain->old_groups, group);
+      }
+    }
+    /* Clear next groups */
+    g_list_free (chain->next_groups);
+    chain->next_groups = NULL;
+  }
+  /* Mark all groups as flushing */
+  if (chain->active_group)
+    flush_group (chain->active_group, flushing);
+  for (tmp = chain->next_groups; tmp; tmp = tmp->next) {
+    GstDecodeGroup *group = (GstDecodeGroup *) tmp->data;
+    flush_group (group, flushing);
+  }
+  GST_DEBUG ("Setting chain %p to drained:%d", chain, flushing);
+  chain->drained = flushing;
 }
 
 static gboolean
@@ -3278,8 +4068,8 @@ drain_and_switch_chains (GstDecodeChain * chain, GstDecodePad * drainpad,
   gboolean handled = FALSE;
   GstDecodeBin *dbin = chain->dbin;
 
-  GST_DEBUG ("Checking chain %p (target pad %s:%s)",
-      chain, GST_DEBUG_PAD_NAME (drainpad));
+  GST_DEBUG ("Checking chain %p %s:%s (target pad %s:%s)",
+      chain, GST_DEBUG_PAD_NAME (chain->pad), GST_DEBUG_PAD_NAME (drainpad));
 
   CHAIN_MUTEX_LOCK (chain);
 
@@ -3287,10 +4077,10 @@ drain_and_switch_chains (GstDecodeChain * chain, GstDecodePad * drainpad,
   if (G_UNLIKELY (chain->drained)) {
     goto beach;
   }
-  
+
   if (chain->endpad) {
     /* Check if we're reached the target endchain */
-    if (chain == drainpad->chain) {
+    if (drainpad != NULL && chain == drainpad->chain) {
       GST_DEBUG ("Found the target chain");
       drainpad->drained = TRUE;
       handled = TRUE;
@@ -3311,7 +4101,7 @@ drain_and_switch_chains (GstDecodeChain * chain, GstDecodePad * drainpad,
         last_group, &subdrained, switched);
 
     /* The group is drained, see if we can switch to another */
-    if (handled && subdrained && !*switched) {
+    if ((handled || drainpad == NULL) && subdrained && !*switched) {
       if (chain->next_groups) {
         /* Switch to next group */
         GST_DEBUG_OBJECT (dbin, "Hiding current group %p", chain->active_group);
@@ -3323,14 +4113,18 @@ drain_and_switch_chains (GstDecodeChain * chain, GstDecodePad * drainpad,
         chain->active_group = chain->next_groups->data;
         chain->next_groups =
             g_list_delete_link (chain->next_groups, chain->next_groups);
+        gst_decode_chain_start_free_hidden_groups_thread (chain);
         *switched = TRUE;
         chain->drained = FALSE;
       } else {
         GST_DEBUG ("Group %p was the last in chain %p", chain->active_group,
             chain);
-        chain->drained = TRUE;	
+        chain->drained = TRUE;
         /* We're drained ! */
       }
+    } else {
+      if (subdrained && !chain->next_groups)
+        *drained = TRUE;
     }
   }
 
@@ -3358,18 +4152,44 @@ gst_decode_pad_handle_eos (GstDecodePad * pad)
   gboolean drained = FALSE;
   GstDecodeChain *chain = pad->chain;
   GstDecodeBin *dbin = chain->dbin;
+  GstEvent *tmp;
 
   GST_LOG_OBJECT (dbin, "pad %p", pad);
-  drain_and_switch_chains (dbin->decode_chain, pad, &last_group, &drained,
-      &switched);
 
-  if (switched) {
-    /* If we resulted in a group switch, expose what's needed */
-    EXPOSE_LOCK (dbin);
-    if (gst_decode_chain_is_complete (dbin->decode_chain))
-      gst_decode_bin_expose (dbin);
-    EXPOSE_UNLOCK (dbin);
+  /* Send a stream-group-done event in case downstream needs
+   * to unblock before we can drain */
+  tmp = gst_pad_get_sticky_event (GST_PAD (pad), GST_EVENT_STREAM_START, 0);
+  if (tmp) {
+    guint group_id;
+    if (gst_event_parse_group_id (tmp, &group_id)) {
+      GstPad *peer = gst_pad_get_peer (GST_PAD (pad));
+
+      if (peer) {
+        GST_DEBUG_OBJECT (dbin,
+            "Sending stream-group-done for group %u to pad %"
+            GST_PTR_FORMAT, group_id, pad);
+        gst_pad_send_event (peer, gst_event_new_stream_group_done (group_id));
+        gst_object_unref (peer);
+      }
+    } else {
+      GST_DEBUG_OBJECT (dbin,
+          "No group ID to send stream-group-done on pad %" GST_PTR_FORMAT, pad);
+    }
+    gst_event_unref (tmp);
   }
+
+  EXPOSE_LOCK (dbin);
+  if (dbin->decode_chain) {
+    drain_and_switch_chains (dbin->decode_chain, pad, &last_group, &drained,
+        &switched);
+
+    if (switched) {
+      /* If we resulted in a group switch, expose what's needed */
+      if (gst_decode_chain_is_complete (dbin->decode_chain))
+        gst_decode_bin_expose (dbin);
+    }
+  }
+  EXPOSE_UNLOCK (dbin);
 
   return last_group;
 }
@@ -3445,6 +4265,42 @@ out:
   return drained;
 }
 
+static gboolean
+gst_decode_group_reset_buffering (GstDecodeGroup * group)
+{
+  GList *l;
+  gboolean ret = TRUE;
+
+  GST_DEBUG_OBJECT (group->dbin, "Group reset buffering %p %s", group,
+      GST_ELEMENT_NAME (group->multiqueue));
+  for (l = group->children; l; l = l->next) {
+    GstDecodeChain *chain = l->data;
+
+    CHAIN_MUTEX_LOCK (chain);
+    if (!gst_decode_chain_reset_buffering (chain)) {
+      ret = FALSE;
+    }
+    CHAIN_MUTEX_UNLOCK (chain);
+  }
+
+  decodebin_set_queue_size_full (group->dbin, group->multiqueue, !ret,
+      FALSE, (group->parent ? group->parent->seekable : TRUE));
+
+  if (ret) {
+    /* all chains are buffering already, no need to do it here */
+    g_object_set (group->multiqueue, "use-buffering", FALSE, NULL);
+  } else {
+    g_object_set (group->multiqueue, "use-buffering", TRUE,
+        "low-percent", group->dbin->low_percent,
+        "high-percent", group->dbin->high_percent, NULL);
+  }
+
+  GST_DEBUG_OBJECT (group->dbin, "Setting %s buffering to %d",
+      GST_ELEMENT_NAME (group->multiqueue), !ret);
+  return TRUE;
+}
+
+
 /* sort_end_pads:
  * GCompareFunc to use with lists of GstPad.
  * Sorts pads by mime type.
@@ -3460,6 +4316,8 @@ sort_end_pads (GstDecodePad * da, GstDecodePad * db)
   GstCaps *capsa, *capsb;
   GstStructure *sa, *sb;
   const gchar *namea, *nameb;
+  gchar *ida, *idb;
+  gint ret;
 
   capsa = get_pad_caps (GST_PAD_CAST (da));
   capsb = get_pad_caps (GST_PAD_CAST (db));
@@ -3495,7 +4353,17 @@ sort_end_pads (GstDecodePad * da, GstDecodePad * db)
   gst_caps_unref (capsa);
   gst_caps_unref (capsb);
 
-  return va - vb;
+  if (va != vb)
+    return va - vb;
+
+  /* if otherwise the same, sort by stream-id */
+  ida = gst_pad_get_stream_id (GST_PAD_CAST (da));
+  idb = gst_pad_get_stream_id (GST_PAD_CAST (db));
+  ret = (ida) ? ((idb) ? strcmp (ida, idb) : -1) : 1;
+  g_free (ida);
+  g_free (idb);
+
+  return ret;
 }
 
 static GstCaps *
@@ -3640,15 +4508,10 @@ gst_decode_chain_get_topology (GstDecodeChain * chain)
   }
 
   /* Caps that resulted in this chain */
-  caps = gst_pad_get_current_caps (chain->pad);
-  if (!caps) {
-    caps = get_pad_caps (chain->pad);
-    if (G_UNLIKELY (!gst_caps_is_fixed (caps))) {
-      GST_ERROR_OBJECT (chain->pad,
-          "Couldn't get fixed caps, got %" GST_PTR_FORMAT, caps);
-      gst_caps_unref (caps);
-      caps = NULL;
-    }
+  caps = get_pad_caps (chain->pad);
+  if (G_UNLIKELY (!caps)) {
+    GST_WARNING_OBJECT (chain->pad, "Couldn't get the caps of decode chain");
+    return u;
   }
   gst_structure_id_set (u, topology_caps, GST_TYPE_CAPS, caps, NULL);
   gst_structure_id_set (u, topology_element_srcpad, GST_TYPE_PAD, chain->pad,
@@ -3666,24 +4529,45 @@ gst_decode_bin_post_topology_message (GstDecodeBin * dbin)
 
   s = gst_decode_chain_get_topology (dbin->decode_chain);
 
+  if (G_UNLIKELY (s == NULL))
+    return;
   msg = gst_message_new_element (GST_OBJECT (dbin), s);
   gst_element_post_message (GST_ELEMENT (dbin), msg);
 }
+
+static gboolean
+debug_sticky_event (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  GST_DEBUG_OBJECT (pad, "sticky event %s (%p)", GST_EVENT_TYPE_NAME (*event),
+      *event);
+  return TRUE;
+}
+
 
 /* Must only be called if the toplevel chain is complete and blocked! */
 /* Not MT-safe, call with decodebin expose lock! */
 static gboolean
 gst_decode_bin_expose (GstDecodeBin * dbin)
 {
-  GList *tmp, *endpads = NULL;
-  gboolean missing_plugin = FALSE;
-  gboolean already_exposed = TRUE;
+  GList *tmp, *endpads;
+  gboolean missing_plugin;
+  GString *missing_plugin_details;
+  gboolean already_exposed;
+  gboolean last_group;
+
+retry:
+  endpads = NULL;
+  missing_plugin = FALSE;
+  already_exposed = TRUE;
+  last_group = TRUE;
+
+  missing_plugin_details = g_string_new ("");
 
   GST_DEBUG_OBJECT (dbin, "Exposing currently active chains/groups");
 
   /* Don't expose if we're currently shutting down */
   DYN_LOCK (dbin);
-  if (G_UNLIKELY (dbin->shutdown == TRUE)) {
+  if (G_UNLIKELY (dbin->shutdown)) {
     GST_WARNING_OBJECT (dbin, "Currently, shutting down, aborting exposing");
     DYN_UNLOCK (dbin);
     return FALSE;
@@ -3691,27 +4575,59 @@ gst_decode_bin_expose (GstDecodeBin * dbin)
   DYN_UNLOCK (dbin);
 
   /* Get the pads that we're going to expose and mark things as exposed */
-  if (!gst_decode_chain_expose (dbin->decode_chain, &endpads, &missing_plugin)) {
+  if (!gst_decode_chain_expose (dbin->decode_chain, &endpads, &missing_plugin,
+          missing_plugin_details, &last_group)) {
     g_list_foreach (endpads, (GFunc) gst_object_unref, NULL);
     g_list_free (endpads);
+    g_string_free (missing_plugin_details, TRUE);
     GST_ERROR_OBJECT (dbin, "Broken chain/group tree");
     g_return_val_if_reached (FALSE);
     return FALSE;
   }
   if (endpads == NULL) {
     if (missing_plugin) {
-      GST_WARNING_OBJECT (dbin, "No suitable plugins found");
-      GST_ELEMENT_ERROR (dbin, CORE, MISSING_PLUGIN, (NULL),
-          ("no suitable plugins found"));
+      if (missing_plugin_details->len > 0) {
+        gchar *details = g_string_free (missing_plugin_details, FALSE);
+        GST_ELEMENT_ERROR (dbin, CORE, MISSING_PLUGIN, (NULL),
+            ("no suitable plugins found:\n%s", details));
+        g_free (details);
+      } else {
+        g_string_free (missing_plugin_details, TRUE);
+        GST_ELEMENT_ERROR (dbin, CORE, MISSING_PLUGIN, (NULL),
+            ("no suitable plugins found"));
+      }
     } else {
       /* in this case, the stream ended without buffers,
        * just post a warning */
-      GST_WARNING_OBJECT (dbin, "All streams finished without buffers");
-      GST_ELEMENT_ERROR (dbin, STREAM, FAILED, (NULL),
-          ("all streams without buffers"));
+      g_string_free (missing_plugin_details, TRUE);
+
+      GST_WARNING_OBJECT (dbin, "All streams finished without buffers. "
+          "Last group: %d", last_group);
+      if (last_group) {
+        GST_ELEMENT_ERROR (dbin, STREAM, FAILED, (NULL),
+            ("all streams without buffers"));
+      } else {
+        gboolean switched = FALSE;
+        gboolean drained = FALSE;
+
+        drain_and_switch_chains (dbin->decode_chain, NULL, &last_group,
+            &drained, &switched);
+        GST_ELEMENT_WARNING (dbin, STREAM, FAILED, (NULL),
+            ("all streams without buffers"));
+        if (switched) {
+          if (gst_decode_chain_is_complete (dbin->decode_chain))
+            goto retry;
+          else
+            return FALSE;
+        }
+      }
     }
+
+    do_async_done (dbin);
     return FALSE;
   }
+
+  g_string_free (missing_plugin_details, TRUE);
 
   /* Check if this was called when everything was exposed already */
   for (tmp = endpads; tmp && already_exposed; tmp = tmp->next) {
@@ -3727,6 +4643,9 @@ gst_decode_bin_expose (GstDecodeBin * dbin)
     g_list_free (endpads);
     return TRUE;
   }
+
+  /* going to expose something, reset buffering */
+  gst_decode_bin_reset_buffering (dbin);
 
   /* Set all already exposed pads to blocked */
   for (tmp = endpads; tmp; tmp = tmp->next) {
@@ -3754,14 +4673,19 @@ gst_decode_bin_expose (GstDecodeBin * dbin)
     gst_object_set_name (GST_OBJECT (dpad), padname);
     g_free (padname);
 
+    gst_pad_sticky_events_foreach (GST_PAD_CAST (dpad), debug_sticky_event,
+        dpad);
+
     /* 2. activate and add */
-    if (!dpad->exposed
-        && !gst_element_add_pad (GST_ELEMENT (dbin), GST_PAD_CAST (dpad))) {
-      /* not really fatal, we can try to add the other pads */
-      g_warning ("error adding pad to decodebin");
-      continue;
+    if (!dpad->exposed) {
+      dpad->exposed = TRUE;
+      if (!gst_element_add_pad (GST_ELEMENT (dbin), GST_PAD_CAST (dpad))) {
+        /* not really fatal, we can try to add the other pads */
+        g_warning ("error adding pad to decodebin");
+        dpad->exposed = FALSE;
+        continue;
+      }
     }
-    dpad->exposed = TRUE;
 
     /* 3. emit signal */
     GST_INFO_OBJECT (dpad, "added new decoded pad");
@@ -3805,24 +4729,40 @@ gst_decode_bin_expose (GstDecodeBin * dbin)
  */
 static gboolean
 gst_decode_chain_expose (GstDecodeChain * chain, GList ** endpads,
-    gboolean * missing_plugin)
+    gboolean * missing_plugin, GString * missing_plugin_details,
+    gboolean * last_group)
 {
   GstDecodeGroup *group;
   GList *l;
   GstDecodeBin *dbin;
 
   if (chain->deadend) {
-    if (chain->endcaps)
+    if (chain->endcaps) {
+      if (chain->deadend_details) {
+        g_string_append (missing_plugin_details, chain->deadend_details);
+        g_string_append_c (missing_plugin_details, '\n');
+      } else {
+        gchar *desc = gst_pb_utils_get_codec_description (chain->endcaps);
+        gchar *caps_str = gst_caps_to_string (chain->endcaps);
+        g_string_append_printf (missing_plugin_details,
+            "Missing decoder: %s (%s)\n", desc, caps_str);
+        g_free (caps_str);
+        g_free (desc);
+      }
       *missing_plugin = TRUE;
+    }
     return TRUE;
   }
 
   if (chain->endpad) {
-    if (!chain->endpad->blocked && !chain->endpad->exposed)
+    if (!gst_decode_pad_is_exposable (chain->endpad) && !chain->endpad->exposed)
       return FALSE;
     *endpads = g_list_prepend (*endpads, gst_object_ref (chain->endpad));
     return TRUE;
   }
+
+  if (chain->next_groups)
+    *last_group = FALSE;
 
   group = chain->active_group;
   if (!group)
@@ -3831,9 +4771,6 @@ gst_decode_chain_expose (GstDecodeChain * chain, GList ** endpads,
     return FALSE;
 
   dbin = group->dbin;
-
-  /* configure queues for playback */
-  decodebin_set_queue_size (dbin, group->multiqueue, FALSE, TRUE);
 
   /* we can now disconnect any overrun signal, which is used to expose the
    * group. */
@@ -3846,7 +4783,8 @@ gst_decode_chain_expose (GstDecodeChain * chain, GList ** endpads,
   for (l = group->children; l; l = l->next) {
     GstDecodeChain *childchain = l->data;
 
-    if (!gst_decode_chain_expose (childchain, endpads, missing_plugin))
+    if (!gst_decode_chain_expose (childchain, endpads, missing_plugin,
+            missing_plugin_details, last_group))
       return FALSE;
   }
 
@@ -3878,16 +4816,52 @@ source_pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   GstDecodePad *dpad = user_data;
   GstDecodeChain *chain;
   GstDecodeBin *dbin;
+  GstPadProbeReturn ret = GST_PAD_PROBE_OK;
 
   if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
-    GST_LOG_OBJECT (pad, "Seeing event '%s'",
-        GST_EVENT_TYPE_NAME (GST_PAD_PROBE_INFO_EVENT (info)));
-    if ((GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info)) != GST_EVENT_CAPS)
-        && (GST_EVENT_IS_STICKY (GST_PAD_PROBE_INFO_EVENT (info))
-            || !GST_EVENT_IS_SERIALIZED (GST_PAD_PROBE_INFO_EVENT (info)))) {
+    GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+
+    GST_LOG_OBJECT (pad, "Seeing event '%s'", GST_EVENT_TYPE_NAME (event));
+
+    if (!GST_EVENT_IS_SERIALIZED (event)) {
       /* do not block on sticky or out of band events otherwise the allocation query
          from demuxer might block the loop thread */
-      GST_LOG_OBJECT (pad, "Letting event through");
+      GST_LOG_OBJECT (pad, "Letting OOB event through");
+      return GST_PAD_PROBE_PASS;
+    }
+
+    if (GST_EVENT_IS_STICKY (event) && GST_EVENT_TYPE (event) != GST_EVENT_EOS) {
+      /* manually push sticky events to ghost pad to avoid exposing pads
+       * that don't have the sticky events. Handle EOS separately as we
+       * want to block the pad on it if we didn't get any buffers before
+       * EOS and expose the pad then. */
+      gst_pad_push_event (GST_PAD_CAST (dpad), gst_event_ref (event));
+
+      /* let the sticky events pass */
+      ret = GST_PAD_PROBE_PASS;
+
+      /* we only want to try to expose on CAPS events */
+      if (GST_EVENT_TYPE (event) != GST_EVENT_CAPS) {
+        GST_LOG_OBJECT (pad, "Letting sticky non-CAPS event through");
+        goto done;
+      }
+    }
+  } else if (GST_PAD_PROBE_INFO_TYPE (info) &
+      GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM) {
+    GstQuery *query = GST_PAD_PROBE_INFO_QUERY (info);
+
+    if (!GST_QUERY_IS_SERIALIZED (query)) {
+      /* do not block on non-serialized queries */
+      GST_LOG_OBJECT (pad, "Letting non-serialized query through");
+      return GST_PAD_PROBE_PASS;
+    }
+    if (!gst_pad_has_current_caps (pad)) {
+      /* do not block on allocation queries before we have caps,
+       * this would deadlock because we are doing no autoplugging
+       * without caps.
+       * TODO: Try to do autoplugging based on the query caps
+       */
+      GST_LOG_OBJECT (pad, "Letting serialized query before caps through");
       return GST_PAD_PROBE_PASS;
     }
   }
@@ -3899,18 +4873,16 @@ source_pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   dpad->blocked = TRUE;
 
   EXPOSE_LOCK (dbin);
-  if (gst_decode_chain_is_complete (dbin->decode_chain)) {
-    if (!gst_decode_bin_expose (dbin))
-      GST_WARNING_OBJECT (dbin, "Couldn't expose group");
+  if (dbin->decode_chain) {
+    if (gst_decode_chain_is_complete (dbin->decode_chain)) {
+      if (!gst_decode_bin_expose (dbin))
+        GST_WARNING_OBJECT (dbin, "Couldn't expose group");
+    }
   }
   EXPOSE_UNLOCK (dbin);
 
-  /* If we unblocked due to a caps event, let it go through */
-  if ((GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) &&
-      (GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info)) == GST_EVENT_CAPS))
-    return GST_PAD_PROBE_PASS;
-
-  return GST_PAD_PROBE_OK;
+done:
+  return ret;
 }
 
 static GstPadProbeReturn
@@ -3961,9 +4933,10 @@ gst_decode_pad_set_blocked (GstDecodePad * dpad, gboolean blocked)
     if (blocked) {
       if (dpad->block_id == 0)
         dpad->block_id =
-            gst_pad_add_probe (opad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM,
-            source_pad_blocked_cb, gst_object_ref (dpad),
-            (GDestroyNotify) gst_object_unref);
+            gst_pad_add_probe (opad,
+            GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM |
+            GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, source_pad_blocked_cb,
+            gst_object_ref (dpad), (GDestroyNotify) gst_object_unref);
     } else {
       if (dpad->block_id != 0) {
         gst_pad_remove_probe (opad, dpad->block_id);
@@ -4021,26 +4994,107 @@ gst_decode_pad_unblock (GstDecodePad * dpad)
   gst_decode_pad_set_blocked (dpad, FALSE);
 }
 
+static gboolean
+gst_decode_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
+{
+  GstDecodeBin *dbin = GST_DECODE_BIN (parent);
+
+  if (GST_EVENT_TYPE (event) == GST_EVENT_SEEK && dbin && dbin->decode_chain) {
+    GstElement *demuxer = NULL;
+
+    /* For adaptive demuxers we send the seek event directly to the demuxer.
+     * See https://bugzilla.gnome.org/show_bug.cgi?id=606382
+     */
+    CHAIN_MUTEX_LOCK (dbin->decode_chain);
+    if (dbin->decode_chain->adaptive_demuxer) {
+      GstDecodeElement *delem = dbin->decode_chain->elements->data;
+      demuxer = gst_object_ref (delem->element);
+    }
+    CHAIN_MUTEX_UNLOCK (dbin->decode_chain);
+
+    if (demuxer) {
+      gboolean ret;
+
+      GST_DEBUG_OBJECT (dbin,
+          "Sending SEEK event directly to adaptive streaming demuxer %s",
+          GST_OBJECT_NAME (demuxer));
+      ret = gst_element_send_event (demuxer, event);
+      gst_object_unref (demuxer);
+      return ret;
+    }
+  }
+
+  return gst_pad_event_default (pad, parent, event);
+}
+
+static gboolean
+gst_decode_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
+{
+  GstDecodePad *dpad = GST_DECODE_PAD (parent);
+  gboolean ret = FALSE;
+
+  CHAIN_MUTEX_LOCK (dpad->chain);
+  if (!dpad->exposed && !dpad->dbin->shutdown && !dpad->chain->deadend
+      && dpad->chain->elements) {
+    GstDecodeElement *delem = dpad->chain->elements->data;
+
+    ret = FALSE;
+    GST_DEBUG_OBJECT (dpad->dbin,
+        "calling autoplug-query for %s (element %s): %" GST_PTR_FORMAT,
+        GST_PAD_NAME (dpad), GST_ELEMENT_NAME (delem->element), query);
+    g_signal_emit (G_OBJECT (dpad->dbin),
+        gst_decode_bin_signals[SIGNAL_AUTOPLUG_QUERY], 0, dpad, delem->element,
+        query, &ret);
+
+    if (ret)
+      GST_DEBUG_OBJECT (dpad->dbin,
+          "autoplug-query returned %d: %" GST_PTR_FORMAT, ret, query);
+    else
+      GST_DEBUG_OBJECT (dpad->dbin, "autoplug-query returned %d", ret);
+  }
+  CHAIN_MUTEX_UNLOCK (dpad->chain);
+
+  /* If exposed or nothing handled the query use the default handler */
+  if (!ret)
+    ret = gst_pad_query_default (pad, parent, query);
+
+  return ret;
+}
+
+static gboolean
+gst_decode_pad_is_exposable (GstDecodePad * endpad)
+{
+  if (endpad->blocked || endpad->exposed)
+    return TRUE;
+
+  return gst_pad_has_current_caps (GST_PAD_CAST (endpad));
+}
+
 /*gst_decode_pad_new:
  *
  * Creates a new GstDecodePad for the given pad.
  */
 static GstDecodePad *
-gst_decode_pad_new (GstDecodeBin * dbin, GstPad * pad, GstDecodeChain * chain)
+gst_decode_pad_new (GstDecodeBin * dbin, GstDecodeChain * chain)
 {
   GstDecodePad *dpad;
+  GstProxyPad *ppad;
   GstPadTemplate *pad_tmpl;
 
   GST_DEBUG_OBJECT (dbin, "making new decodepad");
   pad_tmpl = gst_static_pad_template_get (&decoder_bin_src_template);
   dpad =
-      g_object_new (GST_TYPE_DECODE_PAD, "direction", GST_PAD_DIRECTION (pad),
+      g_object_new (GST_TYPE_DECODE_PAD, "direction", GST_PAD_SRC,
       "template", pad_tmpl, NULL);
   gst_ghost_pad_construct (GST_GHOST_PAD_CAST (dpad));
-  gst_ghost_pad_set_target (GST_GHOST_PAD_CAST (dpad), pad);
   dpad->chain = chain;
   dpad->dbin = dbin;
   gst_object_unref (pad_tmpl);
+
+  ppad = gst_proxy_pad_get_internal (GST_PROXY_PAD (dpad));
+  gst_pad_set_query_function (GST_PAD_CAST (ppad), gst_decode_pad_query);
+  gst_pad_set_event_function (GST_PAD_CAST (dpad), gst_decode_pad_event);
+  gst_object_unref (ppad);
 
   return dpad;
 }
@@ -4053,6 +5107,8 @@ gst_pending_pad_free (GstPendingPad * ppad)
 
   if (ppad->event_probe_id != 0)
     gst_pad_remove_probe (ppad->pad, ppad->event_probe_id);
+  if (ppad->notify_caps_id)
+    g_signal_handler_disconnect (ppad->pad, ppad->notify_caps_id);
   gst_object_unref (ppad->pad);
   g_slice_free (GstPendingPad, ppad);
 }
@@ -4137,7 +5193,7 @@ unblock_pads (GstDecodeBin * dbin)
     }
     dpad->blocked = FALSE;
     /* make flushing, prevent NOT_LINKED */
-    GST_PAD_SET_FLUSHING (GST_PAD_CAST (dpad));
+    gst_pad_set_active (GST_PAD_CAST (dpad), FALSE);
     gst_object_unref (dpad);
     gst_object_unref (opad);
     GST_DEBUG_OBJECT (dpad, "unblocked");
@@ -4148,11 +5204,86 @@ unblock_pads (GstDecodeBin * dbin)
   dbin->blocked_pads = NULL;
 }
 
+static void
+gst_decode_chain_stop (GstDecodeBin * dbin, GstDecodeChain * chain,
+    GQueue * elements)
+{
+  GQueue *internal_elements, internal_elements_ = G_QUEUE_INIT;
+  GList *l;
+
+  CHAIN_MUTEX_LOCK (chain);
+  if (elements) {
+    internal_elements = elements;
+  } else {
+    internal_elements = &internal_elements_;
+  }
+
+  for (l = chain->next_groups; l; l = l->next) {
+    GstDecodeGroup *group = l->data;
+    GList *m;
+
+    for (m = group->children; m; m = m->next) {
+      GstDecodeChain *chain2 = m->data;
+      gst_decode_chain_stop (dbin, chain2, internal_elements);
+    }
+    if (group->multiqueue)
+      g_queue_push_head (internal_elements, gst_object_ref (group->multiqueue));
+  }
+
+  if (chain->active_group) {
+    for (l = chain->active_group->children; l; l = l->next) {
+      GstDecodeChain *chain2 = l->data;
+      gst_decode_chain_stop (dbin, chain2, internal_elements);
+    }
+    if (chain->active_group->multiqueue)
+      g_queue_push_head (internal_elements,
+          gst_object_ref (chain->active_group->multiqueue));
+  }
+
+  for (l = chain->old_groups; l; l = l->next) {
+    GstDecodeGroup *group = l->data;
+    GList *m;
+
+    for (m = group->children; m; m = m->next) {
+      GstDecodeChain *chain2 = m->data;
+      gst_decode_chain_stop (dbin, chain2, internal_elements);
+    }
+    if (group->multiqueue)
+      g_queue_push_head (internal_elements, gst_object_ref (group->multiqueue));
+  }
+
+  for (l = chain->elements; l; l = l->next) {
+    GstDecodeElement *delem = l->data;
+
+    if (delem->capsfilter)
+      g_queue_push_head (internal_elements, gst_object_ref (delem->capsfilter));
+    g_queue_push_head (internal_elements, gst_object_ref (delem->element));
+  }
+
+  CHAIN_MUTEX_UNLOCK (chain);
+
+  if (!elements) {
+    GstElement *element;
+
+    EXPOSE_UNLOCK (dbin);
+    /* Shut down from bottom to top */
+    while ((element = g_queue_pop_tail (internal_elements))) {
+      /* The bin must never ever change the state of this element anymore */
+      gst_element_set_locked_state (element, TRUE);
+      gst_element_set_state (element, GST_STATE_NULL);
+      gst_object_unref (element);
+    }
+    g_queue_clear (internal_elements);
+    EXPOSE_LOCK (dbin);
+  }
+}
+
 static GstStateChangeReturn
 gst_decode_bin_change_state (GstElement * element, GstStateChange transition)
 {
   GstStateChangeReturn ret = GST_STATE_CHANGE_SUCCESS;
   GstDecodeBin *dbin = GST_DECODE_BIN (element);
+  GstDecodeChain *chain_to_free = NULL;
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
@@ -4161,10 +5292,12 @@ gst_decode_bin_change_state (GstElement * element, GstStateChange transition)
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       /* Make sure we've cleared all existing chains */
+      EXPOSE_LOCK (dbin);
       if (dbin->decode_chain) {
         gst_decode_chain_free (dbin->decode_chain);
         dbin->decode_chain = NULL;
       }
+      EXPOSE_UNLOCK (dbin);
       DYN_LOCK (dbin);
       GST_LOG_OBJECT (dbin, "clearing shutdown flag");
       dbin->shutdown = FALSE;
@@ -4172,8 +5305,18 @@ gst_decode_bin_change_state (GstElement * element, GstStateChange transition)
       dbin->have_type = FALSE;
       ret = GST_STATE_CHANGE_ASYNC;
       do_async_start (dbin);
+
+
+      /* connect a signal to find out when the typefind element found
+       * a type */
+      dbin->have_type_id =
+          g_signal_connect (dbin->typefind, "have-type",
+          G_CALLBACK (type_found), dbin);
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
+      if (dbin->have_type_id)
+        g_signal_handler_disconnect (dbin->typefind, dbin->have_type_id);
+      dbin->have_type_id = 0;
       DYN_LOCK (dbin);
       GST_LOG_OBJECT (dbin, "setting shutdown flag");
       dbin->shutdown = TRUE;
@@ -4197,10 +5340,19 @@ gst_decode_bin_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       do_async_done (dbin);
+      EXPOSE_LOCK (dbin);
       if (dbin->decode_chain) {
-        gst_decode_chain_free (dbin->decode_chain);
+        gst_decode_chain_stop (dbin, dbin->decode_chain, NULL);
+        chain_to_free = dbin->decode_chain;
+        gst_decode_chain_free_internal (dbin->decode_chain, TRUE);
         dbin->decode_chain = NULL;
       }
+      EXPOSE_UNLOCK (dbin);
+      if (chain_to_free)
+        gst_decode_chain_free (chain_to_free);
+      g_list_free_full (dbin->buffering_status,
+          (GDestroyNotify) gst_message_unref);
+      dbin->buffering_status = NULL;
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
     default:
@@ -4221,6 +5373,7 @@ activate_failed:
   {
     GST_DEBUG_OBJECT (element,
         "element failed to change states -- activation problem?");
+    do_async_done (dbin);
     return GST_STATE_CHANGE_FAILURE;
   }
 }
@@ -4234,13 +5387,144 @@ gst_decode_bin_handle_message (GstBin * bin, GstMessage * msg)
   if (GST_MESSAGE_TYPE (msg) == GST_MESSAGE_ERROR) {
     GST_OBJECT_LOCK (dbin);
     drop = (g_list_find (dbin->filtered, GST_MESSAGE_SRC (msg)) != NULL);
+    if (drop)
+      dbin->filtered_errors =
+          g_list_prepend (dbin->filtered_errors, gst_message_ref (msg));
     GST_OBJECT_UNLOCK (dbin);
+  } else if (GST_MESSAGE_TYPE (msg) == GST_MESSAGE_BUFFERING) {
+    gint perc, msg_perc;
+    gint smaller_perc = 100;
+    GstMessage *smaller = NULL;
+    GList *found = NULL;
+    GList *iter;
+
+    /* buffering messages must be aggregated as there might be multiple
+     * multiqueue in the pipeline and their independent buffering messages
+     * will confuse the application
+     *
+     * decodebin keeps a list of messages received from elements that are
+     * buffering.
+     * Rules are:
+     * 1) Always post the smaller buffering %
+     * 2) If an element posts a 100% buffering message, remove it from the list
+     * 3) When there are no more messages on the list, post 100% message
+     * 4) When an element posts a new buffering message, update the one
+     *    on the list to this new value
+     */
+
+    BUFFERING_LOCK (dbin);
+    gst_message_parse_buffering (msg, &msg_perc);
+
+    GST_DEBUG_OBJECT (dbin, "Got buffering msg %" GST_PTR_FORMAT, msg);
+
+    g_mutex_lock (&dbin->buffering_post_lock);
+
+    /*
+     * Single loop for 2 things:
+     * 1) Look for a message with the same source
+     *   1.1) If the received message is 100%, remove it from the list
+     * 2) Find the minimum buffering from the list
+     */
+    for (iter = dbin->buffering_status; iter;) {
+      GstMessage *bufstats = iter->data;
+      if (GST_MESSAGE_SRC (bufstats) == GST_MESSAGE_SRC (msg)) {
+        found = iter;
+        if (msg_perc < 100) {
+          GST_DEBUG_OBJECT (dbin, "Replacing old buffering msg %"
+              GST_PTR_FORMAT, iter->data);
+          gst_message_unref (iter->data);
+          bufstats = iter->data = gst_message_ref (msg);
+        } else {
+          GList *current = iter;
+
+          /* remove the element here and avoid confusing the loop */
+          iter = g_list_next (iter);
+
+          GST_DEBUG_OBJECT (dbin, "Deleting old buffering msg %"
+              GST_PTR_FORMAT, current->data);
+
+          gst_message_unref (current->data);
+          dbin->buffering_status =
+              g_list_delete_link (dbin->buffering_status, current);
+
+          continue;
+        }
+      }
+
+      gst_message_parse_buffering (bufstats, &perc);
+      if (perc < smaller_perc) {
+        smaller_perc = perc;
+        smaller = bufstats;
+      }
+      iter = g_list_next (iter);
+    }
+
+    if (found == NULL && msg_perc < 100) {
+      if (msg_perc < smaller_perc) {
+        smaller_perc = msg_perc;
+        smaller = msg;
+      }
+      GST_DEBUG_OBJECT (dbin, "Storing buffering msg %" GST_PTR_FORMAT, msg);
+      dbin->buffering_status =
+          g_list_prepend (dbin->buffering_status, gst_message_ref (msg));
+    }
+
+    /* now compute the buffering message that should be posted */
+    if (smaller_perc == 100) {
+      g_assert (dbin->buffering_status == NULL);
+      /* we are posting the original received msg */
+    } else {
+      gst_message_replace (&msg, smaller);
+    }
+    BUFFERING_UNLOCK (dbin);
+
+    GST_DEBUG_OBJECT (dbin, "Forwarding buffering msg %" GST_PTR_FORMAT, msg);
+    GST_BIN_CLASS (parent_class)->handle_message (bin, msg);
+
+    g_mutex_unlock (&dbin->buffering_post_lock);
+    return;
   }
 
-  if (drop)
+  if (drop) {
     gst_message_unref (msg);
-  else
+  } else {
+    GST_DEBUG_OBJECT (dbin, "Forwarding msg %" GST_PTR_FORMAT, msg);
     GST_BIN_CLASS (parent_class)->handle_message (bin, msg);
+  }
+}
+
+static gboolean
+gst_decode_bin_remove_element (GstBin * bin, GstElement * element)
+{
+  GstDecodeBin *dbin = GST_DECODE_BIN (bin);
+  gboolean removed = FALSE, post = FALSE;
+  GList *iter;
+
+  BUFFERING_LOCK (bin);
+  for (iter = dbin->buffering_status; iter; iter = iter->next) {
+    GstMessage *bufstats = iter->data;
+
+    if (GST_MESSAGE_SRC (bufstats) == GST_OBJECT_CAST (element) ||
+        gst_object_has_as_ancestor (GST_MESSAGE_SRC (bufstats),
+            GST_OBJECT_CAST (element))) {
+      gst_message_unref (bufstats);
+      dbin->buffering_status =
+          g_list_delete_link (dbin->buffering_status, iter);
+      removed = TRUE;
+      break;
+    }
+  }
+
+  if (removed && dbin->buffering_status == NULL)
+    post = TRUE;
+  BUFFERING_UNLOCK (bin);
+
+  if (post) {
+    gst_element_post_message (GST_ELEMENT_CAST (bin),
+        gst_message_new_buffering (GST_OBJECT_CAST (dbin), 100));
+  }
+
+  return GST_BIN_CLASS (parent_class)->remove_element (bin, element);
 }
 
 gboolean

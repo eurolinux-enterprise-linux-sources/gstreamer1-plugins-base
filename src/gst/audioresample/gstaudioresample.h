@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -25,8 +25,6 @@
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/audio/audio.h>
-
-#include "speex_resampler_wrapper.h"
 
 G_BEGIN_DECLS
 
@@ -60,31 +58,21 @@ struct _GstAudioResample {
   guint64 out_offset0;
   guint64 samples_in;
   guint64 samples_out;
-  
+
   guint64 num_gap_samples;
   guint64 num_nongap_samples;
 
-  GstAudioInfo in;
-  GstAudioInfo out;
-
   /* properties */
+  GstAudioResamplerMethod method;
   gint quality;
+  GstAudioResamplerFilterMode sinc_filter_mode;
+  guint32 sinc_filter_auto_threshold;
+  GstAudioResamplerFilterInterpolation sinc_filter_interpolation;
 
   /* state */
-  gboolean fp;
-  gint width;
-  gint channels;
-  gint inrate;
-  gint outrate;
-
-  guint8 *tmp_in;
-  guint tmp_in_size;
-
-  guint8 *tmp_out;
-  guint tmp_out_size;
-
-  SpeexResamplerState *state;
-  const SpeexResampleFuncs *funcs;
+  GstAudioInfo in;
+  GstAudioInfo out;
+  GstAudioConverter *converter;
 };
 
 struct _GstAudioResampleClass {

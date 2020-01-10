@@ -16,15 +16,16 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
+
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
 
 #ifndef __GST_AUDIO_RING_BUFFER_H__
 #define __GST_AUDIO_RING_BUFFER_H__
-
-#include <gst/gst.h>
-#include <gst/audio/audio.h>
 
 G_BEGIN_DECLS
 
@@ -57,13 +58,17 @@ typedef void (*GstAudioRingBufferCallback) (GstAudioRingBuffer *rbuf, guint8* da
  * @GST_AUDIO_RING_BUFFER_STATE_STOPPED: The ringbuffer is stopped
  * @GST_AUDIO_RING_BUFFER_STATE_PAUSED: The ringbuffer is paused
  * @GST_AUDIO_RING_BUFFER_STATE_STARTED: The ringbuffer is started
+ * @GST_AUDIO_RING_BUFFER_STATE_ERROR: The ringbuffer has encountered an
+ *     error after it has been started, e.g. because the device was
+ *     disconnected (Since 1.2)
  *
  * The state of the ringbuffer.
  */
 typedef enum {
   GST_AUDIO_RING_BUFFER_STATE_STOPPED,
   GST_AUDIO_RING_BUFFER_STATE_PAUSED,
-  GST_AUDIO_RING_BUFFER_STATE_STARTED
+  GST_AUDIO_RING_BUFFER_STATE_STARTED,
+  GST_AUDIO_RING_BUFFER_STATE_ERROR
 } GstAudioRingBufferState;
 
 /**
@@ -215,7 +220,7 @@ struct _GstAudioRingBuffer {
  * @pause: pause processing of samples
  * @resume: resume processing of samples after pause
  * @stop: stop processing of samples
- * @delay: get number of samples queued in device
+ * @delay: get number of frames queued in device
  * @activate: activate the thread that starts pulling and monitoring the
  * consumed segments in the device.
  * @commit: write samples into the ringbuffer
@@ -327,6 +332,10 @@ void            gst_audio_ring_buffer_clear           (GstAudioRingBuffer *buf, 
 void            gst_audio_ring_buffer_advance         (GstAudioRingBuffer *buf, guint advance);
 
 void            gst_audio_ring_buffer_may_start       (GstAudioRingBuffer *buf, gboolean allowed);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioRingBuffer, gst_object_unref)
+#endif
 
 G_END_DECLS
 

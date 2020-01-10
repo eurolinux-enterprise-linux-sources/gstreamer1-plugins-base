@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /**
  * SECTION:element-appsrc
@@ -26,8 +26,6 @@
  * For the documentation of the API, please see the
  * <link linkend="gst-plugins-base-libs-appsrc">libgstapp</link> section in the
  * GStreamer Plugins Base Libraries documentation.
- *
- * Since: 0.10.22
  */
 /**
  * SECTION:element-appsink
@@ -39,8 +37,6 @@
  * For the documentation of the API, please see the
  * <link linkend="gst-plugins-base-libs-appsink">libgstapp</link> section in
  * the GStreamer Plugins Base Libraries documentation.
- *
- * Since: 0.10.22
  */
 
 #ifdef HAVE_CONFIG_H

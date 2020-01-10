@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* FIXME 0.11: suppress warnings for deprecated API such as GValueArray
@@ -98,8 +98,8 @@ GST_START_TEST (test_sink_usage_video_only_stream)
   fakeaudiosink = gst_element_factory_make ("fakesink", "fakeaudiosink");
   fail_unless (fakeaudiosink != NULL, "Failed to create fakeaudiosink element");
 
-  /* video-only stream, audiosink will error out in null => ready if used */
-  g_object_set (fakeaudiosink, "state-error", 1, NULL);
+  /* video-only stream, audiosink will error out in ready => paused if used */
+  g_object_set (fakeaudiosink, "state-error", 2, NULL);
 
   g_object_set (playbin, "video-sink", fakevideosink, NULL);
   g_object_set (playbin, "audio-sink", fakeaudiosink, NULL);
@@ -333,8 +333,7 @@ GST_START_TEST (test_missing_suburisource_handler)
 
   fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_READY),
       GST_STATE_CHANGE_SUCCESS);
-  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PAUSED),
-      GST_STATE_CHANGE_FAILURE);
+  gst_element_set_state (playbin, GST_STATE_PAUSED);
 
   /* there should be at least a missing-plugin message on the bus now and an
    * error message; the missing-plugin message should be first */
@@ -481,9 +480,9 @@ GST_START_TEST (test_refcount)
 
   ASSERT_OBJECT_REFCOUNT (playbin, "playbin", 1);
 
-  /* we have two refs now, one from ourselves and one from playbin */
-  ASSERT_OBJECT_REFCOUNT (audiosink, "myaudiosink", 2);
-  ASSERT_OBJECT_REFCOUNT (videosink, "myvideosink", 2);
+  /* we have 3 refs now, one from ourselves, one from playbin and one from playsink */
+  ASSERT_OBJECT_REFCOUNT (audiosink, "myaudiosink", 3);
+  ASSERT_OBJECT_REFCOUNT (videosink, "myvideosink", 3);
   ASSERT_OBJECT_REFCOUNT (vis, "myvis", 2);
 
   fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PAUSED),
@@ -524,7 +523,7 @@ GST_START_TEST (test_source_setup)
   GstElement *src = NULL;
 
   if (!gst_registry_check_feature_version (gst_registry_get (), "redvideosrc",
-          0, 10, 0)) {
+          GST_VERSION_MAJOR, GST_VERSION_MINOR, 0)) {
     fail_unless (gst_element_register (NULL, "redvideosrc", GST_RANK_PRIMARY,
             gst_red_video_src_get_type ()));
   }
@@ -550,6 +549,59 @@ GST_START_TEST (test_source_setup)
 
   gst_object_unref (playbin);
   gst_object_unref (src);
+}
+
+GST_END_TEST;
+
+static void
+element_setup (GstElement * playbin, GstElement * element, GQueue * elts)
+{
+  GstElementFactory *f = gst_element_get_factory (element);
+
+  g_queue_push_tail (elts, f ? GST_OBJECT_NAME (f) : GST_OBJECT_NAME (element));
+}
+
+GST_START_TEST (test_element_setup)
+{
+  GstElement *playbin, *videosink;
+  GQueue elts = G_QUEUE_INIT;
+
+  if (!gst_registry_check_feature_version (gst_registry_get (), "redvideosrc",
+          GST_VERSION_MAJOR, GST_VERSION_MINOR, 0)) {
+    fail_unless (gst_element_register (NULL, "redvideosrc", GST_RANK_PRIMARY,
+            gst_red_video_src_get_type ()));
+  }
+
+  playbin = gst_element_factory_make ("playbin", NULL);
+  g_object_set (playbin, "uri", "redvideo://", NULL);
+
+  videosink = gst_element_factory_make ("fakesink", "myvideosink");
+  g_object_set (playbin, "video-sink", videosink, NULL);
+
+  g_signal_connect (playbin, "element-setup", G_CALLBACK (element_setup),
+      &elts);
+
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PAUSED),
+      GST_STATE_CHANGE_ASYNC);
+  fail_unless_equals_int (gst_element_get_state (playbin, NULL, NULL,
+          GST_CLOCK_TIME_NONE), GST_STATE_CHANGE_SUCCESS);
+
+#define seen_element(e) g_queue_find_custom(&elts, e, (GCompareFunc) strcmp)
+
+  fail_unless (seen_element ("redvideosrc"));
+  fail_unless (seen_element ("uridecodebin"));
+  fail_unless (seen_element ("videoconvert"));
+  fail_unless (seen_element ("videoscale"));
+  fail_unless (seen_element ("fakesink"));
+
+#undef seen_element
+
+  g_queue_clear (&elts);
+
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_NULL),
+      GST_STATE_CHANGE_SUCCESS);
+
+  gst_object_unref (playbin);
 }
 
 GST_END_TEST;
@@ -650,8 +702,7 @@ gst_red_video_src_class_init (GstRedVideoSrcClass * klass)
       );
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&src_templ));
+  gst_element_class_add_static_pad_template (element_class, &src_templ);
   gst_element_class_set_metadata (element_class,
       "Red Video Src", "Source/Video", "yep", "me");
 
@@ -752,8 +803,7 @@ gst_codec_src_class_init (GstCodecSrcClass * klass)
       );
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&src_templ));
+  gst_element_class_add_static_pad_template (element_class, &src_templ);
   gst_element_class_set_metadata (element_class,
       "Codec Src", "Source/Video", "yep", "me");
 
@@ -765,6 +815,70 @@ static void
 gst_codec_src_init (GstCodecSrc * src)
 {
 }
+
+#if 0
+GST_START_TEST (test_appsink_twice)
+{
+  GstElement *playbin, *appsink;
+  GstSample *sample;
+  gchar *fn, *uri;
+  int flags;
+
+  fn = g_build_filename (GST_TEST_FILES_PATH, "theora-vorbis.ogg", NULL);
+  uri = gst_filename_to_uri (fn, NULL);
+  g_free (fn);
+
+  playbin = gst_element_factory_make ("playbin", NULL);
+  g_object_set (playbin, "uri", uri, NULL);
+  g_free (uri);
+
+  /* disable video decoding/rendering (doesn't actually work yet though) */
+  g_object_get (playbin, "flags", &flags, NULL);
+  g_object_set (playbin, "flags", flags & ~1, NULL);
+
+  appsink = gst_element_factory_make ("appsink", "appsink");
+  g_object_set (playbin, "audio-sink", appsink, NULL);
+
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PLAYING),
+      GST_STATE_CHANGE_ASYNC);
+  fail_unless_equals_int (gst_element_get_state (playbin, NULL, NULL,
+          GST_CLOCK_TIME_NONE), GST_STATE_CHANGE_SUCCESS);
+
+  do {
+    g_signal_emit_by_name (appsink, "pull-sample", &sample);
+    GST_LOG ("got sample: %p", sample);
+    if (sample)
+      gst_sample_unref (sample);
+  }
+  while (sample != NULL);
+
+  GST_INFO ("got first EOS");
+
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_NULL),
+      GST_STATE_CHANGE_SUCCESS);
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PLAYING),
+      GST_STATE_CHANGE_ASYNC);
+  fail_unless_equals_int (gst_element_get_state (playbin, NULL, NULL,
+          GST_CLOCK_TIME_NONE), GST_STATE_CHANGE_SUCCESS);
+
+  do {
+    g_signal_emit_by_name (appsink, "pull-sample", &sample);
+    GST_LOG ("got sample: %p", sample);
+    if (sample)
+      gst_sample_unref (sample);
+  }
+  while (sample != NULL);
+
+  GST_INFO ("got second EOS");
+
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_NULL),
+      GST_STATE_CHANGE_SUCCESS);
+
+  gst_object_unref (playbin);
+}
+
+GST_END_TEST;
+#endif
 
 #endif /* GST_DISABLE_REGISTRY */
 
@@ -788,6 +902,19 @@ playbin_suite (void)
   tcase_add_test (tc_chain, test_missing_primary_decoder);
   tcase_add_test (tc_chain, test_refcount);
   tcase_add_test (tc_chain, test_source_setup);
+  tcase_add_test (tc_chain, test_element_setup);
+
+#if 0
+  {
+    GstRegistry *reg = gst_registry_get ();
+
+    if (gst_registry_check_feature_version (reg, "oggdemux", 1, 0, 0) &&
+        gst_registry_check_feature_version (reg, "theoradec", 1, 0, 0) &&
+        gst_registry_check_feature_version (reg, "vorbisdec", 1, 0, 0)) {
+      tcase_add_test (tc_chain, test_appsink_twice);
+    }
+  }
+#endif
 
   /* one day we might also want to have the following checks:
    * tcase_add_test (tc_chain, test_missing_secondary_decoder_one_fatal);

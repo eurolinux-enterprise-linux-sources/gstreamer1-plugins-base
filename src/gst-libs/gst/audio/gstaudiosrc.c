@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -63,12 +63,11 @@
  * All scheduling of samples and timestamps is done in this base class
  * together with #GstAudioBaseSrc using a default implementation of a
  * #GstAudioRingBuffer that uses threads.
- *
- * Last reviewed on 2006-09-27 (0.10.12)
  */
 
 #include <string.h>
 
+#include <gst/audio/audio.h>
 #include "gstaudiosrc.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_audio_src_debug);
@@ -195,7 +194,7 @@ typedef guint (*ReadFunc)
 
 /* this internal thread does nothing else but read samples from the audio device.
  * It will read each segment in the ringbuffer and will update the play
- * pointer. 
+ * pointer.
  * The start/stop methods control the thread.
  */
 static void
@@ -216,12 +215,12 @@ audioringbuffer_thread_func (GstAudioRingBuffer * buf)
   if ((readfunc = csrc->read) == NULL)
     goto no_function;
 
-  /* FIXME: maybe we should at least use a custom pointer type here? */
-  g_value_init (&val, G_TYPE_POINTER);
-  g_value_set_pointer (&val, src->thread);
   message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
       GST_STREAM_STATUS_TYPE_ENTER, GST_ELEMENT_CAST (src));
+  g_value_init (&val, GST_TYPE_G_THREAD);
+  g_value_set_boxed (&val, g_thread_self ());
   gst_message_set_stream_status_object (message, &val);
+  g_value_unset (&val);
   GST_DEBUG_OBJECT (src, "posting ENTER stream status");
   gst_element_post_message (GST_ELEMENT_CAST (src), message);
 
@@ -291,7 +290,10 @@ stop_running:
     GST_DEBUG ("stop running, exit thread");
     message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
         GST_STREAM_STATUS_TYPE_LEAVE, GST_ELEMENT_CAST (src));
+    g_value_init (&val, GST_TYPE_G_THREAD);
+    g_value_set_boxed (&val, g_thread_self ());
     gst_message_set_stream_status_object (message, &val);
+    g_value_unset (&val);
     GST_DEBUG_OBJECT (src, "posting LEAVE stream status");
     gst_element_post_message (GST_ELEMENT_CAST (src), message);
     return;
@@ -391,7 +393,14 @@ gst_audio_src_ring_buffer_acquire (GstAudioRingBuffer * buf,
     goto could_not_open;
 
   buf->size = spec->segtotal * spec->segsize;
-  buf->memory = g_malloc0 (buf->size);
+  buf->memory = g_malloc (buf->size);
+  if (buf->spec.type == GST_AUDIO_RING_BUFFER_FORMAT_TYPE_RAW) {
+    gst_audio_format_fill_silence (buf->spec.info.finfo, buf->memory,
+        buf->size);
+  } else {
+    /* FIXME, non-raw formats get 0 as the empty sample */
+    memset (buf->memory, 0, buf->size);
+  }
 
   abuf = GST_AUDIO_SRC_RING_BUFFER (buf);
   abuf->running = TRUE;

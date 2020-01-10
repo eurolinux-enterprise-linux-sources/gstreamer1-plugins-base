@@ -15,14 +15,15 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+#include <gst/video/video.h>
 #include "gstvideoutils.h"
 
 #include <string.h>
@@ -106,6 +107,8 @@ gst_video_codec_frame_ref (GstVideoCodecFrame * frame)
 {
   g_return_val_if_fail (frame != NULL, NULL);
 
+  GST_TRACE ("%p ref %d->%d", frame, frame->ref_count, frame->ref_count + 1);
+
   g_atomic_int_inc (&frame->ref_count);
 
   return frame;
@@ -123,6 +126,8 @@ gst_video_codec_frame_unref (GstVideoCodecFrame * frame)
 {
   g_return_if_fail (frame != NULL);
   g_return_if_fail (frame->ref_count > 0);
+
+  GST_TRACE ("%p unref %d->%d", frame, frame->ref_count, frame->ref_count - 1);
 
   if (g_atomic_int_dec_and_test (&frame->ref_count)) {
     _gst_video_codec_frame_free (frame);
@@ -143,6 +148,8 @@ gst_video_codec_state_ref (GstVideoCodecState * state)
 {
   g_return_val_if_fail (state != NULL, NULL);
 
+  GST_TRACE ("%p ref %d->%d", state, state->ref_count, state->ref_count + 1);
+
   g_atomic_int_inc (&state->ref_count);
 
   return state;
@@ -151,8 +158,12 @@ gst_video_codec_state_ref (GstVideoCodecState * state)
 static void
 _gst_video_codec_state_free (GstVideoCodecState * state)
 {
+  GST_DEBUG ("free state %p", state);
+
   if (state->caps)
     gst_caps_unref (state->caps);
+  if (state->allocation_caps)
+    gst_caps_unref (state->allocation_caps);
   if (state->codec_data)
     gst_buffer_unref (state->codec_data);
   g_slice_free (GstVideoCodecState, state);
@@ -170,6 +181,8 @@ gst_video_codec_state_unref (GstVideoCodecState * state)
 {
   g_return_if_fail (state != NULL);
   g_return_if_fail (state->ref_count > 0);
+
+  GST_TRACE ("%p unref %d->%d", state, state->ref_count, state->ref_count - 1);
 
   if (g_atomic_int_dec_and_test (&state->ref_count)) {
     _gst_video_codec_state_free (state);

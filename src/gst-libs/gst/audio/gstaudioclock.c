@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -29,8 +29,6 @@
  * simply need to provide a function that returns the current clock time.
  *
  * This object is internally used to implement the clock in #GstAudioBaseSink.
- *
- * Last reviewed on 2006-09-27 (0.10.12)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -42,42 +40,12 @@
 GST_DEBUG_CATEGORY_STATIC (gst_audio_clock_debug);
 #define GST_CAT_DEFAULT gst_audio_clock_debug
 
-static void gst_audio_clock_class_init (GstAudioClockClass * klass);
-static void gst_audio_clock_init (GstAudioClock * clock);
-
 static void gst_audio_clock_dispose (GObject * object);
 
 static GstClockTime gst_audio_clock_get_internal_time (GstClock * clock);
 
-static GstSystemClockClass *parent_class = NULL;
-
-/* static guint gst_audio_clock_signals[LAST_SIGNAL] = { 0 }; */
-
-GType
-gst_audio_clock_get_type (void)
-{
-  static volatile gsize clock_type = 0;
-  static const GTypeInfo clock_info = {
-    sizeof (GstAudioClockClass),
-    NULL,
-    NULL,
-    (GClassInitFunc) gst_audio_clock_class_init,
-    NULL,
-    NULL,
-    sizeof (GstAudioClock),
-    4,
-    (GInstanceInitFunc) gst_audio_clock_init,
-    NULL
-  };
-
-  if (g_once_init_enter (&clock_type)) {
-    GType tmp = g_type_register_static (GST_TYPE_SYSTEM_CLOCK, "GstAudioClock",
-        &clock_info, 0);
-    g_once_init_leave (&clock_type, tmp);
-  }
-
-  return (GType) clock_type;
-}
+#define parent_class gst_audio_clock_parent_class
+G_DEFINE_TYPE (GstAudioClock, gst_audio_clock, GST_TYPE_SYSTEM_CLOCK);
 
 static void
 gst_audio_clock_class_init (GstAudioClockClass * klass)
@@ -87,8 +55,6 @@ gst_audio_clock_class_init (GstAudioClockClass * klass)
 
   gobject_class = (GObjectClass *) klass;
   gstclock_class = (GstClockClass *) klass;
-
-  parent_class = g_type_class_peek_parent (klass);
 
   gobject_class->dispose = gst_audio_clock_dispose;
   gstclock_class->get_internal_time = gst_audio_clock_get_internal_time;
@@ -170,9 +136,9 @@ gst_audio_clock_reset (GstAudioClock * clock, GstClockTime time)
   clock->time_offset = time_offset;
 
   GST_DEBUG_OBJECT (clock,
-      "reset clock to %" GST_TIME_FORMAT ", last %" GST_TIME_FORMAT ", offset %"
-      GST_TIME_FORMAT, GST_TIME_ARGS (time), GST_TIME_ARGS (clock->last_time),
-      GST_TIME_ARGS (time_offset));
+      "reset clock to %" GST_TIME_FORMAT ", last %" GST_TIME_FORMAT
+      ", offset %" GST_STIME_FORMAT, GST_TIME_ARGS (time),
+      GST_TIME_ARGS (clock->last_time), GST_STIME_ARGS (time_offset));
 }
 
 static GstClockTime

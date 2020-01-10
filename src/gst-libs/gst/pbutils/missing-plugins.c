@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -126,6 +126,7 @@ copy_and_clean_caps (const GstCaps * caps)
    * where template caps usually have the standard MIN - MAX range as value) */
   s = gst_caps_get_structure (ret, 0);
   gst_structure_remove_field (s, "codec_data");
+  gst_structure_remove_field (s, "streamheader");
   gst_structure_remove_field (s, "palette_data");
   gst_structure_remove_field (s, "pixel-aspect-ratio");
   gst_structure_remove_field (s, "framerate");
@@ -141,12 +142,18 @@ copy_and_clean_caps (const GstCaps * caps)
   gst_structure_remove_field (s, "height");
   gst_structure_remove_field (s, "channels");
   gst_structure_remove_field (s, "rate");
+  /* parsed, framed, stream-format and alignment are going to be handled by
+   * parsers and not relevant for decoders/encoders usually */
+  gst_structure_remove_field (s, "parsed");
+  gst_structure_remove_field (s, "framed");
+  gst_structure_remove_field (s, "stream-format");
+  gst_structure_remove_field (s, "alignment");
   /* rtp fields */
   gst_structure_remove_field (s, "config");
   gst_structure_remove_field (s, "clock-rate");
-  gst_structure_remove_field (s, "clock-base");
+  gst_structure_remove_field (s, "timestamp-offset");
   gst_structure_remove_field (s, "maxps");
-  gst_structure_remove_field (s, "seqnum-base");
+  gst_structure_remove_field (s, "seqnum-offset");
   gst_structure_remove_field (s, "npt-start");
   gst_structure_remove_field (s, "npt-stop");
   gst_structure_remove_field (s, "play-speed");
@@ -424,7 +431,7 @@ gst_missing_plugin_message_get_installer_detail (GstMessage * msg)
 
   /* FIXME: use gst_installer_detail_new() here too */
   str = g_string_new (GST_DETAIL_STRING_MARKER "|");
-  g_string_append_printf (str, "%u.%u|", GST_VERSION_MAJOR, GST_VERSION_MINOR);
+  g_string_append_printf (str, "%s|", GST_API_VERSION);
 
   progname = (const gchar *) g_get_prgname ();
   if (progname) {
@@ -528,7 +535,7 @@ gst_missing_plugin_message_get_description (GstMessage * msg)
         else if (missing_type == GST_MISSING_TYPE_URISINK)
           ret = gst_pb_utils_get_sink_description (detail);
         else
-          ret = gst_pb_utils_get_sink_description (detail);
+          ret = gst_pb_utils_get_element_description (detail);
         g_free (detail);
       }
       break;
@@ -616,7 +623,7 @@ gst_installer_detail_new (gchar * description, const gchar * type,
   GString *s;
 
   s = g_string_new (GST_DETAIL_STRING_MARKER "|");
-  g_string_append_printf (s, "%u.%u|", GST_VERSION_MAJOR, GST_VERSION_MINOR);
+  g_string_append_printf (s, "%s|", GST_API_VERSION);
 
   progname = (const gchar *) g_get_prgname ();
   if (progname) {

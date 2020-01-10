@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_VIDEO_OVERLAY_COMPOSITION_H__
@@ -36,7 +36,7 @@ G_BEGIN_DECLS
 #define GST_TYPE_VIDEO_OVERLAY_RECTANGLE			\
   (gst_video_overlay_rectangle_get_type ())
 #define GST_VIDEO_OVERLAY_RECTANGLE_CAST(obj)			\
-  ((GstVideoOverlayRectangle *)(obj)
+  ((GstVideoOverlayRectangle *)(obj))
 #define GST_VIDEO_OVERLAY_RECTANGLE(obj)			\
   (GST_VIDEO_OVERLAY_RECTANGLE_CAST(obj))
 #define GST_IS_VIDEO_OVERLAY_RECTANGLE(obj)			\
@@ -58,11 +58,6 @@ typedef struct _GstVideoOverlayRectangle      GstVideoOverlayRectangle;
  *
  * Returns: (transfer full): @comp
  */
-#ifdef _FOOL_GTK_DOC_
-G_INLINE_FUNC GstVideoOverlayRectangle *
-gst_video_overlay_rectangle_ref (GstVideoOverlayRectangle * comp);
-#endif
-
 static inline GstVideoOverlayRectangle *
 gst_video_overlay_rectangle_ref (GstVideoOverlayRectangle * comp)
 {
@@ -76,11 +71,6 @@ gst_video_overlay_rectangle_ref (GstVideoOverlayRectangle * comp)
  * Decreases the refcount of the rectangle. If the refcount reaches 0, the
  * rectangle will be freed.
  */
-#ifdef _FOOL_GTK_DOC_
-G_INLINE_FUNC void
-gst_video_overlay_rectangle_unref (GstVideoOverlayRectangle * comp);
-#endif
-
 static inline void
 gst_video_overlay_rectangle_unref (GstVideoOverlayRectangle * comp)
 {
@@ -101,6 +91,8 @@ typedef enum {
   GST_VIDEO_OVERLAY_FORMAT_FLAG_GLOBAL_ALPHA = 2
 } GstVideoOverlayFormatFlags;
 
+#define GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION "meta:GstVideoOverlayComposition"
+
 /**
   * GST_VIDEO_OVERLAY_COMPOSITION_FORMAT_RGB:
   *
@@ -118,6 +110,19 @@ typedef enum {
   * Supported YUV overlay video format.
   */
 #define GST_VIDEO_OVERLAY_COMPOSITION_FORMAT_YUV      GST_VIDEO_FORMAT_AYUV
+
+/**
+ * GST_VIDEO_OVERLAY_COMPOSITION_BLEND_FORMATS:
+ *
+ * Video formats supported by gst_video_overlay_composition_blend(), for
+ * use in overlay elements' pad template caps.
+ *
+ * Since: 1.2
+ */
+#define GST_VIDEO_OVERLAY_COMPOSITION_BLEND_FORMATS \
+    "{ BGRx, RGBx, xRGB, xBGR, RGBA, BGRA, ARGB, ABGR, RGB, BGR," \
+     " I420, YV12, AYUV, YUY2, UYVY, v308, Y41B, Y42B, Y444," \
+     " NV12, NV21, A420, YUV9, YVU9, IYU1, GRAY8 }"
 
 GType                        gst_video_overlay_rectangle_get_type (void);
 
@@ -175,7 +180,7 @@ void                         gst_video_overlay_rectangle_set_global_alpha       
 #define GST_TYPE_VIDEO_OVERLAY_COMPOSITION			\
   (gst_video_overlay_composition_get_type ())
 #define GST_VIDEO_OVERLAY_COMPOSITION_CAST(obj)			\
-  ((GstVideoOverlayComposition *)(obj)
+  ((GstVideoOverlayComposition *)(obj))
 #define GST_VIDEO_OVERLAY_COMPOSITION(obj)			\
   (GST_VIDEO_OVERLAY_COMPOSITION_CAST(obj))
 #define GST_IS_VIDEO_OVERLAY_COMPOSITION(obj)			\
@@ -195,11 +200,6 @@ typedef struct _GstVideoOverlayComposition      GstVideoOverlayComposition;
  *
  * Returns: (transfer full): @comp
  */
-#ifdef _FOOL_GTK_DOC_
-G_INLINE_FUNC GstVideoOverlayComposition *
-gst_video_overlay_composition_ref (GstVideoOverlayComposition * comp);
-#endif
-
 static inline GstVideoOverlayComposition *
 gst_video_overlay_composition_ref (GstVideoOverlayComposition * comp)
 {
@@ -213,11 +213,6 @@ gst_video_overlay_composition_ref (GstVideoOverlayComposition * comp)
  * Decreases the refcount of the composition. If the refcount reaches 0, the
  * composition will be freed.
  */
-#ifdef _FOOL_GTK_DOC_
-G_INLINE_FUNC void
-gst_video_overlay_composition_unref (GstVideoOverlayComposition * comp);
-#endif
-
 static inline void
 gst_video_overlay_composition_unref (GstVideoOverlayComposition * comp)
 {
@@ -279,6 +274,14 @@ GstVideoOverlayCompositionMeta * gst_buffer_add_video_overlay_composition_meta (
   ((GstVideoOverlayCompositionMeta*)gst_buffer_get_meta((b),GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE))
 #define gst_buffer_remove_video_overlay_composition_meta(b,m) \
   gst_buffer_remove_meta((b),((GstMeta *) m))
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstVideoOverlayComposition, gst_video_overlay_composition_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstVideoOverlayRectangle, gst_video_overlay_rectangle_unref)
+#endif
 
 G_END_DECLS
 

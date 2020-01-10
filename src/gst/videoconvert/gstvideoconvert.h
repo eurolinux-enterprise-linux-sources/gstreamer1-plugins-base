@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_VIDEOCONVERT_H__
@@ -25,7 +25,6 @@
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/video/gstvideofilter.h>
-#include "videoconvert.h"
 
 G_BEGIN_DECLS
 
@@ -47,8 +46,16 @@ typedef struct _GstVideoConvertClass GstVideoConvertClass;
 struct _GstVideoConvert {
   GstVideoFilter element;
 
-  VideoConvert *convert;
-  gboolean dither;
+  GstVideoConverter *convert;
+  GstVideoDitherMethod dither;
+  guint dither_quantization;
+  GstVideoResamplerMethod chroma_resampler;
+  GstVideoAlphaMode alpha_mode;
+  GstVideoChromaMode chroma_mode;
+  GstVideoMatrixMode matrix_mode;
+  GstVideoGammaMode gamma_mode;
+  GstVideoPrimariesMode primaries_mode;
+  gdouble alpha_value;
 };
 
 struct _GstVideoConvertClass

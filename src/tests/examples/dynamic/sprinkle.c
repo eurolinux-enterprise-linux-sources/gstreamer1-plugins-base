@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /*
@@ -164,7 +164,12 @@ do_sprinkle (SprinkleState * state)
     state->count++;
   } else {
     state->infos[0] = NULL;
+
+    /* if no more sources left, quit */
+    if (!state->infos[2])
+      g_main_loop_quit (loop);
   }
+
   return TRUE;
 }
 
@@ -202,7 +207,7 @@ main (int argc, char *argv[])
   GstBus *bus;
   GstElement *filter, *convert, *sink;
   GstCaps *caps;
-  gboolean res;
+  gboolean linked;
   SprinkleState *state;
 
   gst_init (&argc, &argv);
@@ -227,8 +232,8 @@ main (int argc, char *argv[])
 
   gst_bin_add_many (GST_BIN (pipeline), adder, filter, convert, sink, NULL);
 
-  res = gst_element_link_many (adder, filter, convert, sink, NULL);
-  g_assert (res);
+  linked = gst_element_link_many (adder, filter, convert, sink, NULL);
+  g_assert (linked);
 
   /* setup message handling */
   bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));

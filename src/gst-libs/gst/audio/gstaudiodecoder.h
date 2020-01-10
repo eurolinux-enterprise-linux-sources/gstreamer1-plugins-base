@@ -17,14 +17,18 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
+
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
+
 #ifndef _GST_AUDIO_DECODER_H_
 #define _GST_AUDIO_DECODER_H_
 
 #include <gst/gst.h>
-#include <gst/audio/audio.h>
 #include <gst/base/gstadapter.h>
 
 G_BEGIN_DECLS
@@ -129,8 +133,8 @@ GstFlowReturn _gst_audio_decoder_error (GstAudioDecoder *dec, gint weight,
 G_STMT_START {                                                              \
   gchar *__txt = _gst_element_error_printf text;                            \
   gchar *__dbg = _gst_element_error_printf debug;                           \
-  GstAudioDecoder *dec = GST_AUDIO_DECODER (el);                   \
-  ret = _gst_audio_decoder_error (dec, weight, GST_ ## domain ## _ERROR,    \
+  GstAudioDecoder *__dec = GST_AUDIO_DECODER (el);                   \
+  ret = _gst_audio_decoder_error (__dec, weight, GST_ ## domain ## _ERROR,    \
       GST_ ## domain ## _ERROR_ ## code, __txt, __dbg, __FILE__,            \
       GST_FUNCTION, __LINE__);                                              \
 } G_STMT_END
@@ -227,6 +231,26 @@ struct _GstAudioDecoder
  *                      Propose buffer allocation parameters for upstream elements.
  *                      Subclasses should chain up to the parent implementation to
  *                      invoke the default handler.
+ * @sink_query:     Optional.
+ *                  Query handler on the sink pad. This function should
+ *                  return TRUE if the query could be performed. Subclasses
+ *                  should chain up to the parent implementation to invoke the
+ *                  default handler. Since 1.6
+ * @src_query:      Optional.
+ *                  Query handler on the source pad. This function should
+ *                  return TRUE if the query could be performed. Subclasses
+ *                  should chain up to the parent implementation to invoke the
+ *                  default handler. Since 1.6
+ * @getcaps:        Optional.
+ *                  Allows for a custom sink getcaps implementation.
+ *                  If not implemented,
+ *                  default returns gst_audio_decoder_proxy_getcaps
+ *                  applied to sink template caps.
+ * @transform_meta: Optional. Transform the metadata on the input buffer to the
+ *                  output buffer. By default this method copies all meta without
+ *                  tags and meta with only the "audio" tag. subclasses can
+ *                  implement this method and return %TRUE if the metadata is to be
+ *                  copied. Since 1.6
  *
  * Subclasses can override any of the available virtual methods or not, as
  * needed. At minimum @handle_frame (and likely @set_format) needs to be
@@ -264,7 +288,7 @@ struct _GstAudioDecoderClass
                                        GstEvent *event);
 
   gboolean      (*open)               (GstAudioDecoder *dec);
-  
+
   gboolean      (*close)              (GstAudioDecoder *dec);
 
   gboolean      (*negotiate)          (GstAudioDecoder *dec);
@@ -274,8 +298,18 @@ struct _GstAudioDecoderClass
   gboolean      (*propose_allocation) (GstAudioDecoder *dec,
                                        GstQuery * query);
 
+  gboolean      (*sink_query)         (GstAudioDecoder *dec, GstQuery *query);
+
+  gboolean      (*src_query)          (GstAudioDecoder *dec, GstQuery *query);
+
+  GstCaps *     (*getcaps)            (GstAudioDecoder * dec,
+                                       GstCaps * filter);
+
+  gboolean      (*transform_meta)     (GstAudioDecoder *enc, GstBuffer *outbuf,
+                                       GstMeta *meta, GstBuffer *inbuf);
+
   /*< private >*/
-  gpointer       _gst_reserved[GST_PADDING_LARGE];
+  gpointer       _gst_reserved[GST_PADDING_LARGE - 4];
 };
 
 GType             gst_audio_decoder_get_type (void);
@@ -283,6 +317,9 @@ GType             gst_audio_decoder_get_type (void);
 gboolean          gst_audio_decoder_set_output_format  (GstAudioDecoder    * dec,
                                                         const GstAudioInfo * info);
 
+GstCaps *         gst_audio_decoder_proxy_getcaps (GstAudioDecoder * decoder,
+                                                   GstCaps         * caps,
+                                                   GstCaps         * filter);
 gboolean          gst_audio_decoder_negotiate (GstAudioDecoder * dec);
 
 GstFlowReturn     gst_audio_decoder_finish_frame (GstAudioDecoder * dec,
@@ -323,6 +360,8 @@ void              gst_audio_decoder_get_parse_state (GstAudioDecoder * dec,
                                                      gboolean        * sync,
                                                      gboolean        * eos);
 
+void              gst_audio_decoder_set_allocation_caps (GstAudioDecoder * dec,
+                                                         GstCaps         * allocation_caps);
 
 /* object properties */
 void              gst_audio_decoder_set_plc (GstAudioDecoder * dec,
@@ -356,6 +395,13 @@ void              gst_audio_decoder_get_allocator (GstAudioDecoder * dec,
 
 void              gst_audio_decoder_merge_tags (GstAudioDecoder * dec,
                                                 const GstTagList * tags, GstTagMergeMode mode);
+
+void              gst_audio_decoder_set_use_default_pad_acceptcaps (GstAudioDecoder * decoder,
+                                                                   gboolean use);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioDecoder, gst_object_unref)
+#endif
 
 G_END_DECLS
 

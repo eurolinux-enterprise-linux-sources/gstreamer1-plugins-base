@@ -13,18 +13,26 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+#include <locale.h>
+
 #include <stdlib.h>
 #include <glib.h>
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
+
+#define MAX_INDENT 40
+
+/* *INDENT-OFF* */
+static void my_g_string_append_printf (GString * str, int depth, const gchar * format, ...) G_GNUC_PRINTF (3, 4);
+/* *INDENT-ON* */
 
 static gboolean async = FALSE;
 static gboolean show_toc = FALSE;
@@ -51,21 +59,13 @@ my_g_string_append_printf (GString * str, int depth, const gchar * format, ...)
   va_end (args);
 }
 
-static gchar *
-gst_stream_audio_information_to_string (GstDiscovererStreamInfo * info,
-    gint depth)
+static void
+gst_stream_information_to_string (GstDiscovererStreamInfo * info, GString * s,
+    guint depth)
 {
-  GstDiscovererAudioInfo *audio_info;
-  GString *s;
   gchar *tmp;
-  const gchar *ctmp;
-  int len = 400;
-  const GstTagList *tags;
   GstCaps *caps;
-
-  g_return_val_if_fail (info != NULL, NULL);
-
-  s = g_string_sized_new (len);
+  const GstStructure *misc;
 
   my_g_string_append_printf (s, depth, "Codec:\n");
   caps = gst_discoverer_stream_info_get_caps (info);
@@ -75,13 +75,90 @@ gst_stream_audio_information_to_string (GstDiscovererStreamInfo * info,
   g_free (tmp);
 
   my_g_string_append_printf (s, depth, "Additional info:\n");
-  if (gst_discoverer_stream_info_get_misc (info)) {
-    tmp = gst_structure_to_string (gst_discoverer_stream_info_get_misc (info));
+  if ((misc = gst_discoverer_stream_info_get_misc (info))) {
+    tmp = gst_structure_to_string (misc);
     my_g_string_append_printf (s, depth, "  %s\n", tmp);
     g_free (tmp);
   } else {
     my_g_string_append_printf (s, depth, "  None\n");
   }
+
+  my_g_string_append_printf (s, depth, "Stream ID: %s\n",
+      gst_discoverer_stream_info_get_stream_id (info));
+}
+
+static void
+print_tag_foreach (const GstTagList * tags, const gchar * tag,
+    gpointer user_data)
+{
+  GValue val = { 0, };
+  gchar *str;
+  guint depth = GPOINTER_TO_UINT (user_data);
+
+  if (!gst_tag_list_copy_value (&val, tags, tag))
+    return;
+
+  if (G_VALUE_HOLDS_STRING (&val)) {
+    str = g_value_dup_string (&val);
+  } else if (G_VALUE_TYPE (&val) == GST_TYPE_SAMPLE) {
+    GstSample *sample = gst_value_get_sample (&val);
+    GstBuffer *img = gst_sample_get_buffer (sample);
+    GstCaps *caps = gst_sample_get_caps (sample);
+
+    if (img) {
+      if (caps) {
+        gchar *caps_str;
+
+        caps_str = gst_caps_to_string (caps);
+        str = g_strdup_printf ("buffer of %" G_GSIZE_FORMAT " bytes, "
+            "type: %s", gst_buffer_get_size (img), caps_str);
+        g_free (caps_str);
+      } else {
+        str = g_strdup_printf ("buffer of %" G_GSIZE_FORMAT " bytes",
+            gst_buffer_get_size (img));
+      }
+    } else {
+      str = g_strdup ("NULL buffer");
+    }
+  } else {
+    str = gst_value_serialize (&val);
+  }
+
+  g_print ("%*s%s: %s\n", 2 * depth, " ", gst_tag_get_nick (tag), str);
+  g_free (str);
+
+  g_value_unset (&val);
+}
+
+static void
+print_tags_topology (guint depth, const GstTagList * tags)
+{
+  g_print ("%*sTags:\n", 2 * depth, " ");
+  if (tags) {
+    gst_tag_list_foreach (tags, print_tag_foreach,
+        GUINT_TO_POINTER (depth + 1));
+  } else {
+    g_print ("%*sNone\n", 2 * (depth + 1), " ");
+  }
+  if (verbose)
+    g_print ("%*s\n", 2 * depth, " ");
+}
+
+static gchar *
+gst_stream_audio_information_to_string (GstDiscovererStreamInfo * info,
+    guint depth)
+{
+  GstDiscovererAudioInfo *audio_info;
+  GString *s;
+  const gchar *ctmp;
+  int len = 400;
+  const GstTagList *tags;
+
+  g_return_val_if_fail (info != NULL, NULL);
+
+  s = g_string_sized_new (len);
+
+  gst_stream_information_to_string (info, s, depth);
 
   audio_info = (GstDiscovererAudioInfo *) info;
   ctmp = gst_discoverer_audio_info_get_language (audio_info);
@@ -99,53 +176,26 @@ gst_stream_audio_information_to_string (GstDiscovererStreamInfo * info,
   my_g_string_append_printf (s, depth, "Max bitrate: %u\n",
       gst_discoverer_audio_info_get_max_bitrate (audio_info));
 
-  my_g_string_append_printf (s, depth, "Tags:\n");
   tags = gst_discoverer_stream_info_get_tags (info);
-  if (tags) {
-    tmp = gst_tag_list_to_string (tags);
-    my_g_string_append_printf (s, depth, "  %s\n", tmp);
-    g_free (tmp);
-  } else {
-    my_g_string_append_printf (s, depth, "  None\n");
-  }
-  if (verbose)
-    my_g_string_append_printf (s, depth, "\n");
+  print_tags_topology (depth, tags);
 
   return g_string_free (s, FALSE);
 }
 
 static gchar *
 gst_stream_video_information_to_string (GstDiscovererStreamInfo * info,
-    gint depth)
+    guint depth)
 {
   GstDiscovererVideoInfo *video_info;
   GString *s;
-  gchar *tmp;
   int len = 500;
-  const GstStructure *misc;
   const GstTagList *tags;
-  GstCaps *caps;
 
   g_return_val_if_fail (info != NULL, NULL);
 
   s = g_string_sized_new (len);
 
-  my_g_string_append_printf (s, depth, "Codec:\n");
-  caps = gst_discoverer_stream_info_get_caps (info);
-  tmp = gst_caps_to_string (caps);
-  gst_caps_unref (caps);
-  my_g_string_append_printf (s, depth, "  %s\n", tmp);
-  g_free (tmp);
-
-  my_g_string_append_printf (s, depth, "Additional info:\n");
-  misc = gst_discoverer_stream_info_get_misc (info);
-  if (misc) {
-    tmp = gst_structure_to_string (misc);
-    my_g_string_append_printf (s, depth, "  %s\n", tmp);
-    g_free (tmp);
-  } else {
-    my_g_string_append_printf (s, depth, "  None\n");
-  }
+  gst_stream_information_to_string (info, s, depth);
 
   video_info = (GstDiscovererVideoInfo *) info;
   my_g_string_append_printf (s, depth, "Width: %u\n",
@@ -171,69 +221,35 @@ gst_stream_video_information_to_string (GstDiscovererStreamInfo * info,
   my_g_string_append_printf (s, depth, "Max bitrate: %u\n",
       gst_discoverer_video_info_get_max_bitrate (video_info));
 
-  my_g_string_append_printf (s, depth, "Tags:\n");
   tags = gst_discoverer_stream_info_get_tags (info);
-  if (tags) {
-    tmp = gst_tag_list_to_string (tags);
-    my_g_string_append_printf (s, depth, "  %s\n", tmp);
-    g_free (tmp);
-  } else {
-    my_g_string_append_printf (s, depth, "  None\n");
-  }
-  if (verbose)
-    my_g_string_append_printf (s, depth, "\n");
+  print_tags_topology (depth, tags);
 
   return g_string_free (s, FALSE);
 }
 
 static gchar *
 gst_stream_subtitle_information_to_string (GstDiscovererStreamInfo * info,
-    gint depth)
+    guint depth)
 {
   GstDiscovererSubtitleInfo *subtitle_info;
   GString *s;
-  gchar *tmp;
   const gchar *ctmp;
   int len = 400;
   const GstTagList *tags;
-  GstCaps *caps;
 
   g_return_val_if_fail (info != NULL, NULL);
 
   s = g_string_sized_new (len);
 
-  my_g_string_append_printf (s, depth, "Codec:\n");
-  caps = gst_discoverer_stream_info_get_caps (info);
-  tmp = gst_caps_to_string (caps);
-  gst_caps_unref (caps);
-  my_g_string_append_printf (s, depth, "  %s\n", tmp);
-  g_free (tmp);
-
-  my_g_string_append_printf (s, depth, "Additional info:\n");
-  if (gst_discoverer_stream_info_get_misc (info)) {
-    tmp = gst_structure_to_string (gst_discoverer_stream_info_get_misc (info));
-    my_g_string_append_printf (s, depth, "  %s\n", tmp);
-    g_free (tmp);
-  } else {
-    my_g_string_append_printf (s, depth, "  None\n");
-  }
+  gst_stream_information_to_string (info, s, depth);
 
   subtitle_info = (GstDiscovererSubtitleInfo *) info;
   ctmp = gst_discoverer_subtitle_info_get_language (subtitle_info);
   my_g_string_append_printf (s, depth, "Language: %s\n",
       ctmp ? ctmp : "<unknown>");
 
-  my_g_string_append_printf (s, depth, "Tags:\n");
   tags = gst_discoverer_stream_info_get_tags (info);
-  if (tags) {
-    tmp = gst_tag_list_to_string (tags);
-    my_g_string_append_printf (s, depth, "  %s\n", tmp);
-    g_free (tmp);
-  } else {
-    my_g_string_append_printf (s, depth, "  None\n");
-  }
-  if (verbose)
-    my_g_string_append_printf (s, depth, "\n");
+  print_tags_topology (depth, tags);
 
   return g_string_free (s, FALSE);
 }
@@ -283,7 +299,7 @@ print_stream_info (GstDiscovererStreamInfo * info, void *depth)
 }
 
 static void
-print_topology (GstDiscovererStreamInfo * info, gint depth)
+print_topology (GstDiscovererStreamInfo * info, guint depth)
 {
   GstDiscovererStreamInfo *next;
 
@@ -311,33 +327,10 @@ print_topology (GstDiscovererStreamInfo * info, gint depth)
 }
 
 static void
-print_tag_foreach (const GstTagList * tags, const gchar * tag,
-    gpointer user_data)
-{
-  GValue val = { 0, };
-  gchar *str;
-  gint depth = GPOINTER_TO_INT (user_data);
-
-  gst_tag_list_copy_value (&val, tags, tag);
-
-  if (G_VALUE_HOLDS_STRING (&val))
-    str = g_value_dup_string (&val);
-  else
-    str = gst_value_serialize (&val);
-
-  g_print ("%*s%s: %s\n", 2 * depth, " ", gst_tag_get_nick (tag), str);
-  g_free (str);
-
-  g_value_unset (&val);
-}
-
-#define MAX_INDENT 40
-
-static void
 print_toc_entry (gpointer data, gpointer user_data)
 {
   GstTocEntry *entry = (GstTocEntry *) data;
-  gint depth = GPOINTER_TO_INT (user_data);
+  guint depth = GPOINTER_TO_UINT (user_data);
   guint indent = MIN (GPOINTER_TO_UINT (user_data), MAX_INDENT);
   GstTagList *tags;
   GList *subentries;
@@ -388,9 +381,16 @@ print_properties (GstDiscovererInfo * info, gint tab)
 static void
 print_info (GstDiscovererInfo * info, GError * err)
 {
-  GstDiscovererResult result = gst_discoverer_info_get_result (info);
+  GstDiscovererResult result;
   GstDiscovererStreamInfo *sinfo;
 
+  if (!info) {
+    g_print ("Could not discover URI\n");
+    g_print (" %s\n", err->message);
+    return;
+  }
+
+  result = gst_discoverer_info_get_result (info);
   g_print ("Done discovering %s\n", gst_discoverer_info_get_uri (info));
   switch (result) {
     case GST_DISCOVERER_OK:
@@ -422,10 +422,15 @@ print_info (GstDiscovererInfo * info, GError * err)
     {
       g_print ("Missing plugins\n");
       if (verbose) {
-        gchar *tmp =
-            gst_structure_to_string (gst_discoverer_info_get_misc (info));
-        g_print (" (%s)\n", tmp);
-        g_free (tmp);
+        gint i = 0;
+        const gchar **installer_details =
+            gst_discoverer_info_get_missing_elements_installer_details (info);
+
+        while (installer_details[i]) {
+          g_print (" (%s)\n", installer_details[i]);
+
+          i++;
+        }
       }
       break;
     }
@@ -482,20 +487,20 @@ process_file (GstDiscoverer * dc, const gchar * filename)
 
     if (err) {
       g_warning ("Couldn't convert filename to URI: %s\n", err->message);
-      g_error_free (err);
+      g_clear_error (&err);
       return;
     }
   } else {
     uri = g_strdup (filename);
   }
 
-  if (async == FALSE) {
+  if (!async) {
     g_print ("Analyzing %s\n", uri);
     info = gst_discoverer_discover_uri (dc, uri, &err);
     print_info (info, err);
-    if (err)
-      g_error_free (err);
-    gst_discoverer_info_unref (info);
+    g_clear_error (&err);
+    if (info)
+      gst_discoverer_info_unref (info);
   } else {
     gst_discoverer_discover_uri_async (dc, uri);
   }
@@ -547,6 +552,8 @@ main (int argc, char **argv)
   };
   GOptionContext *ctx;
 
+  setlocale (LC_ALL, "");
+
   ctx =
       g_option_context_new
       ("- discover files synchronously with GstDiscoverer");
@@ -555,6 +562,8 @@ main (int argc, char **argv)
 
   if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
     g_print ("Error initializing: %s\n", err->message);
+    g_option_context_free (ctx);
+    g_clear_error (&err);
     exit (1);
   }
 
@@ -568,10 +577,11 @@ main (int argc, char **argv)
   dc = gst_discoverer_new (timeout * GST_SECOND, &err);
   if (G_UNLIKELY (dc == NULL)) {
     g_print ("Error initializing: %s\n", err->message);
+    g_clear_error (&err);
     exit (1);
   }
 
-  if (async == FALSE) {
+  if (!async) {
     gint i;
     for (i = 1; i < argc; i++)
       process_file (dc, argv[i]);

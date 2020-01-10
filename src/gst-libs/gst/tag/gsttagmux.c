@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -221,6 +221,9 @@ gst_tag_mux_get_tags (GstTagMux * mux)
 
   mux->priv->final_tags =
       gst_tag_list_merge (tagsetter_tags, mux->priv->event_tags, merge_mode);
+
+  if (mux->priv->final_tags == NULL)
+    mux->priv->final_tags = gst_tag_list_new_empty ();
 
   GST_LOG_OBJECT (mux, "final tags: %" GST_PTR_FORMAT, mux->priv->final_tags);
 

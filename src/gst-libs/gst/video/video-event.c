@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include "video-event.h"
@@ -202,6 +202,8 @@ gst_video_event_is_force_key_unit (GstEvent * event)
  * key unit event. See gst_video_event_new_downstream_force_key_unit() for a
  * full description of the downstream force key unit event.
  *
+ * @running_time will be adjusted for any pad offsets of pads it was passing through.
+ *
  * Returns: %TRUE if the event is a valid downstream force key unit event.
  */
 gboolean
@@ -241,8 +243,16 @@ gst_video_event_parse_downstream_force_key_unit (GstEvent * event,
   if (stream_time)
     *stream_time = ev_stream_time;
 
-  if (running_time)
+  if (running_time) {
+    gint64 offset = gst_event_get_running_time_offset (event);
+
     *running_time = ev_running_time;
+    /* Catch underflows */
+    if (*running_time > -offset)
+      *running_time += offset;
+    else
+      *running_time = 0;
+  }
 
   if (all_headers)
     *all_headers = ev_all_headers;
@@ -265,6 +275,8 @@ gst_video_event_parse_downstream_force_key_unit (GstEvent * event,
  * upstream force key unit event.
  *
  * Create an upstream force key unit event using  gst_video_event_new_upstream_force_key_unit()
+ *
+ * @running_time will be adjusted for any pad offsets of pads it was passing through.
  *
  * Returns: %TRUE if the event is a valid upstream force-key-unit event. %FALSE if not
  */
@@ -294,8 +306,17 @@ gst_video_event_parse_upstream_force_key_unit (GstEvent * event,
   if (!gst_structure_get_uint (s, "count", &ev_count))
     ev_count = 0;
 
-  if (running_time)
+
+  if (running_time) {
+    gint64 offset = gst_event_get_running_time_offset (event);
+
     *running_time = ev_running_time;
+    /* Catch underflows */
+    if (*running_time > -offset)
+      *running_time += offset;
+    else
+      *running_time = 0;
+  }
 
   if (all_headers)
     *all_headers = ev_all_headers;

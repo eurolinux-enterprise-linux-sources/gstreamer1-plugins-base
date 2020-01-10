@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -27,7 +27,10 @@
  * file descriptors can be added to multifdsink by emitting the #GstMultiFdSink::add signal. 
  * For each descriptor added, the #GstMultiFdSink::client-added signal will be called.
  *
- * As of version 0.10.8, a client can also be added with the #GstMultiFdSink::add-full signal
+ * The multifdsink element needs to be set into READY, PAUSED or PLAYING state
+ * before operations such as adding clients are possible.
+ *
+ * A client can also be added with the #GstMultiFdSink::add-full signal
  * that allows for more control over what and how much data a client 
  * initially receives.
  *
@@ -59,7 +62,7 @@
  * Multifdsink will always keep at least one keyframe in its internal buffers
  * when the sync-mode is set to latest-keyframe.
  *
- * As of version 0.10.8, there are additional values for the #GstMultiFdSink:sync-method 
+ * There are additional values for the #GstMultiFdSink:sync-method
  * property to allow finer control over burst-on-connect behaviour. By selecting
  * the 'burst' method a minimum burst size can be chosen, 'burst-keyframe'
  * additionally requires that the burst begin with a keyframe, and 
@@ -94,8 +97,6 @@
  * buffers to the clients. This behaviour can be disabled by setting the sync 
  * property to FALSE. Multifdsink will by default not do QoS and will never
  * drop late buffers.
- *
- * Last reviewed on 2006-09-12 (0.10.10)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -122,7 +123,6 @@
 #endif
 
 #include "gstmultifdsink.h"
-#include "gsttcp-marshal.h"
 
 #define NOT_IMPLEMENTED 0
 
@@ -153,8 +153,7 @@ enum
 enum
 {
   PROP_0,
-  PROP_HANDLE_READ,
-  PROP_LAST
+  PROP_HANDLE_READ
 };
 
 static void gst_multi_fd_sink_stop_pre (GstMultiHandleSink * mhsink);
@@ -219,8 +218,6 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
    * GstMultiFdSink::handle-read
    *
    * Handle read requests from clients and discard the data.
-   *
-   * Since: 0.10.23
    */
   g_object_class_install_property (gobject_class, PROP_HANDLE_READ,
       g_param_spec_boolean ("handle-read", "Handle Read",
@@ -238,7 +235,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
       g_signal_new ("add", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiFdSinkClass, add), NULL, NULL,
-      g_cclosure_marshal_VOID__INT, G_TYPE_NONE, 1, G_TYPE_INT);
+      g_cclosure_marshal_generic, G_TYPE_NONE, 1, G_TYPE_INT);
   /**
    * GstMultiFdSink::add-full:
    * @gstmultifdsink:  the multifdsink element to emit this signal on
@@ -258,7 +255,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
       g_signal_new ("add-full", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiFdSinkClass, add_full), NULL, NULL,
-      gst_tcp_marshal_VOID__INT_ENUM_INT_UINT64_INT_UINT64, G_TYPE_NONE, 6,
+      g_cclosure_marshal_generic, G_TYPE_NONE, 6,
       G_TYPE_INT, GST_TYPE_SYNC_METHOD, GST_TYPE_FORMAT, G_TYPE_UINT64,
       GST_TYPE_FORMAT, G_TYPE_UINT64);
   /**
@@ -272,7 +269,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
       g_signal_new ("remove", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiFdSinkClass, remove), NULL, NULL,
-      gst_tcp_marshal_VOID__INT, G_TYPE_NONE, 1, G_TYPE_INT);
+      g_cclosure_marshal_generic, G_TYPE_NONE, 1, G_TYPE_INT);
   /**
    * GstMultiFdSink::remove-flush:
    * @gstmultifdsink: the multifdsink element to emit this signal on
@@ -285,7 +282,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
       g_signal_new ("remove-flush", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiFdSinkClass, remove_flush), NULL, NULL,
-      gst_tcp_marshal_VOID__INT, G_TYPE_NONE, 1, G_TYPE_INT);
+      g_cclosure_marshal_generic, G_TYPE_NONE, 1, G_TYPE_INT);
 
   /**
    * GstMultiFdSink::get-stats:
@@ -307,7 +304,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
       g_signal_new ("get-stats", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_STRUCT_OFFSET (GstMultiFdSinkClass, get_stats), NULL, NULL,
-      gst_tcp_marshal_BOXED__INT, GST_TYPE_STRUCTURE, 1, G_TYPE_INT);
+      g_cclosure_marshal_generic, GST_TYPE_STRUCTURE, 1, G_TYPE_INT);
 
   /**
    * GstMultiFdSink::client-added:
@@ -320,7 +317,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
    */
   gst_multi_fd_sink_signals[SIGNAL_CLIENT_ADDED] =
       g_signal_new ("client-added", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, gst_tcp_marshal_VOID__INT, G_TYPE_NONE,
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE,
       1, G_TYPE_INT);
   /**
    * GstMultiFdSink::client-removed:
@@ -338,7 +335,7 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
    */
   gst_multi_fd_sink_signals[SIGNAL_CLIENT_REMOVED] =
       g_signal_new ("client-removed", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, gst_tcp_marshal_VOID__INT_ENUM,
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic,
       G_TYPE_NONE, 2, G_TYPE_INT, GST_TYPE_CLIENT_STATUS);
   /**
    * GstMultiFdSink::client-fd-removed:
@@ -352,12 +349,10 @@ gst_multi_fd_sink_class_init (GstMultiFdSinkClass * klass)
    * In this callback, @gstmultifdsink has removed all the information
    * associated with @fd and it is therefore not possible to call get-stats
    * with @fd. It is however safe to close() and reuse @fd in the callback.
-   *
-   * Since: 0.10.7
    */
   gst_multi_fd_sink_signals[SIGNAL_CLIENT_FD_REMOVED] =
       g_signal_new ("client-fd-removed", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, gst_tcp_marshal_VOID__INT,
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic,
       G_TYPE_NONE, 1, G_TYPE_INT);
 
   gst_element_class_set_static_metadata (gstelement_class,
@@ -683,14 +678,14 @@ gst_multi_fd_sink_handle_client_write (GstMultiFdSink * sink,
   GstMultiHandleClient *mhclient = (GstMultiHandleClient *) client;
   int fd = mhclient->handle.fd;
 
-  g_get_current_time (&nowtv);
-  now = GST_TIMEVAL_TO_TIME (nowtv);
-
   flushing = mhclient->status == GST_CLIENT_STATUS_FLUSHING;
 
   more = TRUE;
   do {
     gint maxsize;
+
+    g_get_current_time (&nowtv);
+    now = GST_TIMEVAL_TO_TIME (nowtv);
 
     if (!mhclient->sending) {
       /* client is not working on a buffer */
@@ -957,7 +952,7 @@ gst_multi_fd_sink_handle_clients (GstMultiFdSink * sink)
 
           res = fcntl (fd, F_GETFL, &flags);
           if (res == -1) {
-            GST_WARNING_OBJECT (sink, "fnctl failed for %d, removing: %s (%d)",
+            GST_WARNING_OBJECT (sink, "fcntl failed for %d, removing: %s (%d)",
                 fd, g_strerror (errno), errno);
             if (errno == EBADF) {
               mhclient->status = GST_CLIENT_STATUS_ERROR;

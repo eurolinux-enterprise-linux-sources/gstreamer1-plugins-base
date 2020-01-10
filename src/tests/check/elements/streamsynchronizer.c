@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -162,7 +162,7 @@ my_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
   return TRUE;
 }
 
-static void
+static gpointer
 my_push_thread (MyPushInfo * pushinfo)
 {
   GList *tmp;
@@ -174,6 +174,9 @@ my_push_thread (MyPushInfo * pushinfo)
     else
       gst_pad_push (pushinfo->pad, GST_BUFFER (tmp->data));
   }
+
+  GST_INFO ("leaving thread");
+  return NULL;
 }
 
 GST_START_TEST (test_basic)
@@ -264,14 +267,16 @@ GST_START_TEST (test_basic)
   pushinfo.pad = mysrcpad;
   pushinfo.to_push = to_push;
   g_mutex_lock (&push_mutex);
-  thread =
-      g_thread_create ((GThreadFunc) my_push_thread, &pushinfo, FALSE, NULL);
+  thread = g_thread_new ("pushthread", (GThreadFunc) my_push_thread, &pushinfo);
   fail_unless (thread != NULL);
 
   g_cond_wait (&push_cond, &push_mutex);
   g_mutex_unlock (&push_mutex);
 
   fail_if (expected != NULL);
+
+  /* wait for thread to exit before freeing things */
+  g_thread_join (thread);
 
   /* Cleanup */
   g_list_free (to_push);

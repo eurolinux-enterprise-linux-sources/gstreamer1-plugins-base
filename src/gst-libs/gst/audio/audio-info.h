@@ -15,17 +15,16 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
+
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
 
 #ifndef __GST_AUDIO_INFO_H__
 #define __GST_AUDIO_INFO_H__
-
-#include <gst/gst.h>
-#include <gst/audio/audio-enumtypes.h>
-#include <gst/audio/audio-format.h>
-#include <gst/audio/audio-channels.h>
 
 G_BEGIN_DECLS
 
@@ -85,7 +84,8 @@ struct _GstAudioInfo {
   gpointer _gst_reserved[GST_PADDING];
 };
 
-GType gst_audio_info_get_type        (void);
+#define GST_TYPE_AUDIO_INFO                  (gst_audio_info_get_type ())
+GType gst_audio_info_get_type                (void);
 
 #define GST_AUDIO_INFO_IS_VALID(i)           ((i)->finfo != NULL && (i)->rate > 0 && (i)->channels > 0 && (i)->bpf > 0)
 
@@ -99,7 +99,7 @@ GType gst_audio_info_get_type        (void);
 #define GST_AUDIO_INFO_IS_FLOAT(i)           (GST_AUDIO_FORMAT_INFO_IS_FLOAT((i)->finfo))
 #define GST_AUDIO_INFO_IS_SIGNED(i)          (GST_AUDIO_FORMAT_INFO_IS_SIGNED((i)->finfo))
 
-#define GST_AUDIO_INFO_ENDIANNESS(i)         (GST_AUDIO_FORMAT_INFO_ENDIANNES((i)->finfo))
+#define GST_AUDIO_INFO_ENDIANNESS(i)         (GST_AUDIO_FORMAT_INFO_ENDIANNESS((i)->finfo))
 #define GST_AUDIO_INFO_IS_LITTLE_ENDIAN(i)   (GST_AUDIO_FORMAT_INFO_IS_LITTLE_ENDIAN((i)->finfo))
 #define GST_AUDIO_INFO_IS_BIG_ENDIAN(i)      (GST_AUDIO_FORMAT_INFO_IS_BIG_ENDIAN((i)->finfo))
 
@@ -127,6 +127,13 @@ GstCaps *      gst_audio_info_to_caps     (const GstAudioInfo *info);
 gboolean       gst_audio_info_convert     (const GstAudioInfo * info,
                                            GstFormat src_fmt, gint64 src_val,
                                            GstFormat dest_fmt, gint64 * dest_val);
+
+gboolean       gst_audio_info_is_equal    (const GstAudioInfo *info,
+                                           const GstAudioInfo *other);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioInfo, gst_audio_info_free)
+#endif
 
 G_END_DECLS
 

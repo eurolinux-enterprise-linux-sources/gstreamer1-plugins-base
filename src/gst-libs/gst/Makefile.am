@@ -1,16 +1,17 @@
 SUBDIRS = \
 	tag \
 	fft \
+	audio \
 	rtp \
 	sdp \
 	rtsp \
 	video \
-	audio \
 	pbutils \
 	riff \
-	app
+	app \
+	allocators
 
-noinst_HEADERS = gettext.h gst-i18n-plugin.h glib-compat-private.h
+noinst_HEADERS = gettext.h gst-i18n-app.h gst-i18n-plugin.h glib-compat-private.h
 
 # dependencies:
 audio: tag
@@ -21,8 +22,12 @@ rtsp: sdp
 
 pbutils: video audio
 
+rtp: audio
+
+sdp: rtp
+
 INDEPENDENT_SUBDIRS = \
-	tag audio fft rtp sdp video app
+	tag audio fft video app
 
 .PHONY: independent-subdirs $(INDEPENDENT_SUBDIRS)
 

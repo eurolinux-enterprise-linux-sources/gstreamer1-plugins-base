@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -40,8 +40,6 @@
  * gst_rtcp_packet_move_to_next().
  * </para>
  * </refsect2>
- *
- * Last reviewed on 2007-03-26 (0.10.13)
  */
 
 #include <string.h>
@@ -89,20 +87,9 @@ gst_rtcp_buffer_new_copy_data (gpointer data, guint len)
   return gst_rtcp_buffer_new_take_data (g_memdup (data, len), len);
 }
 
-/**
- * gst_rtcp_buffer_validate_data:
- * @data: (array length=len): the data to validate
- * @len: the length of @data to validate
- *
- * Check if the @data and @size point to the data of a valid RTCP (compound)
- * packet. 
- * Use this function to validate a packet before using the other functions in
- * this module.
- *
- * Returns: TRUE if the data points to a valid RTCP packet.
- */
-gboolean
-gst_rtcp_buffer_validate_data (guint8 * data, guint len)
+static gboolean
+gst_rtcp_buffer_validate_data_internal (guint8 * data, guint len,
+    guint16 valid_mask)
 {
   guint16 header_mask;
   guint header_len;
@@ -118,7 +105,7 @@ gst_rtcp_buffer_validate_data (guint8 * data, guint len)
     goto wrong_length;
 
   /* first packet must be RR or SR  and version must be 2 */
-  header_mask = ((data[0] << 8) | data[1]) & GST_RTCP_VALID_MASK;
+  header_mask = ((data[0] << 8) | data[1]) & valid_mask;
   if (G_UNLIKELY (header_mask != GST_RTCP_VALID_VALUE))
     goto wrong_mask;
 
@@ -142,24 +129,28 @@ gst_rtcp_buffer_validate_data (guint8 * data, guint len)
     if (data_len < 4)
       break;
 
+    /* padding only allowed on last packet */
+    if (padding)
+      break;
+
     /* check version of new packet */
     version = data[0] & 0xc0;
     if (version != (GST_RTCP_VERSION << 6))
       goto wrong_version;
 
-    /* padding only allowed on last packet */
-    if ((padding = data[0] & 0x20))
-      break;
+    /* check padding of new packet */
+    if (data[0] & 0x20) {
+      padding = TRUE;
+      /* last byte of padding contains the number of padded bytes including
+       * itself. must be a multiple of 4, but cannot be 0. */
+      pad_bytes = data[data_len - 1];
+      if (pad_bytes == 0 || (pad_bytes & 0x3))
+        goto wrong_padding;
+    }
   }
-  if (data_len > 0) {
-    /* some leftover bytes, check padding */
-    if (!padding)
-      goto wrong_length;
-
-    /* get padding */
-    pad_bytes = data[data_len - 1];
-    if (data_len != pad_bytes)
-      goto wrong_padding;
+  if (data_len != 0) {
+    /* some leftover bytes */
+    goto wrong_length;
   }
   return TRUE;
 
@@ -171,8 +162,7 @@ wrong_length:
   }
 wrong_mask:
   {
-    GST_DEBUG ("mask check failed (%04x != %04x)", header_mask,
-        GST_RTCP_VALID_VALUE);
+    GST_DEBUG ("mask check failed (%04x != %04x)", header_mask, valid_mask);
     return FALSE;
   }
 wrong_version:
@@ -185,6 +175,75 @@ wrong_padding:
     GST_DEBUG ("padding check failed");
     return FALSE;
   }
+}
+
+/**
+ * gst_rtcp_buffer_validate_data_reduced:
+ * @data: (array length=len): the data to validate
+ * @len: the length of @data to validate
+ *
+ * Check if the @data and @size point to the data of a valid RTCP packet.
+ * Use this function to validate a packet before using the other functions in
+ * this module.
+ *
+ * This function is updated to support reduced size rtcp packets according to
+ * RFC 5506 and will validate full compound RTCP packets as well as reduced
+ * size RTCP packets.
+ *
+ * Returns: TRUE if the data points to a valid RTCP packet.
+ *
+ * Since: 1.6
+ */
+gboolean
+gst_rtcp_buffer_validate_data_reduced (guint8 * data, guint len)
+{
+  return gst_rtcp_buffer_validate_data_internal (data, len,
+      GST_RTCP_REDUCED_SIZE_VALID_MASK);
+}
+
+/**
+ * gst_rtcp_buffer_validate_data:
+ * @data: (array length=len): the data to validate
+ * @len: the length of @data to validate
+ *
+ * Check if the @data and @size point to the data of a valid compound,
+ * non-reduced size RTCP packet.
+ * Use this function to validate a packet before using the other functions in
+ * this module.
+ *
+ * Returns: TRUE if the data points to a valid RTCP packet.
+ */
+gboolean
+gst_rtcp_buffer_validate_data (guint8 * data, guint len)
+{
+  return gst_rtcp_buffer_validate_data_internal (data, len,
+      GST_RTCP_VALID_MASK);
+}
+
+/**
+ * gst_rtcp_buffer_validate_reduced:
+ * @buffer: the buffer to validate
+ *
+ * Check if the data pointed to by @buffer is a valid RTCP packet using
+ * gst_rtcp_buffer_validate_reduced().
+ *
+ * Returns: TRUE if @buffer is a valid RTCP packet.
+ *
+ * Since: 1.6
+ */
+gboolean
+gst_rtcp_buffer_validate_reduced (GstBuffer * buffer)
+{
+  gboolean res;
+  GstMapInfo map;
+
+  g_return_val_if_fail (GST_IS_BUFFER (buffer), FALSE);
+
+  gst_buffer_map (buffer, &map, GST_MAP_READ);
+  res = gst_rtcp_buffer_validate_data_reduced (map.data, map.size);
+  gst_buffer_unmap (buffer, &map);
+
+  return res;
 }
 
 /**
@@ -263,7 +322,7 @@ gst_rtcp_buffer_map (GstBuffer * buffer, GstMapFlags flags,
  * gst_rtcp_buffer_unmap:
  * @rtcp: a buffer with an RTCP packet
  *
- * Finish @rtcp after being constructured. This function is usually called
+ * Finish @rtcp after being constructed. This function is usually called
  * after gst_rtcp_buffer_map() and after adding the RTCP items to the new buffer.
  *
  * The function adjusts the size of @rtcp with the total length of all the
@@ -353,6 +412,11 @@ read_packet_header (GstRTCPPacket * packet)
   packet->item_offset = 4;
   packet->item_count = 0;
   packet->entry_offset = 4;
+
+  /* Ensure no overread from the claimed data size. The packet length
+     is expressed in multiple of 32 bits, to make things obvious. */
+  if (offset + 4 + packet->length * 4 > maxsize)
+    return FALSE;
 
   return TRUE;
 }
@@ -799,6 +863,7 @@ gst_rtcp_packet_get_rb (GstRTCPPacket * packet, guint nth, guint32 * ssrc,
     guint8 * fractionlost, gint32 * packetslost, guint32 * exthighestseq,
     guint32 * jitter, guint32 * lsr, guint32 * dlsr)
 {
+  guint offset;
   guint8 *data;
   guint32 tmp;
 
@@ -807,18 +872,31 @@ gst_rtcp_packet_get_rb (GstRTCPPacket * packet, guint nth, guint32 * ssrc,
       packet->type == GST_RTCP_TYPE_SR);
   g_return_if_fail (packet->rtcp != NULL);
   g_return_if_fail (packet->rtcp->map.flags & GST_MAP_READ);
+  g_return_if_fail (nth < packet->count);
 
-  data = packet->rtcp->map.data;
-
-  /* skip header */
-  data += packet->offset + 4;
+  /* get offset in 32-bits words into packet, skip the header */
   if (packet->type == GST_RTCP_TYPE_RR)
-    data += 4;
+    offset = 2;
   else
-    data += 24;
+    offset = 7;
 
   /* move to requested index */
-  data += (nth * 24);
+  offset += (nth * 6);
+
+  /* check that we don't go past the packet length */
+  if (offset > packet->length)
+    return;
+
+  /* scale to bytes */
+  offset <<= 2;
+  offset += packet->offset;
+
+  /* check if the packet is valid */
+  if (offset + 24 > packet->rtcp->map.size)
+    return;
+
+  data = packet->rtcp->map.data;
+  data += offset;
 
   if (ssrc)
     *ssrc = GST_READ_UINT32_BE (data);
@@ -878,6 +956,9 @@ gst_rtcp_packet_add_rb (GstRTCPPacket * packet, guint32 ssrc,
       packet->type == GST_RTCP_TYPE_SR, FALSE);
   g_return_val_if_fail (packet->rtcp != NULL, FALSE);
   g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE, FALSE);
+  /* if profile-specific extension is added, fail for now!? */
+  g_return_val_if_fail (gst_rtcp_packet_get_profile_specific_ext_length (packet)
+      == 0, FALSE);
 
   if (packet->count >= GST_RTCP_MAX_RB_COUNT)
     goto no_space;
@@ -958,6 +1039,156 @@ gst_rtcp_packet_set_rb (GstRTCPPacket * packet, guint nth, guint32 ssrc,
   g_return_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE);
 
   g_warning ("not implemented");
+}
+
+
+/**
+ * gst_rtcp_packet_set_profile_specific_ext:
+ * @packet: a valid SR or RR #GstRTCPPacket
+ * @data: (array length=len) (transfer none): profile-specific data
+ * @len: length of the profile-specific data in bytes
+ *
+ * Add profile-specific extension @data to @packet. If @packet already
+ * contains profile-specific extension @data will be appended to the existing
+ * extension.
+ *
+ * Returns: %TRUE if the profile specific extension data was added.
+ */
+gboolean
+gst_rtcp_packet_add_profile_specific_ext (GstRTCPPacket * packet,
+    const guint8 * data, guint len)
+{
+  guint8 *bdata;
+  guint maxsize, offset;
+
+  g_return_val_if_fail (packet != NULL, FALSE);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_RR ||
+      packet->type == GST_RTCP_TYPE_SR, FALSE);
+  g_return_val_if_fail (packet->rtcp != NULL, FALSE);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE, FALSE);
+  g_return_val_if_fail ((len & 0x03) == 0, FALSE);
+
+  bdata = packet->rtcp->map.data;
+  maxsize = packet->rtcp->map.maxsize;
+
+  /* skip to the end of the packet */
+  offset = packet->offset + (packet->length << 2) + 4;
+
+  /* we need 'len' free bytes now */
+  if (G_UNLIKELY (offset + len > maxsize))
+    return FALSE;
+
+  memcpy (&bdata[offset], data, len);
+  packet->length += len >> 2;
+  bdata[packet->offset + 2] = (packet->length) >> 8;
+  bdata[packet->offset + 3] = (packet->length) & 0xff;
+  packet->rtcp->map.size += len;
+
+  return TRUE;
+}
+
+/**
+ * gst_rtcp_packet_get_profile_specific_ext_length:
+ * @packet: a valid SR or RR #GstRTCPPacket
+ *
+ * Returns: The number of 32-bit words containing profile-specific extension
+ *          data from @packet.
+ */
+guint16
+gst_rtcp_packet_get_profile_specific_ext_length (GstRTCPPacket * packet)
+{
+  guint pse_offset = 2;
+
+  g_return_val_if_fail (packet != NULL, 0);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_RR ||
+      packet->type == GST_RTCP_TYPE_SR, 0);
+  g_return_val_if_fail (packet->rtcp != NULL, 0);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, 0);
+
+  if (packet->type == GST_RTCP_TYPE_SR)
+    pse_offset += 5;
+  pse_offset += (packet->count * 6);
+
+  if (pse_offset <= (packet->length + 1))
+    return packet->length + 1 - pse_offset;
+
+  /* This means that the packet is invalid! */
+  return 0;
+}
+
+/**
+ * gst_rtcp_packet_get_profile_specific_ext:
+ * @packet: a valid SR or RR #GstRTCPPacket
+ * @data: (out) (array length=len) (transfer none): result profile-specific data
+ * @len: (out): result length of the profile-specific data
+ *
+ * Returns: %TRUE if there was valid data.
+ */
+gboolean
+gst_rtcp_packet_get_profile_specific_ext (GstRTCPPacket * packet,
+    guint8 ** data, guint * len)
+{
+  guint16 pse_len;
+
+  g_return_val_if_fail (packet != NULL, FALSE);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_RR ||
+      packet->type == GST_RTCP_TYPE_SR, FALSE);
+  g_return_val_if_fail (packet->rtcp != NULL, FALSE);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, FALSE);
+
+  pse_len = gst_rtcp_packet_get_profile_specific_ext_length (packet);
+  if (pse_len > 0) {
+    if (len != NULL)
+      *len = pse_len * sizeof (guint32);
+    if (data != NULL) {
+      *data = packet->rtcp->map.data;
+      *data += packet->offset;
+      *data += ((packet->length + 1 - pse_len) * sizeof (guint32));
+    }
+
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * gst_rtcp_packet_copy_profile_specific_ext:
+ * @packet: a valid SR or RR #GstRTCPPacket
+ * @data: (out) (array length=len): result profile-specific data
+ * @len: (out): length of the profile-specific extension data
+ *
+ * The profile-specific extension data is copied into a new allocated
+ * memory area @data. This must be freed with g_free() after usage.
+ *
+ * Returns: %TRUE if there was valid data.
+ */
+gboolean
+gst_rtcp_packet_copy_profile_specific_ext (GstRTCPPacket * packet,
+    guint8 ** data, guint * len)
+{
+  guint16 pse_len;
+
+  g_return_val_if_fail (packet != NULL, FALSE);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_RR ||
+      packet->type == GST_RTCP_TYPE_SR, FALSE);
+  g_return_val_if_fail (packet->rtcp != NULL, FALSE);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, FALSE);
+
+  pse_len = gst_rtcp_packet_get_profile_specific_ext_length (packet);
+  if (pse_len > 0) {
+    if (len != NULL)
+      *len = pse_len * sizeof (guint32);
+    if (data != NULL) {
+      guint8 *ptr = packet->rtcp->map.data + packet->offset;
+      ptr += ((packet->length + 1 - pse_len) * sizeof (guint32));
+      *data = g_memdup (ptr, pse_len * sizeof (guint32));
+    }
+
+    return TRUE;
+  }
+
+  return FALSE;
 }
 
 
@@ -1423,17 +1654,12 @@ gst_rtcp_packet_bye_get_nth_ssrc (GstRTCPPacket * packet, guint nth)
   guint8 *data;
   guint offset;
   guint32 ssrc;
-  guint8 sc;
 
   g_return_val_if_fail (packet != NULL, 0);
   g_return_val_if_fail (packet->type == GST_RTCP_TYPE_BYE, 0);
   g_return_val_if_fail (packet->rtcp != NULL, 0);
   g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, 0);
-
-  /* get amount of sources and check that we don't read too much */
-  sc = packet->count;
-  if (nth >= sc)
-    return 0;
+  g_return_val_if_fail (nth < packet->count, 0);
 
   /* get offset in 32-bits words into packet, skip the header */
   offset = 1 + nth;
@@ -2054,7 +2280,7 @@ gst_rtcp_packet_fb_set_fci_length (GstRTCPPacket * packet, guint16 wordlen)
   wordlen += 2;
   GST_WRITE_UINT16_BE (data, wordlen);
 
-  packet->rtcp->map.size += wordlen * 4;
+  packet->rtcp->map.size = packet->offset + ((wordlen + 1) * 4);
 
   return TRUE;
 }
@@ -2075,6 +2301,235 @@ gst_rtcp_packet_fb_get_fci (GstRTCPPacket * packet)
   g_return_val_if_fail (packet != NULL, NULL);
   g_return_val_if_fail (packet->type == GST_RTCP_TYPE_RTPFB ||
       packet->type == GST_RTCP_TYPE_PSFB, NULL);
+  g_return_val_if_fail (packet->rtcp != NULL, NULL);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, NULL);
+
+  data = packet->rtcp->map.data + packet->offset;
+
+  if (GST_READ_UINT16_BE (data + 2) <= 2)
+    return NULL;
+
+  return data + 12;
+}
+
+/**
+ * gst_rtcp_packet_app_set_subtype:
+ * @packet: a valid APP #GstRTCPPacket
+ * @subtype: subtype of the packet
+ *
+ * Set the subtype field of the APP @packet.
+ *
+ * Since: 1.10
+ **/
+void
+gst_rtcp_packet_app_set_subtype (GstRTCPPacket * packet, guint8 subtype)
+{
+  guint8 *data;
+
+  g_return_if_fail (packet != NULL);
+  g_return_if_fail (packet->type == GST_RTCP_TYPE_APP);
+  g_return_if_fail (packet->rtcp != NULL);
+  g_return_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE);
+
+  data = packet->rtcp->map.data + packet->offset;
+  data[0] = (data[0] & 0xe0) | subtype;
+}
+
+/**
+ * gst_rtcp_packet_app_get_subtype:
+ * @packet: a valid APP #GstRTCPPacket
+ *
+ * Get the subtype field of the APP @packet.
+ *
+ * Returns: The subtype.
+ *
+ * Since: 1.10
+ */
+guint8
+gst_rtcp_packet_app_get_subtype (GstRTCPPacket * packet)
+{
+  guint8 *data;
+
+  g_return_val_if_fail (packet != NULL, 0);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, 0);
+  g_return_val_if_fail (packet->rtcp != NULL, 0);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, 0);
+
+  data = packet->rtcp->map.data + packet->offset;
+
+  return data[0] & 0x1f;
+}
+
+/**
+ * gst_rtcp_packet_app_set_ssrc:
+ * @packet: a valid APP #GstRTCPPacket
+ * @ssrc: SSRC/CSRC of the packet
+ *
+ * Set the SSRC/CSRC field of the APP @packet.
+ *
+ * Since: 1.10
+ */
+void
+gst_rtcp_packet_app_set_ssrc (GstRTCPPacket * packet, guint32 ssrc)
+{
+  guint8 *data;
+
+  g_return_if_fail (packet != NULL);
+  g_return_if_fail (packet->type == GST_RTCP_TYPE_APP);
+  g_return_if_fail (packet->rtcp != NULL);
+  g_return_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE);
+
+  data = packet->rtcp->map.data + packet->offset + 4;
+  GST_WRITE_UINT32_BE (data, ssrc);
+}
+
+/**
+ * gst_rtcp_packet_app_get_ssrc:
+ * @packet: a valid APP #GstRTCPPacket
+ *
+ * Get the SSRC/CSRC field of the APP @packet.
+ *
+ * Returns: The SSRC/CSRC.
+ *
+ * Since: 1.10
+ */
+guint32
+gst_rtcp_packet_app_get_ssrc (GstRTCPPacket * packet)
+{
+  guint8 *data;
+
+  g_return_val_if_fail (packet != NULL, 0);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, 0);
+  g_return_val_if_fail (packet->rtcp != NULL, 0);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, 0);
+
+  data = packet->rtcp->map.data + packet->offset + 4;
+
+  return GST_READ_UINT32_BE (data);
+}
+
+/**
+ * gst_rtcp_packet_app_set_name:
+ * @packet: a valid APP #GstRTCPPacket
+ * @name: 4-byte ASCII name
+ *
+ * Set the name field of the APP @packet.
+ *
+ * Since: 1.10
+ */
+void
+gst_rtcp_packet_app_set_name (GstRTCPPacket * packet, const gchar * name)
+{
+  guint8 *data;
+
+  g_return_if_fail (packet != NULL);
+  g_return_if_fail (packet->type == GST_RTCP_TYPE_APP);
+  g_return_if_fail (packet->rtcp != NULL);
+  g_return_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE);
+
+  data = packet->rtcp->map.data + packet->offset + 8;
+  memcpy (data, name, 4);
+}
+
+/**
+ * gst_rtcp_packet_app_get_name:
+ * @packet: a valid APP #GstRTCPPacket
+ *
+ * Get the name field of the APP @packet.
+ *
+ * Returns: The 4-byte name field, not zero-terminated.
+ *
+ * Since: 1.10
+ */
+const gchar *
+gst_rtcp_packet_app_get_name (GstRTCPPacket * packet)
+{
+  g_return_val_if_fail (packet != NULL, NULL);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, NULL);
+  g_return_val_if_fail (packet->rtcp != NULL, NULL);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, NULL);
+
+  return (const gchar *) &packet->rtcp->map.data[packet->offset + 8];
+}
+
+/**
+ * gst_rtcp_packet_app_get_data_length:
+ * @packet: a valid APP #GstRTCPPacket
+ *
+ * Get the length of the application-dependent data attached to an APP
+ * @packet.
+ *
+ * Returns: The length of data in 32-bit words.
+ *
+ * Since: 1.10
+ */
+guint16
+gst_rtcp_packet_app_get_data_length (GstRTCPPacket * packet)
+{
+  guint8 *data;
+
+  g_return_val_if_fail (packet != NULL, 0);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, 0);
+  g_return_val_if_fail (packet->rtcp != NULL, 0);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, 0);
+
+  data = packet->rtcp->map.data + packet->offset + 2;
+
+  return GST_READ_UINT16_BE (data) - 2;
+}
+
+/**
+ * gst_rtcp_packet_app_set_data_length:
+ * @packet: a valid APP #GstRTCPPacket
+ * @wordlen: Length of the data in 32-bit words
+ *
+ * Set the length of the application-dependent data attached to an APP
+ * @packet.
+ *
+ * Returns: %TRUE if there was enough space in the packet to add this much
+ * data.
+ *
+ * Since: 1.10
+ */
+gboolean
+gst_rtcp_packet_app_set_data_length (GstRTCPPacket * packet, guint16 wordlen)
+{
+  guint8 *data;
+
+  g_return_val_if_fail (packet != NULL, FALSE);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, FALSE);
+  g_return_val_if_fail (packet->rtcp != NULL, FALSE);
+  g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_WRITE, FALSE);
+
+  if (packet->rtcp->map.maxsize < packet->offset + ((wordlen + 3) * 4))
+    return FALSE;
+
+  data = packet->rtcp->map.data + packet->offset + 2;
+  wordlen += 2;
+  GST_WRITE_UINT16_BE (data, wordlen);
+
+  packet->rtcp->map.size = packet->offset + ((wordlen + 1) * 4);
+
+  return TRUE;
+}
+
+/**
+ * gst_rtcp_packet_app_get_data:
+ * @packet: a valid APP #GstRTCPPacket
+ *
+ * Get the application-dependent data attached to a RTPFB or PSFB @packet.
+ *
+ * Returns: A pointer to the data
+ *
+ * Since: 1.10
+ */
+guint8 *
+gst_rtcp_packet_app_get_data (GstRTCPPacket * packet)
+{
+  guint8 *data;
+
+  g_return_val_if_fail (packet != NULL, NULL);
+  g_return_val_if_fail (packet->type == GST_RTCP_TYPE_APP, NULL);
   g_return_val_if_fail (packet->rtcp != NULL, NULL);
   g_return_val_if_fail (packet->rtcp->map.flags & GST_MAP_READ, NULL);
 

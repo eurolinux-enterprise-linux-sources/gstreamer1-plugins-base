@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* An example of synchronized playback and recording.
@@ -26,9 +26,8 @@
 
 #include <gst/gst.h>
 
-/* Define to run the asynchronous version. This requires 0.10.31 of the
- * GStreamer core. The async version has the benefit that it doesn't block the
- * main thread but it produces slightly less clear code. */
+/* Define to run the asynchronous version, which has the benefit that it doesn't
+ * block the main thread but it produces slightly less clear code. */
 #define ASYNC_VERSION
 
 static GMainLoop *loop;

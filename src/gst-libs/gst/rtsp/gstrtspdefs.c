@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /*
  * Unless otherwise indicated, Source Code is licensed under MIT license.
@@ -46,8 +46,6 @@
  * @see_also: gstrtspurl, gstrtspconnection
  *  
  * Provides common defines for the RTSP library. 
- *  
- * Last reviewed on 2007-07-24 (0.10.14)
  */
 
 #include <errno.h>
@@ -133,14 +131,12 @@ static struct rtsp_header rtsp_headers[] = {
   {"Language", FALSE},
   {"PlayerStarttime", FALSE},
 
-  /* Since 0.10.16 */
   {"Location", FALSE},
 
-  /* Since 0.10.23 */
   {"ETag", FALSE},
   {"If-Match", TRUE},
 
-  /* WM extensions [MS-RTSP] Since 0.10.23 */
+  /* WM extensions [MS-RTSP] */
   {"Accept-Charset", TRUE},
   {"Supported", TRUE},
   {"Vary", TRUE},
@@ -161,18 +157,18 @@ static struct rtsp_header rtsp_headers[] = {
   {"X-RTP-Info", FALSE},
   {"X-StartupProfile", FALSE},
 
-  /* Since 0.10.24 */
   {"Timestamp", FALSE},
 
-  /* Since 0.10.25 */
   {"Authentication-Info", FALSE},
   {"Host", FALSE},
   {"Pragma", TRUE},
   {"X-Server-IP-Address", FALSE},
-  {"X-Sessioncookie", FALSE},
+  {"x-sessioncookie", FALSE},
 
-  /* Since 0.10.36 */
   {"RTCP-Interval", FALSE},
+
+  /* Since 1.4 */
+  {"KeyMgmt", FALSE},
 
   {NULL, FALSE}
 };
@@ -229,6 +225,7 @@ rtsp_init_status (void)
       "Only aggregate operation allowed");
   DEF_STATUS (GST_RTSP_STS_UNSUPPORTED_TRANSPORT, "Unsupported transport");
   DEF_STATUS (GST_RTSP_STS_DESTINATION_UNREACHABLE, "Destination unreachable");
+  DEF_STATUS (GST_RTSP_STS_KEY_MANAGEMENT_FAILURE, "Key management failure");
   DEF_STATUS (GST_RTSP_STS_INTERNAL_SERVER_ERROR, "Internal Server Error");
   DEF_STATUS (GST_RTSP_STS_NOT_IMPLEMENTED, "Not Implemented");
   DEF_STATUS (GST_RTSP_STS_BAD_GATEWAY, "Bad Gateway");
@@ -463,6 +460,46 @@ gst_rtsp_options_as_text (GstRTSPMethod options)
     str = g_string_truncate (str, str->len - 2);
 
   return g_string_free (str, FALSE);
+}
+
+/**
+ * gst_rtsp_options_from_text:
+ * @options: a comma separated list of options
+ *
+ * Convert the comma separated list @options to a #GstRTSPMethod bitwise or
+ * of methods. This functions is the reverse of gst_rtsp_options_as_text().
+ *
+ * Returns: a #GstRTSPMethod
+ *
+ * Since: 1.2
+ */
+GstRTSPMethod
+gst_rtsp_options_from_text (const gchar * options)
+{
+  GstRTSPMethod methods;
+  gchar **ostr;
+  gint i;
+
+  /* The string is like:
+   * OPTIONS, DESCRIBE, ANNOUNCE, PLAY, SETUP, ...
+   */
+  ostr = g_strsplit (options, ",", 0);
+
+  methods = 0;
+  for (i = 0; ostr[i]; i++) {
+    gchar *stripped;
+    GstRTSPMethod method;
+
+    stripped = g_strstrip (ostr[i]);
+    method = gst_rtsp_find_method (stripped);
+
+    /* keep bitfield of supported methods */
+    if (method != GST_RTSP_INVALID)
+      methods |= method;
+  }
+  g_strfreev (ostr);
+
+  return methods;
 }
 
 /**

@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_PLAY_BACK_H__
@@ -24,10 +24,14 @@
 #include <gst/gst.h>
 
 gboolean gst_decode_bin_plugin_init (GstPlugin * plugin);
+gboolean gst_decodebin3_plugin_init (GstPlugin * plugin);
 gboolean gst_uri_decode_bin_plugin_init (GstPlugin * plugin);
+gboolean gst_uri_source_bin_plugin_init (GstPlugin * plugin);
+gboolean gst_parse_bin_plugin_init (GstPlugin * plugin);
 
 gboolean gst_play_bin_plugin_init (GstPlugin * plugin);
 gboolean gst_play_bin2_plugin_init (GstPlugin * plugin);
+gboolean gst_play_bin3_plugin_init (GstPlugin * plugin, gboolean as_playbin);
 
 
 #endif /* __GST_PLAY_BACK_H__ */

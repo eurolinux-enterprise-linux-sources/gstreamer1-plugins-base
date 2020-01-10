@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -36,17 +36,15 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch -v filesrc location=sine.ogg ! oggdemux ! vorbisparse ! fakesink
+ * gst-launch-1.0 -v filesrc location=sine.ogg ! oggdemux ! vorbisparse ! fakesink
  * ]| This pipeline shows that the streamheader is set in the caps, and that each
  * buffer has the timestamp, duration, offset, and offset_end set.
  * |[
- * gst-launch filesrc location=sine.ogg ! oggdemux ! vorbisparse \
+ * gst-launch-1.0 filesrc location=sine.ogg ! oggdemux ! vorbisparse \
  *            ! oggmux ! filesink location=sine-remuxed.ogg
  * ]| This pipeline shows remuxing. sine-remuxed.ogg might not be exactly the same
  * as sine.ogg, but they should produce exactly the same decoded data.
  * </refsect2>
- *
- * Last reviewed on 2006-04-01 (0.10.4.1)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -95,13 +93,12 @@ gst_vorbis_parse_class_init (GstVorbisParseClass * klass)
 
   gstelement_class->change_state = vorbis_parse_change_state;
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&vorbis_parse_src_factory));
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&vorbis_parse_sink_factory));
-  gst_element_class_set_static_metadata (gstelement_class,
-      "VorbisParse", "Codec/Parser/Audio",
-      "parse raw vorbis streams",
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &vorbis_parse_src_factory);
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &vorbis_parse_sink_factory);
+  gst_element_class_set_static_metadata (gstelement_class, "VorbisParse",
+      "Codec/Parser/Audio", "parse raw vorbis streams",
       "Thomas Vander Stichele <thomas at apestaart dot org>");
 
   klass->parse_packet = GST_DEBUG_FUNCPTR (vorbis_parse_parse_packet);
@@ -164,9 +161,8 @@ vorbis_parse_set_header_on_caps (GstVorbisParse * parse, GstCaps * caps)
   g_value_init (&value, GST_TYPE_BUFFER);
   gst_value_set_buffer (&value, buf3);
   gst_value_array_append_value (&array, &value);
-  gst_structure_set_value (structure, "streamheader", &array);
+  gst_structure_take_value (structure, "streamheader", &array);
   g_value_unset (&value);
-  g_value_unset (&array);
 }
 
 static void
@@ -230,7 +226,7 @@ vorbis_parse_push_headers (GstVorbisParse * parse)
   /* get the headers into the caps, passing them to vorbis as we go */
   caps = gst_caps_new_simple ("audio/x-vorbis",
       "rate", G_TYPE_INT, parse->sample_rate,
-      "channels", G_TYPE_INT, parse->channels, NULL);;
+      "channels", G_TYPE_INT, parse->channels, NULL);
   vorbis_parse_set_header_on_caps (parse, caps);
   GST_DEBUG_OBJECT (parse, "here are the caps: %" GST_PTR_FORMAT, caps);
   gst_pad_set_caps (parse->srcpad, caps);
@@ -457,7 +453,7 @@ vorbis_parse_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
   parse = GST_VORBIS_PARSE (parent);
 
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
       vorbis_parse_clear_queue (parse);
       parse->prev_granulepos = -1;
       parse->prev_blocksize = -1;
@@ -468,7 +464,8 @@ vorbis_parse_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       ret = gst_pad_event_default (pad, parent, event);
       break;
     default:
-      if (!parse->streamheader_sent && GST_EVENT_IS_SERIALIZED (event))
+      if (!parse->streamheader_sent && GST_EVENT_IS_SERIALIZED (event)
+          && GST_EVENT_TYPE (event) > GST_EVENT_CAPS)
         ret = vorbis_parse_queue_event (parse, event);
       else
         ret = gst_pad_event_default (pad, parent, event);

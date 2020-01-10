@@ -16,12 +16,16 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_VALGRIND
+#include <valgrind/valgrind.h>
 #endif
 
 #include <gst/check/gstcheck.h>
@@ -55,7 +59,7 @@ buffer_probe_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   }
   old_ts = new_ts;
 
-  return TRUE;
+  return GST_PAD_PROBE_OK;
 }
 
 GST_START_TEST (test_basetime_calculation)
@@ -68,7 +72,7 @@ GST_START_TEST (test_basetime_calculation)
   loop = g_main_loop_new (NULL, FALSE);
 
   /* The "main" pipeline */
-  p1 = gst_parse_launch ("fakesrc ! fakesink", NULL);
+  p1 = gst_parse_launch ("fakesrc ! identity sleep-time=1 ! fakesink", NULL);
   fail_if (p1 == NULL);
 
   /* Create a sub-bin that is activated only in "certain situations" */
@@ -97,7 +101,7 @@ GST_START_TEST (test_basetime_calculation)
 
   /* Run main pipeline first */
   gst_element_set_state (p1, GST_STATE_PLAYING);
-  g_timeout_add (2 * 1000, break_mainloop, loop);
+  g_timeout_add_seconds (2, break_mainloop, loop);
   g_main_loop_run (loop);
 
   /* Now activate the audio pipeline */
@@ -111,7 +115,7 @@ GST_START_TEST (test_basetime_calculation)
   /* At this point a new clock is selected */
   gst_element_set_state (p1, GST_STATE_PLAYING);
 
-  g_timeout_add (2 * 1000, break_mainloop, loop);
+  g_timeout_add_seconds (2, break_mainloop, loop);
   g_main_loop_run (loop);
 
   gst_object_unref (pad);
@@ -130,9 +134,19 @@ baseaudiosrc_suite (void)
 {
   Suite *s = suite_create ("baseaudiosrc");
   TCase *tc_chain = tcase_create ("general");
+  guint timeout;
 
   /* timeout 6 sec */
-  tcase_set_timeout (tc_chain, 6);
+  timeout = 6;
+
+#ifdef HAVE_VALGRIND
+  {
+    if (RUNNING_ON_VALGRIND)
+      timeout *= 4;
+  }
+#endif
+
+  tcase_set_timeout (tc_chain, timeout);
   suite_add_tcase (s, tc_chain);
 
 #ifndef GST_DISABLE_PARSE
@@ -142,19 +156,4 @@ baseaudiosrc_suite (void)
   return s;
 }
 
-int
-main (int argc, char **argv)
-{
-  int nf;
-
-  Suite *s = baseaudiosrc_suite ();
-  SRunner *sr = srunner_create (s);
-
-  gst_check_init (&argc, &argv);
-
-  srunner_run_all (sr, CK_NORMAL);
-  nf = srunner_ntests_failed (sr);
-  srunner_free (sr);
-
-  return nf;
-}
+GST_CHECK_MAIN (baseaudiosrc);

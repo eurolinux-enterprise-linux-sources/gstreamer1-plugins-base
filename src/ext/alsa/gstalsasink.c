@@ -16,24 +16,22 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
  * SECTION:element-alsasink
  * @see_also: alsasrc
  *
- * This element renders raw audio samples using the ALSA api.
+ * This element renders audio samples using the ALSA audio API.
  *
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch -v filesrc location=sine.ogg ! oggdemux ! vorbisdec ! audioconvert ! audioresample ! alsasink
- * ]| Play an Ogg/Vorbis file.
+ * gst-launch-1.0 -v uridecodebin uri=file:///path/to/audio.ogg ! audioconvert ! audioresample ! autoaudiosink
+ * ]| Play an Ogg/Vorbis file and output audio via ALSA.
  * </refsect2>
- *
- * Last reviewed on 2006-03-01 (0.10.4)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -53,6 +51,10 @@
 
 #include <gst/audio/gstaudioiec61937.h>
 #include <gst/gst-i18n-plugin.h>
+
+#ifndef ESTRPIPE
+#define ESTRPIPE EPIPE
+#endif
 
 #define DEFAULT_DEVICE		"default"
 #define DEFAULT_DEVICE_NAME	""
@@ -164,8 +166,8 @@ gst_alsasink_class_init (GstAlsaSinkClass * klass)
       "Audio sink (ALSA)", "Sink/Audio",
       "Output to a sound card via ALSA", "Wim Taymans <wim@fluendo.com>");
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&alsasink_sink_factory));
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &alsasink_sink_factory);
 
   gstbasesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_alsasink_getcaps);
   gstbasesink_class->query = GST_DEBUG_FUNCPTR (gst_alsasink_query);
@@ -282,7 +284,9 @@ gst_alsasink_getcaps (GstBaseSink * bsink, GstCaps * filter)
   GstAlsaSink *sink = GST_ALSA_SINK (bsink);
   GstCaps *caps, *templ_caps;
 
+  GST_OBJECT_LOCK (sink);
   if (sink->handle == NULL) {
+    GST_OBJECT_UNLOCK (sink);
     GST_DEBUG_OBJECT (sink, "device not open, using template caps");
     return NULL;                /* base class will get template caps for us */
   }
@@ -291,20 +295,26 @@ gst_alsasink_getcaps (GstBaseSink * bsink, GstCaps * filter)
     if (filter) {
       caps = gst_caps_intersect_full (filter, sink->cached_caps,
           GST_CAPS_INTERSECT_FIRST);
+      GST_OBJECT_UNLOCK (sink);
       GST_LOG_OBJECT (sink, "Returning cached caps %" GST_PTR_FORMAT " with "
           "filter %" GST_PTR_FORMAT " applied: %" GST_PTR_FORMAT,
           sink->cached_caps, filter, caps);
       return caps;
     } else {
-      GST_LOG_OBJECT (sink, "Returning cached caps %" GST_PTR_FORMAT,
-          sink->cached_caps);
-      return gst_caps_ref (sink->cached_caps);
+      caps = gst_caps_ref (sink->cached_caps);
+      GST_OBJECT_UNLOCK (sink);
+      GST_LOG_OBJECT (sink, "Returning cached caps %" GST_PTR_FORMAT, caps);
+      return caps;
     }
   }
 
   element_class = GST_ELEMENT_GET_CLASS (sink);
   pad_template = gst_element_class_get_pad_template (element_class, "sink");
-  g_return_val_if_fail (pad_template != NULL, NULL);
+  if (pad_template == NULL) {
+    GST_OBJECT_UNLOCK (sink);
+    g_assert_not_reached ();
+    return NULL;
+  }
 
   templ_caps = gst_pad_template_get_caps (pad_template);
   caps = gst_alsa_probe_supported_formats (GST_OBJECT (sink), sink->device,
@@ -314,6 +324,8 @@ gst_alsasink_getcaps (GstBaseSink * bsink, GstCaps * filter)
   if (caps) {
     sink->cached_caps = gst_caps_ref (caps);
   }
+
+  GST_OBJECT_UNLOCK (sink);
 
   GST_INFO_OBJECT (sink, "returning caps %" GST_PTR_FORMAT, caps);
 
@@ -491,6 +503,7 @@ retry:
       goto retry;
     }
     GST_DEBUG_OBJECT (alsa, "buffer time %u", buffer_time);
+    alsa->buffer_time = buffer_time;
   }
   if (period_time != -1 && !alsa->iec958) {
     /* set the period time */
@@ -504,6 +517,7 @@ retry:
       goto retry;
     }
     GST_DEBUG_OBJECT (alsa, "period time %u", period_time);
+    alsa->period_time = period_time;
   }
 
   /* Set buffer size and period size manually for SPDIF */
@@ -894,6 +908,11 @@ gst_alsasink_prepare (GstAudioSink * asink, GstAudioRingBufferSpec * spec)
     snd_output_close (out_buf);
   }
 
+#ifdef SND_CHMAP_API_VERSION
+  alsa_detect_channels_mapping (GST_OBJECT (alsa), alsa->handle, spec,
+      alsa->channels, GST_AUDIO_BASE_SINK (alsa)->ringbuffer);
+#endif /* SND_CHMAP_API_VERSION */
+
   return TRUE;
 
   /* ERRORS */
@@ -941,11 +960,13 @@ gst_alsasink_close (GstAudioSink * asink)
 {
   GstAlsaSink *alsa = GST_ALSA_SINK (asink);
 
+  GST_OBJECT_LOCK (asink);
   if (alsa->handle) {
     snd_pcm_close (alsa->handle);
     alsa->handle = NULL;
   }
   gst_caps_replace (&alsa->cached_caps, NULL);
+  GST_OBJECT_UNLOCK (asink);
 
   return TRUE;
 }
@@ -957,14 +978,15 @@ gst_alsasink_close (GstAudioSink * asink)
 static gint
 xrun_recovery (GstAlsaSink * alsa, snd_pcm_t * handle, gint err)
 {
-  GST_DEBUG_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (err));
+  GST_WARNING_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (-err));
 
   if (err == -EPIPE) {          /* under-run */
     err = snd_pcm_prepare (handle);
     if (err < 0)
       GST_WARNING_OBJECT (alsa,
-          "Can't recovery from underrun, prepare failed: %s",
+          "Can't recover from underrun, prepare failed: %s",
           snd_strerror (err));
+    gst_audio_base_sink_report_device_failure (GST_AUDIO_BASE_SINK (alsa));
     return 0;
   } else if (err == -ESTRPIPE) {
     while ((err = snd_pcm_resume (handle)) == -EAGAIN)
@@ -974,9 +996,11 @@ xrun_recovery (GstAlsaSink * alsa, snd_pcm_t * handle, gint err)
       err = snd_pcm_prepare (handle);
       if (err < 0)
         GST_WARNING_OBJECT (alsa,
-            "Can't recovery from suspend, prepare failed: %s",
+            "Can't recover from suspend, prepare failed: %s",
             snd_strerror (err));
     }
+    if (err == 0)
+      gst_audio_base_sink_report_device_failure (GST_AUDIO_BASE_SINK (alsa));
     return 0;
   }
   return err;
@@ -988,16 +1012,17 @@ gst_alsasink_write (GstAudioSink * asink, gpointer data, guint length)
   GstAlsaSink *alsa;
   gint err;
   gint cptr;
-  gint16 *ptr = data;
+  guint8 *ptr = data;
 
   alsa = GST_ALSA_SINK (asink);
 
   if (alsa->iec958 && alsa->need_swap) {
     guint i;
+    guint16 *ptr_tmp = (guint16 *) ptr;
 
     GST_DEBUG_OBJECT (asink, "swapping bytes");
     for (i = 0; i < length / 2; i++) {
-      ptr[i] = GUINT16_SWAP_LE_BE (ptr[i]);
+      ptr_tmp[i] = GUINT16_SWAP_LE_BE (ptr_tmp[i]);
     }
   }
 

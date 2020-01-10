@@ -3,7 +3,7 @@
   <description>Subtitle parsing</description>
   <filename>../../gst/subparse/.libs/libgstsubparse.so</filename>
   <basename>libgstsubparse.so</basename>
-  <version>1.0.6</version>
+  <version>1.10.4</version>
   <license>LGPL</license>
   <source>gst-plugins-base</source>
   <package>GStreamer Base Plug-ins source release</package>
@@ -35,13 +35,13 @@
       <longname>Subtitle parser</longname>
       <class>Codec/Parser/Subtitle</class>
       <description>Parses subtitle (.sub) files into text streams</description>
-      <author>Gustavo J. A. M. Carneiro &lt;gjc@inescporto.pt&gt;, GStreamer maintainers &lt;gstreamer-devel@lists.sourceforge.net&gt;</author>
+      <author>Gustavo J. A. M. Carneiro &lt;gjc@inescporto.pt&gt;, GStreamer maintainers &lt;gstreamer-devel@lists.freedesktop.org&gt;</author>
       <pads>
         <caps>
           <name>sink</name>
           <direction>sink</direction>
           <presence>always</presence>
-          <details>application/x-subtitle; application/x-subtitle-dks; application/x-subtitle-tmplayer; application/x-subtitle-mpl2; application/x-subtitle-qttext</details>
+          <details>application/x-subtitle; application/x-subtitle-sami; application/x-subtitle-tmplayer; application/x-subtitle-mpl2; application/x-subtitle-dks; application/x-subtitle-qttext; application/x-subtitle-lrc; application/x-subtitle-vtt</details>
         </caps>
         <caps>
           <name>src</name>

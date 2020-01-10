@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -30,7 +30,7 @@
  * # server:
  * nc -l -p 3000
  * # client:
- * gst-launch tcpclientsrc port=3000 ! fdsink fd=2
+ * gst-launch-1.0 tcpclientsrc port=3000 ! fdsink fd=2
  * ]| everything you type in the server is shown on the client
  * </refsect2>
  */
@@ -109,8 +109,7 @@ gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
           TCP_HIGHEST_PORT, TCP_DEFAULT_PORT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&srctemplate));
+  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
 
   gst_element_class_set_static_metadata (gstelement_class,
       "TCP client source", "Source/Network",
@@ -276,10 +275,16 @@ done:
 
 select_error:
   {
-    GST_ELEMENT_ERROR (src, RESOURCE, READ, (NULL),
-        ("Select failed: %s", err->message));
+    if (g_error_matches (err, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+      GST_DEBUG_OBJECT (src, "Cancelled");
+      ret = GST_FLOW_FLUSHING;
+    } else {
+      GST_ELEMENT_ERROR (src, RESOURCE, READ, (NULL),
+          ("Select failed: %s", err->message));
+      ret = GST_FLOW_ERROR;
+    }
     g_clear_error (&err);
-    return GST_FLOW_ERROR;
+    return ret;
   }
 get_available_error:
   {
@@ -479,7 +484,8 @@ gst_tcp_client_src_unlock_stop (GstBaseSrc * bsrc)
   GstTCPClientSrc *src = GST_TCP_CLIENT_SRC (bsrc);
 
   GST_DEBUG_OBJECT (src, "unset flushing");
-  g_cancellable_reset (src->cancellable);
+  g_object_unref (src->cancellable);
+  src->cancellable = g_cancellable_new ();
 
   return TRUE;
 }

@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include <gst/check/gstcheck.h>
@@ -43,8 +43,8 @@ test_shutdown_for_factory (const gchar * factory_name)
   vis = gst_check_setup_element (factory_name);
 
   cf = gst_check_setup_element ("capsfilter");
-  caps = gst_caps_new_simple ("video/x-raw", "width", G_TYPE_INT, 320,
-      "height", G_TYPE_INT, 240, "framerate", GST_TYPE_FRACTION, 15, 1, NULL);
+  caps = gst_caps_new_simple ("video/x-raw", "width", G_TYPE_INT, 64,
+      "height", G_TYPE_INT, 64, "framerate", GST_TYPE_FRACTION, 15, 1, NULL);
   g_object_set (cf, "caps", caps, NULL);
   gst_caps_unref (caps);
 

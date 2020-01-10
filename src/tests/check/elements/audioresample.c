@@ -17,8 +17,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include <unistd.h>
@@ -51,21 +51,16 @@ static GstPad *mysrcpad, *mysinkpad;
     "rate = (int) [ 1,  MAX ], "        \
     "layout = (string) interleaved"
 
-static GstStaticPadTemplate sinktemplate = GST_STATIC_PAD_TEMPLATE ("sink",
-    GST_PAD_SINK,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (RESAMPLE_CAPS)
-    );
-static GstStaticPadTemplate srctemplate = GST_STATIC_PAD_TEMPLATE ("src",
-    GST_PAD_SRC,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (RESAMPLE_CAPS)
-    );
-
 static GstElement *
 setup_audioresample (int channels, guint64 mask, int inrate, int outrate,
     const gchar * format)
 {
+  GstPadTemplate *sinktemplate;
+  static GstStaticPadTemplate srctemplate = GST_STATIC_PAD_TEMPLATE ("src",
+      GST_PAD_SRC,
+      GST_PAD_ALWAYS,
+      GST_STATIC_CAPS (RESAMPLE_CAPS)
+      );
   GstElement *audioresample;
   GstCaps *caps;
   GstStructure *structure;
@@ -86,7 +81,7 @@ setup_audioresample (int channels, guint64 mask, int inrate, int outrate,
 
   mysrcpad = gst_check_setup_src_pad (audioresample, &srctemplate);
   gst_pad_set_active (mysrcpad, TRUE);
-  gst_pad_set_caps (mysrcpad, caps);
+  gst_check_setup_events (mysrcpad, audioresample, caps, GST_FORMAT_TIME);
   gst_caps_unref (caps);
 
   caps = gst_caps_from_string (RESAMPLE_CAPS);
@@ -94,16 +89,18 @@ setup_audioresample (int channels, guint64 mask, int inrate, int outrate,
   gst_structure_set (structure, "channels", G_TYPE_INT, channels,
       "rate", G_TYPE_INT, outrate, "format", G_TYPE_STRING, format, NULL);
   fail_unless (gst_caps_is_fixed (caps));
+  sinktemplate =
+      gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, caps);
 
-  mysinkpad = gst_check_setup_sink_pad (audioresample, &sinktemplate);
+  mysinkpad =
+      gst_check_setup_sink_pad_from_template (audioresample, sinktemplate);
   gst_pad_set_active (mysinkpad, TRUE);
   /* this installs a getcaps func that will always return the caps we set
    * later */
-  gst_pad_set_caps (mysinkpad, caps);
   gst_pad_use_fixed_caps (mysinkpad);
 
-
   gst_caps_unref (caps);
+  gst_object_unref (sinktemplate);
 
   return audioresample;
 }
@@ -633,6 +630,9 @@ test_pipeline (const gchar * format, gint inrate, gint outrate, gint quality)
 
   gst_element_set_state (pipeline, GST_STATE_NULL);
 
+  gst_bus_remove_signal_watch (bus);
+  gst_object_unref (bus);
+
   fail_if (messages > 0, "Received imperfect timestamp messages");
   gst_object_unref (pipeline);
 }
@@ -882,6 +882,9 @@ GST_START_TEST (test_timestamp_drift)
   fail_unless (gst_element_set_state (pipeline,
           GST_STATE_NULL) == GST_STATE_CHANGE_SUCCESS);
   g_main_loop_unref (loop);
+  gst_bus_remove_signal_watch (bus);
+  gst_object_unref (bus);
+
   gst_object_unref (pipeline);
 
 } GST_END_TEST;
@@ -1005,14 +1008,11 @@ run_fft_pipeline (int inrate, int outrate, int quality, int width,
 {
   GstElement *audioresample;
   GstBuffer *inbuffer, *outbuffer;
-  GstCaps *caps;
   const int nsamples = 2048;
 
   audioresample = setup_audioresample (1, 0, inrate, outrate, format);
   fail_unless (audioresample != NULL);
   g_object_set (audioresample, "quality", quality, NULL);
-  caps = gst_pad_get_current_caps (mysrcpad);
-  fail_unless (gst_caps_is_fixed (caps));
 
   fail_unless (gst_element_set_state (audioresample,
           GST_STATE_PLAYING) == GST_STATE_CHANGE_SUCCESS,
@@ -1021,7 +1021,6 @@ run_fft_pipeline (int inrate, int outrate, int quality, int width,
   inbuffer = gst_buffer_new_and_alloc (nsamples * width / 8);
   GST_BUFFER_DURATION (inbuffer) = GST_FRAMES_TO_CLOCK_TIME (nsamples, inrate);
   GST_BUFFER_TIMESTAMP (inbuffer) = 0;
-  gst_pad_set_caps (mysrcpad, caps);
 
   (*init) (inbuffer);
 
@@ -1042,7 +1041,6 @@ run_fft_pipeline (int inrate, int outrate, int quality, int width,
   (*compare_ffts) (inbuffer, outbuffer);
 
   /* cleanup */
-  gst_caps_unref (caps);
   cleanup_audioresample (audioresample);
 }
 

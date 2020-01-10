@@ -18,8 +18,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -81,8 +81,30 @@ copy_samples (vorbis_sample_t * out, vorbis_sample_t ** in, guint samples,
 #endif
 }
 
+static void
+copy_samples_no_reorder (vorbis_sample_t * out, vorbis_sample_t ** in,
+    guint samples, gint channels)
+{
+#ifdef GST_VORBIS_DEC_SEQUENTIAL
+  gint i;
+
+  for (i = 0; i < channels; i++) {
+    memcpy (out, in[i], samples * sizeof (float));
+    out += samples;
+  }
+#else
+  gint i, j;
+
+  for (j = 0; j < samples; j++) {
+    for (i = 0; i < channels; i++) {
+      *out++ = in[i][j];
+    }
+  }
+#endif
+}
+
 CopySampleFunc
-get_copy_sample_func (gint channels)
+gst_vorbis_get_copy_sample_func (gint channels)
 {
   CopySampleFunc f = NULL;
 
@@ -93,8 +115,16 @@ get_copy_sample_func (gint channels)
     case 2:
       f = copy_samples_s;
       break;
-    default:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
       f = copy_samples;
+      break;
+    default:
+      f = copy_samples_no_reorder;
       break;
   }
 
@@ -173,7 +203,7 @@ copy_samples_16 (vorbis_sample_t * _out, vorbis_sample_t ** _in, guint samples,
 }
 
 CopySampleFunc
-get_copy_sample_func (gint channels)
+gst_vorbis_get_copy_sample_func (gint channels)
 {
   CopySampleFunc f = NULL;
 

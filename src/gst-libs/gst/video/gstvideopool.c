@@ -13,12 +13,28 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include "gst/video/gstvideometa.h"
 #include "gst/video/gstvideopool.h"
+
+
+GST_DEBUG_CATEGORY_STATIC (gst_video_pool_debug);
+#define GST_CAT_DEFAULT gst_video_pool_debug
+
+/**
+ * SECTION:gstvideopool
+ * @short_description: GstBufferPool for raw video buffers
+ * @see_also: #GstBufferPool
+ *
+ * Special GstBufferPool subclass for raw video buffers.
+ *
+ * Allows configuration of video-specific requirements such as
+ * stride alignments or pixel padding, and can also be configured
+ * to automatically add #GstVideoMeta to the buffers.
+ */
 
 /**
  * gst_buffer_pool_config_set_video_alignment:
@@ -110,11 +126,13 @@ video_buffer_pool_set_config (GstBufferPool * pool, GstStructure * config)
   GstVideoBufferPoolPrivate *priv = vpool->priv;
   GstVideoInfo info;
   GstCaps *caps;
+  guint size, min_buffers, max_buffers;
   gint width, height;
   GstAllocator *allocator;
   GstAllocationParams params;
 
-  if (!gst_buffer_pool_config_get_params (config, &caps, NULL, NULL, NULL))
+  if (!gst_buffer_pool_config_get_params (config, &caps, &size, &min_buffers,
+          &max_buffers))
     goto wrong_config;
 
   if (caps == NULL)
@@ -123,6 +141,9 @@ video_buffer_pool_set_config (GstBufferPool * pool, GstStructure * config)
   /* now parse the caps from the config */
   if (!gst_video_info_from_caps (&info, caps))
     goto wrong_caps;
+
+  if (size < info.size)
+    goto wrong_size;
 
   if (!gst_buffer_pool_config_get_allocator (config, &allocator, &params))
     goto wrong_config;
@@ -152,11 +173,35 @@ video_buffer_pool_set_config (GstBufferPool * pool, GstStructure * config)
       GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
 
   if (priv->need_alignment && priv->add_videometa) {
-    /* get an apply the alignment to the info */
+    guint max_align, n;
+
     gst_buffer_pool_config_get_video_alignment (config, &priv->video_align);
+
+    /* ensure GstAllocationParams alignment is compatible with video alignment */
+    max_align = priv->params.align;
+    for (n = 0; n < GST_VIDEO_MAX_PLANES; ++n)
+      max_align |= priv->video_align.stride_align[n];
+
+    for (n = 0; n < GST_VIDEO_MAX_PLANES; ++n)
+      priv->video_align.stride_align[n] = max_align;
+
+    /* apply the alignment to the info */
     gst_video_info_align (&info, &priv->video_align);
+    gst_buffer_pool_config_set_video_alignment (config, &priv->video_align);
+
+    if (priv->params.align < max_align) {
+      GST_WARNING_OBJECT (pool, "allocation params alignment %u is smaller "
+          "than the max specified video stride alignment %u, fixing",
+          (guint) priv->params.align, max_align);
+      priv->params.align = max_align;
+      gst_buffer_pool_config_set_allocator (config, allocator, &priv->params);
+    }
   }
+  info.size = MAX (size, info.size);
   priv->info = info;
+
+  gst_buffer_pool_config_set_params (config, caps, info.size, min_buffers,
+      max_buffers);
 
   return GST_BUFFER_POOL_CLASS (parent_class)->set_config (pool, config);
 
@@ -176,6 +221,13 @@ wrong_caps:
     GST_WARNING_OBJECT (pool,
         "failed getting geometry from caps %" GST_PTR_FORMAT, caps);
     return FALSE;
+  }
+wrong_size:
+  {
+    GST_WARNING_OBJECT (pool,
+        "Provided size is to small for the caps: %u", size);
+    return FALSE;
+
   }
 }
 
@@ -221,7 +273,7 @@ no_memory:
  * Create a new bufferpool that can allocate video frames. This bufferpool
  * supports all the video bufferpool options.
  *
- * Returns: a new #GstBufferPool to allocate video frames
+ * Returns: (transfer floating): a new #GstBufferPool to allocate video frames
  */
 GstBufferPool *
 gst_video_buffer_pool_new ()
@@ -248,6 +300,9 @@ gst_video_buffer_pool_class_init (GstVideoBufferPoolClass * klass)
   gstbufferpool_class->get_options = video_buffer_pool_get_options;
   gstbufferpool_class->set_config = video_buffer_pool_set_config;
   gstbufferpool_class->alloc_buffer = video_buffer_pool_alloc;
+
+  GST_DEBUG_CATEGORY_INIT (gst_video_pool_debug, "videopool", 0,
+      "videopool object");
 }
 
 static void

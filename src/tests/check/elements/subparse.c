@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -105,7 +105,13 @@ static SubParseInputChunk srt_input[] = {
       360 * GST_SECOND, 480 * GST_SECOND, "Rock &amp; Roll"}, {
         "28\n00:10:00,000 --> 00:11:00,000\n"
         "<font \"#0000FF\"><joj>This is </xxx>in blue but <5</font>\n\n",
-      600 * GST_SECOND, 660 * GST_SECOND, "This is in blue but &lt;5"}
+      600 * GST_SECOND, 660 * GST_SECOND, "This is in blue but &lt;5"}, {
+        /* closing tags should be recognised properly even if there's a space */
+        "29\n00:11:00,000 --> 00:12:00,000\n" "<i>italics</ i>\n\n",
+      660 * GST_SECOND, 720 * GST_SECOND, "<i>italics</i>"}, {
+        /* closing tags should be escaped and fixed up if not recognised */
+        "30\n00:12:00,000 --> 00:12:01,000\n" "<i>italics</ x>\n\n",
+      720 * GST_SECOND, 721 * GST_SECOND, "<i>italics&lt;/ x&gt;</i>"},
 };
 
 /* starts with chunk number 0 (not exactly according to spec) */
@@ -154,15 +160,39 @@ static SubParseInputChunk srt_input3[] = {
       3090 * GST_MSECOND, 4000 * GST_MSECOND, "Three"}
 };
 
+/* Some WebVTT chunks, this format is similar to SRT but should be
+ * parsed differently nonetheless, the WebVTT tags should be stripped
+ * off. */
+static SubParseInputChunk srt_input4[] = {
+  {
+        "1\n00:00:01,000 --> 00:00:02,000\n<v>some text\n\n",
+      1 * GST_SECOND, 2 * GST_SECOND, "some text"}
+  ,
+  {
+        "1\n00:00:01,000 --> 00:00:02,000\n<b.loud>some text\n\n",
+      1 * GST_SECOND, 2 * GST_SECOND, "<b>some text</b>"}
+  ,
+  {
+        "1\n00:00:01,000 --> 00:00:02,000\n<ruby>base text<rt>annotation</rt></ruby>\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND,
+      "base textannotation"}
+  ,
+};
+
 static void
 setup_subparse (void)
 {
+  GstSegment segment;
   subparse = gst_check_setup_element ("subparse");
 
   mysrcpad = gst_check_setup_src_pad (subparse, &srctemplate);
   mysinkpad = gst_check_setup_sink_pad (subparse, &sinktemplate);
 
   gst_pad_set_active (mysrcpad, TRUE);
+
+  gst_segment_init (&segment, GST_FORMAT_BYTES);
+  gst_pad_push_event (mysrcpad, gst_event_new_stream_start ("test"));
+  gst_pad_push_event (mysrcpad, gst_event_new_segment (&segment));
   gst_pad_set_active (mysinkpad, TRUE);
 
   fail_unless_equals_int (gst_element_set_state (subparse, GST_STATE_PLAYING),
@@ -249,6 +279,71 @@ test_srt_do_test (SubParseInputChunk * input, guint start_idx, guint num)
   teardown_subparse ();
 }
 
+static void
+test_vtt_do_test (SubParseInputChunk * input, guint start_idx, guint num)
+{
+  guint n;
+
+  GST_LOG ("vtt test: start_idx = %u, num = %u", start_idx, num);
+
+  setup_subparse ();
+
+  for (n = start_idx; n < start_idx + num; ++n) {
+    GstBuffer *buf;
+    gchar *data = g_strconcat ("WEBVTT FILE\n", input[n].in, NULL);
+    buf = buffer_from_static_string (data);
+    fail_unless_equals_int (gst_pad_push (mysrcpad, buf), GST_FLOW_OK);
+    g_free (data);
+  }
+
+  gst_pad_push_event (mysrcpad, gst_event_new_eos ());
+
+  fail_unless_equals_int (g_list_length (buffers), num);
+
+  for (n = start_idx; n < start_idx + num; ++n) {
+    const GstStructure *buffer_caps_struct;
+    GstMapInfo map;
+    GstBuffer *buf;
+    GstCaps *outcaps;
+    gchar *out;
+    guint out_size;
+
+    buf = g_list_nth_data (buffers, n - start_idx);
+    fail_unless (buf != NULL);
+    fail_unless (GST_BUFFER_TIMESTAMP_IS_VALID (buf), NULL);
+    fail_unless (GST_BUFFER_DURATION_IS_VALID (buf), NULL);
+    fail_unless_equals_uint64 (GST_BUFFER_TIMESTAMP (buf), input[n].from_ts);
+    fail_unless_equals_uint64 (GST_BUFFER_DURATION (buf),
+        input[n].to_ts - input[n].from_ts);
+    fail_unless (gst_buffer_map (buf, &map, GST_MAP_READ));
+    out = (gchar *) map.data;
+
+    out_size = gst_buffer_get_size (buf);
+    /* shouldn't have trailing newline characters */
+    fail_if (out_size > 0 && out[out_size - 1] == '\n');
+    /* shouldn't include NUL-terminator in data size */
+    fail_if (out_size > 0 && out[out_size - 1] == '\0');
+    /* but should still have a  NUL-terminator behind the declared data */
+    fail_unless_equals_int (out[out_size], '\0');
+    /* make sure out string matches expected string */
+    fail_unless_equals_string (out, input[n].out);
+
+    gst_buffer_unmap (buf, &map);
+
+    /* check caps */
+    outcaps = gst_pad_get_current_caps (mysinkpad);
+    fail_unless (outcaps != NULL);
+    buffer_caps_struct = gst_caps_get_structure (outcaps, 0);
+    fail_unless_equals_string (gst_structure_get_name (buffer_caps_struct),
+        "text/x-raw");
+    fail_unless_equals_string (gst_structure_get_string (buffer_caps_struct,
+            "format"), "pango-markup");
+    gst_caps_unref (outcaps);
+  }
+
+  teardown_subparse ();
+}
+
 GST_START_TEST (test_srt)
 {
   test_srt_do_test (srt_input, 0, G_N_ELEMENTS (srt_input));
@@ -273,6 +368,96 @@ GST_START_TEST (test_srt)
 
   /* try with fewer than three post-comma digits, and some extra spaces */
   test_srt_do_test (srt_input3, 0, G_N_ELEMENTS (srt_input3));
+
+  /* try with some WebVTT chunks */
+  test_srt_do_test (srt_input4, 0, G_N_ELEMENTS (srt_input4));
+}
+
+GST_END_TEST;
+
+
+GST_START_TEST (test_webvtt)
+{
+  SubParseInputChunk webvtt_input[] = {
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 D:vertical T:50%\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 D:vertical   T:50%\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 D:vertical\tT:50%\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 D:vertical-lr\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 L:-123\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 L:123\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 L:12%\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 L:12% S:35% A:start\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 A:middle\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000 A:end\nOne\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\nOne & Two\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One &amp; Two"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\nOne < Two\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "One &lt; Two"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\n<v Spoke>Live long and prosper\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "<v Spoke>Live long and prosper</v>"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\n<v The Joker>HAHAHA\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "<v The Joker>HAHAHA</v>"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\n<c.someclass>some text\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "<c.someclass>some text</c>"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\n<b.loud>some text\n\n",
+        1 * GST_SECOND, 2 * GST_SECOND, "<b.loud>some text</b>"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:02.000\n<ruby>base text<rt>annotation</rt></ruby>\n\n",
+          1 * GST_SECOND, 2 * GST_SECOND,
+        "<ruby>base text<rt>annotation</rt></ruby>"}
+    ,
+    {
+          "1\n00:00:01.000 --> 00:00:03.000\nOne... <00:00:00,200>Two... <00:00:00,500>Three...\n\n",
+          1 * GST_SECOND, 3 * GST_SECOND,
+        "One... &lt;00:00:00,200&gt;Two... &lt;00:00:00,500&gt;Three..."}
+    ,
+    {"1\n00:00:02.000 --> 00:00:03.000\nHello\nWorld\n\n",
+        2 * GST_SECOND, 3 * GST_SECOND, "Hello\nWorld"}
+    ,
+  };
+  test_vtt_do_test (webvtt_input, 0, G_N_ELEMENTS (webvtt_input));
 }
 
 GST_END_TEST;
@@ -662,7 +847,6 @@ GST_START_TEST (test_dks)
 
 GST_END_TEST;
 
-#ifndef GST_DISABLE_XML
 GST_START_TEST (test_sami)
 {
   SubParseInputChunk sami_input[] = {
@@ -698,7 +882,119 @@ GST_START_TEST (test_sami)
 }
 
 GST_END_TEST;
-#endif
+
+GST_START_TEST (test_sami_xml_entities)
+{
+  SubParseInputChunk sami_input[] = {
+    {"<SAMI>\n"
+          "<BODY>\n"
+          "    <SYNC Start=1000>\n"
+          "        <P Class=CC>\n" "            &lt;Hello&gt; &amp;\n",
+          1000 * GST_MSECOND, 2000 * GST_MSECOND,
+        "&lt;Hello&gt; &amp;"},
+    {"    <SYNC Start=2000>\n"
+          "        <P Class=CC>\n"
+          "            &quot;World&apos;\n" "</BODY>\n" "</SAMI>\n",
+          2000 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "&quot;World&apos;"}
+
+  };
+
+  do_test (sami_input, G_N_ELEMENTS (sami_input), "pango-markup");
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_sami_html_entities)
+{
+  SubParseInputChunk sami_input[] = {
+    {"<SAMI>\n"
+          "<BODY>\n"
+          "    <SYNC Start=1000>\n"
+          "        <P Class=CC>\n" "            &nbsp; &plusmn; &acute;\n",
+          1000 * GST_MSECOND, 2000 * GST_MSECOND,
+        "\xc2\xa0 \xc2\xb1 \xc2\xb4"},
+    {"    <SYNC Start=2000>\n"
+          "        <P Class=CC>\n" "            &Alpha; &omega;\n",
+          2000 * GST_MSECOND, 3000 * GST_MSECOND,
+        "\xce\x91 \xcf\x89"},
+    {"    <SYNC Start=3000>\n"
+          "        <P Class=CC>\n"
+          "            &#xa0; &#177; &#180;\n" "</BODY>\n" "</SAMI>\n",
+          3000 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "\xc2\xa0 \xc2\xb1 \xc2\xb4"}
+  };
+
+  do_test (sami_input, G_N_ELEMENTS (sami_input), "pango-markup");
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_sami_bad_entities)
+{
+  SubParseInputChunk sami_input[] = {
+    {"<SAMI>\n"
+          "<BODY>\n"
+          "    <SYNC Start=1000>\n"
+          "        <P Class=CC>\n" "            &nbsp &\n",
+          1000 * GST_MSECOND, 2000 * GST_MSECOND,
+        "\xc2\xa0 &amp;"},
+    {"    <SYNC Start=2000>\n"
+          "        <P Class=CC>\n"
+          "            &#xa0 &#177 &#180;\n" "</BODY>\n" "</SAMI>\n",
+          2000 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "\xc2\xa0 \xc2\xb1 \xc2\xb4"}
+  };
+
+  do_test (sami_input, G_N_ELEMENTS (sami_input), "pango-markup");
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_sami_comment)
+{
+  SubParseInputChunk sami_input[] = {
+    {"<SAMI>\n"
+          "<!--\n"
+          "=======\n"
+          "foo bar\n"
+          "=======\n"
+          "-->\n"
+          "<BODY>\n"
+          "    <SYNC Start=1000>\n"
+          "        <P Class=\"C====\">\n" "            &nbsp &\n",
+          1000 * GST_MSECOND, 2000 * GST_MSECOND,
+        "\xc2\xa0 &amp;"},
+    {"    <SYNC Start=2000>\n"
+          "        <P Class=CC>\n"
+          "            &#xa0 &#177 &#180;\n" "</BODY>\n" "</SAMI>\n",
+          2000 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "\xc2\xa0 \xc2\xb1 \xc2\xb4"}
+  };
+
+  do_test (sami_input, G_N_ELEMENTS (sami_input), "pango-markup");
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_lrc)
+{
+  SubParseInputChunk lrc_input[] = {
+    {"[ar:123]\n" "[ti:Title]\n" "[al:Album]\n" "[00:02.23]Line 1\n",
+          2230 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "Line 1"},
+    {"[00:05.10]Line 2\n",
+          5100 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "Line 2"},
+    {"[00:06.123]Line 3\n",
+          6123 * GST_MSECOND, GST_CLOCK_TIME_NONE,
+        "Line 3"}
+  };
+
+  do_test (lrc_input, G_N_ELEMENTS (lrc_input), "utf8");
+}
+
+GST_END_TEST;
 
 /* TODO:
  *  - add/modify tests so that lines aren't dogfed to the parsers in complete
@@ -714,6 +1010,7 @@ subparse_suite (void)
   suite_add_tcase (s, tc_chain);
 
   tcase_add_test (tc_chain, test_srt);
+  tcase_add_test (tc_chain, test_webvtt);
   tcase_add_test (tc_chain, test_tmplayer_multiline);
   tcase_add_test (tc_chain, test_tmplayer_multiline_with_bogus_lines);
   tcase_add_test (tc_chain, test_tmplayer_style1);
@@ -728,9 +1025,12 @@ subparse_suite (void)
   tcase_add_test (tc_chain, test_subviewer);
   tcase_add_test (tc_chain, test_subviewer2);
   tcase_add_test (tc_chain, test_dks);
-#ifndef GST_DISABLE_XML
   tcase_add_test (tc_chain, test_sami);
-#endif
+  tcase_add_test (tc_chain, test_sami_xml_entities);
+  tcase_add_test (tc_chain, test_sami_html_entities);
+  tcase_add_test (tc_chain, test_sami_bad_entities);
+  tcase_add_test (tc_chain, test_sami_comment);
+  tcase_add_test (tc_chain, test_lrc);
   return s;
 }
 

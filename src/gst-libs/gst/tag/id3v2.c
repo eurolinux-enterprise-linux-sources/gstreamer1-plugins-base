@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -195,6 +195,8 @@ gst_tag_list_from_id3v2_tag (GstBuffer * buffer)
   guint8 flags;
   guint16 version;
 
+  gst_tag_register_musicbrainz_tags ();
+
   read_size = gst_tag_get_id3v2_tag_size (buffer);
 
   /* Ignore tag if it has no frames attached, but skip the header then */
@@ -234,10 +236,16 @@ gst_tag_list_from_id3v2_tag (GstBuffer * buffer)
   work.hdr.size = read_size;
   work.hdr.flags = flags;
   work.hdr.frame_data = info.data + ID3V2_HDR_SIZE;
-  if (flags & ID3V2_HDR_FLAG_FOOTER)
+
+  if (flags & ID3V2_HDR_FLAG_FOOTER) {
+    if (read_size < ID3V2_HDR_SIZE + 10)
+      goto not_enough_data;     /* Invalid frame size */
     work.hdr.frame_data_size = read_size - ID3V2_HDR_SIZE - 10;
-  else
+  } else {
+    if (read_size < ID3V2_HDR_SIZE)
+      goto not_enough_data;     /* Invalid frame size */
     work.hdr.frame_data_size = read_size - ID3V2_HDR_SIZE;
+  }
 
   /* in v2.3 the frame sizes are not syncsafe, so the entire tag had to be
    * unsynced. In v2.4 the frame sizes are syncsafe so it's just the frame
@@ -393,6 +401,7 @@ static void
 id3v2_add_id3v2_frame_blob_to_taglist (ID3TagsWorking * work, guint size)
 {
   GstBuffer *blob;
+  GstSample *sample;
   guint8 *frame_data;
 #if 0
   GstCaps *caps;
@@ -420,6 +429,9 @@ id3v2_add_id3v2_frame_blob_to_taglist (ID3TagsWorking * work, guint size)
   blob = gst_buffer_new_and_alloc (frame_size);
   gst_buffer_fill (blob, 0, frame_data, frame_size);
 
+  sample = gst_sample_new (blob, NULL, NULL, NULL);
+  gst_buffer_unref (blob);
+
   /* Sanitize frame id */
   for (i = 0; i < 4; i++) {
     if (!g_ascii_isalnum (frame_data[i]))
@@ -440,8 +452,8 @@ id3v2_add_id3v2_frame_blob_to_taglist (ID3TagsWorking * work, guint size)
   /* gst_util_dump_mem (GST_BUFFER_DATA (blob), GST_BUFFER_SIZE (blob)); */
 
   gst_tag_list_add (work->tags, GST_TAG_MERGE_APPEND,
-      GST_TAG_ID3V2_FRAME, blob, NULL);
-  gst_buffer_unref (blob);
+      GST_TAG_ID3V2_FRAME, sample, NULL);
+  gst_sample_unref (sample);
 }
 
 static gboolean

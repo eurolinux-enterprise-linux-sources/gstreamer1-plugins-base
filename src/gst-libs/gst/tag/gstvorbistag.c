@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -53,7 +53,9 @@ static const GstTagEntryMatch tag_matches[] = {
   {GST_TAG_TRACK_NUMBER, "TRACKNUMBER"},
   {GST_TAG_ALBUM_VOLUME_NUMBER, "DISCNUMBER"},
   {GST_TAG_TRACK_COUNT, "TRACKTOTAL"},
+  {GST_TAG_TRACK_COUNT, "TOTALTRACKS"}, /* old / non-standard */
   {GST_TAG_ALBUM_VOLUME_COUNT, "DISCTOTAL"},
+  {GST_TAG_ALBUM_VOLUME_COUNT, "TOTALDISCS"},   /* old / non-standard */
   {GST_TAG_ARTIST, "ARTIST"},
   {GST_TAG_PERFORMER, "PERFORMER"},
   {GST_TAG_COMPOSER, "COMPOSER"},
@@ -566,9 +568,22 @@ gst_tag_to_metadata_block_picture (const gchar * tag,
     mime_type = "-->";
   mime_type_len = strlen (mime_type);
 
+  /* FIXME 2.0: Remove the image-type reading from the caps, this was
+   * a bug until 1.2.2. The image-type is only supposed to be in the
+   * info structure */
   gst_structure_get (mime_struct, "image-type", GST_TYPE_TAG_IMAGE_TYPE,
       &image_type, "width", G_TYPE_INT, &width, "height", G_TYPE_INT, &height,
       NULL);
+
+  if (image_type == GST_TAG_IMAGE_TYPE_NONE) {
+    const GstStructure *info_struct;
+
+    info_struct = gst_sample_get_info (sample);
+    if (info_struct && gst_structure_has_name (info_struct, "GstTagImageInfo")) {
+      gst_structure_get (info_struct, "image-type", GST_TYPE_TAG_IMAGE_TYPE,
+          &image_type, NULL);
+    }
+  }
 
   metadata_block_len = 32 + mime_type_len + gst_buffer_get_size (buffer);
   gst_byte_writer_init_with_size (&writer, metadata_block_len, TRUE);

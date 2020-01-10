@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -29,8 +29,8 @@
  * <refsect2>
  * <title>Examples</title>
  * |[
- * gst-launch -v filesrc location=test.mkv ! matroskademux name=demux ! "video/x-h264" ! queue2 ! decodebin ! subtitleoverlay name=overlay ! videoconvert ! autovideosink  demux. ! "subpicture/x-dvd" ! queue2 ! overlay.
- * ]| This will play back the given Matroska file with h264 video and subpicture subtitles.
+ * gst-launch-1.0 -v filesrc location=test.mkv ! matroskademux name=demux ! video/x-h264 ! queue ! decodebin ! subtitleoverlay name=overlay ! videoconvert ! autovideosink  demux. ! subpicture/x-dvd ! queue ! overlay.
+ * ]| This will play back the given Matroska file with h264 video and dvd subpicture style subtitles.
  * </refsect2>
  */
 
@@ -157,6 +157,20 @@ unblock_subtitle (GstSubtitleOverlay * self)
   }
 }
 
+static gboolean
+pad_supports_caps (GstPad * pad, GstCaps * caps)
+{
+  GstCaps *pad_caps;
+  gboolean ret = FALSE;
+
+  pad_caps = gst_pad_query_caps (pad, NULL);
+  if (gst_caps_is_subset (caps, pad_caps))
+    ret = TRUE;
+  gst_caps_unref (pad_caps);
+
+  return ret;
+}
+
 static void
 gst_subtitle_overlay_finalize (GObject * object)
 {
@@ -220,25 +234,14 @@ static const gchar *const _sub_pad_names[] = { "subpicture", "subpicture_sink",
   "subtitle_sink", "subtitle"
 };
 
-static inline gboolean
-_is_raw_video (GstStructure * s)
-{
-  const gchar *name;
-
-  name = gst_structure_get_name (s);
-
-  if (g_str_equal (name, "video/x-raw"))
-    return TRUE;
-  return FALSE;
-}
-
 static gboolean
 _is_video_pad (GstPad * pad, gboolean * hw_accelerated)
 {
   GstPad *peer = gst_pad_get_peer (pad);
   GstCaps *caps;
-  gboolean ret;
+  gboolean ret = FALSE;
   const gchar *name;
+  guint i;
 
   if (peer) {
     caps = gst_pad_get_current_caps (peer);
@@ -250,21 +253,23 @@ _is_video_pad (GstPad * pad, gboolean * hw_accelerated)
     caps = gst_pad_query_caps (pad, NULL);
   }
 
-  name = gst_structure_get_name (gst_caps_get_structure (caps, 0));
-  if (g_str_equal (name, "video/x-raw")) {
-    ret = TRUE;
-    if (hw_accelerated)
-      *hw_accelerated = FALSE;
+  for (i = 0; i < gst_caps_get_size (caps) && !ret; i++) {
+    name = gst_structure_get_name (gst_caps_get_structure (caps, i));
+    if (g_str_equal (name, "video/x-raw")) {
+      ret = TRUE;
+      if (hw_accelerated)
+        *hw_accelerated = FALSE;
 
-  } else if (g_str_has_prefix (name, "video/x-surface")) {
-    ret = TRUE;
-    if (hw_accelerated)
-      *hw_accelerated = TRUE;
-  } else {
+    } else if (g_str_has_prefix (name, "video/x-surface")) {
+      ret = TRUE;
+      if (hw_accelerated)
+        *hw_accelerated = TRUE;
+    } else {
 
-    ret = FALSE;
-    if (hw_accelerated)
-      *hw_accelerated = FALSE;
+      ret = FALSE;
+      if (hw_accelerated)
+        *hw_accelerated = FALSE;
+    }
   }
 
   gst_caps_unref (caps);
@@ -425,6 +430,10 @@ gst_subtitle_overlay_create_factory_caps (void)
       gst_caps_unref (_factory_caps);
     _factory_caps = gst_caps_new_empty ();
 
+    /* The caps is cached */
+    GST_MINI_OBJECT_FLAG_SET (_factory_caps,
+        GST_MINI_OBJECT_FLAG_MAY_BE_LEAKED);
+
     factories = gst_registry_feature_filter (registry,
         (GstPluginFeatureFilter) _factory_filter, FALSE, &_factory_caps);
     GST_DEBUG ("Created factory caps: %" GST_PTR_FORMAT, _factory_caps);
@@ -441,7 +450,7 @@ static gboolean
 check_factory_for_caps (GstElementFactory * factory, const GstCaps * caps)
 {
   GstCaps *fcaps = _get_sub_caps (factory);
-  gboolean ret = (fcaps) ? gst_caps_can_intersect (fcaps, caps) : FALSE;
+  gboolean ret = (fcaps) ? gst_caps_is_subset (caps, fcaps) : FALSE;
 
   if (fcaps)
     gst_caps_unref (fcaps);
@@ -606,86 +615,6 @@ _remove_element (GstSubtitleOverlay * self, GstElement ** element)
 }
 
 static gboolean
-_pad_query_convert_to_time (GstPad * pad, GstFormat src_format, gint64 src_val,
-    gint64 * dest_val)
-{
-  GstFormat dest_format;
-
-  if (src_val == GST_CLOCK_TIME_NONE) {
-    *dest_val = GST_CLOCK_TIME_NONE;
-    return TRUE;
-  }
-
-  dest_format = GST_FORMAT_TIME;
-  return gst_pad_query_convert (pad, src_format, src_val, dest_format,
-      dest_val);
-}
-
-static void
-_generate_update_segment_event (GstPad * pad, GstSegment * segment,
-    GstEvent ** event1)
-{
-  GstEvent *event;
-  GstStructure *structure;
-  GstSegment newsegment;
-  gboolean use_newseg = FALSE;
-  gint64 start, stop, base, time, position, duration;
-
-  /* always push newsegment with format TIME */
-  if (segment->format != GST_FORMAT_TIME) {
-    gboolean res;
-    GstPad *peer;
-
-    peer = gst_pad_get_peer (pad);
-    if (peer) {
-      res = _pad_query_convert_to_time (peer, segment->format,
-          segment->start, &start);
-      res = res && _pad_query_convert_to_time (peer, segment->format,
-          segment->stop, &stop);
-      res = res && _pad_query_convert_to_time (peer, segment->format,
-          segment->time, &time);
-      res = res && _pad_query_convert_to_time (peer, segment->format,
-          segment->base, &base);
-      res = res && _pad_query_convert_to_time (peer, segment->format,
-          segment->position, &position);
-      res = res && _pad_query_convert_to_time (peer, segment->format,
-          segment->duration, &duration);
-      if (!res) {
-        start = 0;
-        stop = GST_CLOCK_TIME_NONE;
-        time = 0;
-        position = 0;
-        duration = GST_CLOCK_TIME_NONE;
-        base = 0;
-      } else {
-        use_newseg = TRUE;
-        gst_segment_init (&newsegment, GST_FORMAT_TIME);
-        newsegment.rate = segment->rate;
-        newsegment.applied_rate = segment->applied_rate;
-        newsegment.start = start;
-        newsegment.stop = stop;
-        newsegment.time = time;
-        newsegment.base = base;
-        newsegment.position = position;
-        newsegment.duration = duration;
-      }
-
-      gst_object_unref (peer);
-    }
-  }
-
-  if (use_newseg) {
-    event = gst_event_new_segment (&newsegment);
-  } else {
-    event = gst_event_new_segment (segment);
-  }
-  structure = gst_event_writable_structure (event);
-  gst_structure_id_set (structure, _subtitle_overlay_event_marker_id,
-      G_TYPE_BOOLEAN, TRUE, NULL);
-  *event1 = event;
-}
-
-static gboolean
 _setup_passthrough (GstSubtitleOverlay * self)
 {
   GstPad *src, *sink;
@@ -741,17 +670,6 @@ _setup_passthrough (GstSubtitleOverlay * self)
     GST_ELEMENT_ERROR (self, CORE, PAD, (NULL),
         ("Failed to get sinkpad from identity"));
     return FALSE;
-  }
-
-  /* Send segment to the identity. This is dropped because identity
-   * is not linked downstream yet */
-  if (self->video_segment.format != GST_FORMAT_UNDEFINED) {
-    GstEvent *event1;
-
-    _generate_update_segment_event (sink, &self->video_segment, &event1);
-    GST_DEBUG_OBJECT (self,
-        "Pushing video segment event: %" GST_PTR_FORMAT, event1);
-    gst_pad_send_event (sink, event1);
   }
 
   /* Link sink ghostpads to identity */
@@ -999,7 +917,7 @@ _link_renderer (GstSubtitleOverlay * self, GstElement * renderer,
   } else {                      /* No video pad */
     GstCaps *allowed_caps, *video_caps = NULL;
     GstPad *video_peer;
-    gboolean can_intersect = FALSE;
+    gboolean is_subset = FALSE;
 
     video_peer = gst_pad_get_peer (self->video_sinkpad);
     if (video_peer) {
@@ -1013,13 +931,15 @@ _link_renderer (GstSubtitleOverlay * self, GstElement * renderer,
     sink = _get_video_pad (renderer);
     if (G_UNLIKELY (!sink)) {
       GST_WARNING_OBJECT (self, "Can't get video sink from renderer");
+      if (video_caps)
+        gst_caps_unref (video_caps);
       return FALSE;
     }
     allowed_caps = gst_pad_query_caps (sink, NULL);
     gst_object_unref (sink);
 
     if (allowed_caps && video_caps)
-      can_intersect = gst_caps_can_intersect (allowed_caps, video_caps);
+      is_subset = gst_caps_is_subset (video_caps, allowed_caps);
 
     if (allowed_caps)
       gst_caps_unref (allowed_caps);
@@ -1027,7 +947,7 @@ _link_renderer (GstSubtitleOverlay * self, GstElement * renderer,
     if (video_caps)
       gst_caps_unref (video_caps);
 
-    if (G_UNLIKELY (!can_intersect)) {
+    if (G_UNLIKELY (!is_subset)) {
       GST_WARNING_OBJECT (self, "Renderer with custom caps is not "
           "compatible with video stream");
       return FALSE;
@@ -1104,6 +1024,19 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   GstCaps *subcaps;
   GList *l, *factories = NULL;
 
+  if (GST_IS_EVENT (info->data)) {
+    if (!GST_EVENT_IS_SERIALIZED (info->data)) {
+      GST_DEBUG_OBJECT (pad, "Letting non-serialized event %s pass",
+          GST_EVENT_TYPE_NAME (info->data));
+      return GST_PAD_PROBE_PASS;
+    }
+    if (GST_EVENT_TYPE (info->data) == GST_EVENT_STREAM_START) {
+      GST_DEBUG_OBJECT (pad, "Letting event %s pass",
+          GST_EVENT_TYPE_NAME (info->data));
+      return GST_PAD_PROBE_PASS;
+    }
+  }
+
   GST_DEBUG_OBJECT (pad, "Pad blocked");
 
   GST_SUBTITLE_OVERLAY_LOCK (self);
@@ -1139,7 +1072,7 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 
   /* If there are no subcaps but the subtitle sink is blocked upstream
    * must behave wrong as there are no fixed caps set for the first
-   * buffer or in-order event */
+   * buffer or in-order event after stream-start */
   if (G_UNLIKELY (!subcaps && self->subtitle_sink_blocked)) {
     GST_ELEMENT_WARNING (self, CORE, NEGOTIATION, (NULL),
         ("Subtitle sink is blocked but we have no subtitle caps"));
@@ -1157,7 +1090,7 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
     GstPad *target =
         gst_ghost_pad_get_target (GST_GHOST_PAD_CAST (self->subtitle_sinkpad));
 
-    if (target && gst_pad_query_accept_caps (target, subcaps)) {
+    if (target && pad_supports_caps (target, subcaps)) {
       GST_DEBUG_OBJECT (pad, "Target accepts caps");
 
       gst_object_unref (target);
@@ -1366,43 +1299,6 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
     goto out;
   }
 
-  /* Send segments to the renderer if necessary. These are not sent
-   * outside this element because of the proxy pad event handler */
-  if (self->video_segment.format != GST_FORMAT_UNDEFINED) {
-    GstEvent *event1;
-    GstPad *sink;
-
-    if (self->pre_colorspace) {
-      sink = gst_element_get_static_pad (self->pre_colorspace, "sink");
-    } else {
-      sink = _get_video_pad ((self->renderer) ? self->renderer : self->overlay);
-    }
-
-    _generate_update_segment_event (sink, &self->video_segment, &event1);
-    GST_DEBUG_OBJECT (self,
-        "Pushing video update segment event: %" GST_PTR_FORMAT,
-        gst_event_get_structure (event1));
-    gst_pad_send_event (sink, event1);
-    gst_object_unref (sink);
-  }
-
-  if (self->subtitle_segment.format != GST_FORMAT_UNDEFINED) {
-    GstEvent *event1;
-    GstPad *sink;
-
-    if (self->renderer)
-      sink = _get_sub_pad (self->renderer);
-    else
-      sink = gst_element_get_static_pad (self->parser, "sink");
-
-    _generate_update_segment_event (sink, &self->subtitle_segment, &event1);
-    GST_DEBUG_OBJECT (self,
-        "Pushing subtitle update segment event: %" GST_PTR_FORMAT,
-        gst_event_get_structure (event1));
-    gst_pad_send_event (sink, event1);
-    gst_object_unref (sink);
-  }
-
   GST_DEBUG_OBJECT (self, "Everything worked, unblocking pads");
   unblock_video (self);
   unblock_subtitle (self);
@@ -1441,8 +1337,6 @@ gst_subtitle_overlay_change_state (GstElement * element,
       break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG_OBJECT (self, "State change READY->PAUSED");
-      gst_segment_init (&self->video_segment, GST_FORMAT_UNDEFINED);
-      gst_segment_init (&self->subtitle_segment, GST_FORMAT_UNDEFINED);
 
       self->fps_n = self->fps_d = 0;
 
@@ -1466,8 +1360,11 @@ gst_subtitle_overlay_change_state (GstElement * element,
 
     bret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
     GST_DEBUG_OBJECT (self, "Base class state changed returned: %d", bret);
-    if (G_UNLIKELY (bret == GST_STATE_CHANGE_FAILURE))
+    if (G_UNLIKELY (bret == GST_STATE_CHANGE_FAILURE)) {
+      do_async_done (self);
       return ret;
+    }
+
     else if (bret == GST_STATE_CHANGE_ASYNC)
       ret = bret;
     else if (G_UNLIKELY (bret == GST_STATE_CHANGE_NO_PREROLL)) {
@@ -1538,11 +1435,11 @@ gst_subtitle_overlay_handle_message (GstBin * bin, GstMessage * message)
      * warnings and switch to passthrough mode */
     if (src && (
             (self->overlay
-                && gst_object_has_ancestor (src,
+                && gst_object_has_as_ancestor (src,
                     GST_OBJECT_CAST (self->overlay))) || (self->parser
-                && gst_object_has_ancestor (src,
+                && gst_object_has_as_ancestor (src,
                     GST_OBJECT_CAST (self->parser))) || (self->renderer
-                && gst_object_has_ancestor (src,
+                && gst_object_has_as_ancestor (src,
                     GST_OBJECT_CAST (self->renderer))))) {
       GError *err = NULL;
       gchar *debug = NULL;
@@ -1691,13 +1588,12 @@ gst_subtitle_overlay_class_init (GstSubtitleOverlayClass * klass)
           "ISO-8859-15 will be assumed.", NULL,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&srctemplate));
+  gst_element_class_add_static_pad_template (element_class, &srctemplate);
 
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&video_sinktemplate));
-  gst_element_class_add_pad_template (element_class,
-      gst_static_pad_template_get (&subtitle_sinktemplate));
+  gst_element_class_add_static_pad_template (element_class,
+      &video_sinktemplate);
+  gst_element_class_add_static_pad_template (element_class,
+      &subtitle_sinktemplate);
 
   gst_element_class_set_static_metadata (element_class, "Subtitle Overlay",
       "Video/Overlay/Subtitle",
@@ -1803,7 +1699,7 @@ gst_subtitle_overlay_video_sink_setcaps (GstSubtitleOverlay * self,
 
   GST_SUBTITLE_OVERLAY_LOCK (self);
 
-  if (!target || !gst_pad_query_accept_caps (target, caps)) {
+  if (!target || !pad_supports_caps (target, caps)) {
     GST_DEBUG_OBJECT (target, "Target did not accept caps -- reconfiguring");
 
     block_subtitle (self);
@@ -1834,14 +1730,6 @@ gst_subtitle_overlay_video_sink_event (GstPad * pad, GstObject * parent,
   gboolean ret;
 
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_FLUSH_STOP:
-    {
-      GST_DEBUG_OBJECT (pad,
-          "Resetting video segment because of flush-stop event");
-      gst_segment_init (&self->video_segment, GST_FORMAT_UNDEFINED);
-      self->fps_n = self->fps_d = 0;
-      break;
-    }
     case GST_EVENT_CAPS:
     {
       GstCaps *caps;
@@ -1858,27 +1746,10 @@ gst_subtitle_overlay_video_sink_event (GstPad * pad, GstObject * parent,
 
   ret = gst_pad_event_default (pad, parent, gst_event_ref (event));
 
-  if (GST_EVENT_TYPE (event) == GST_EVENT_SEGMENT) {
-    GST_DEBUG_OBJECT (pad, "segment event: %" GST_PTR_FORMAT, event);
-    gst_event_copy_segment (event, &self->video_segment);
-
-    if (self->video_segment.format != GST_FORMAT_TIME)
-      goto invalid_format;
-  }
-
 done:
   gst_event_unref (event);
 
   return ret;
-
-  /* ERRORS */
-invalid_format:
-  {
-    GST_ERROR_OBJECT (pad, "Segment event in non-time format: %s",
-        gst_format_get_name (self->video_segment.format));
-    ret = FALSE;
-    goto done;
-  }
 }
 
 static GstFlowReturn
@@ -1936,12 +1807,15 @@ gst_subtitle_overlay_subtitle_sink_chain (GstPad * pad, GstObject * parent,
 static GstCaps *
 gst_subtitle_overlay_subtitle_sink_getcaps (GstPad * pad, GstCaps * filter)
 {
-  GstCaps *ret;
+  GstCaps *ret, *subcaps;
 
-  if (filter)
-    ret = gst_caps_ref (filter);
-  else
-    ret = gst_caps_new_any ();
+  subcaps = gst_subtitle_overlay_create_factory_caps ();
+  if (filter) {
+    ret = gst_caps_intersect_full (filter, subcaps, GST_CAPS_INTERSECT_FIRST);
+    gst_caps_unref (subcaps);
+  } else {
+    ret = subcaps;
+  }
 
   return ret;
 }
@@ -1951,7 +1825,7 @@ gst_subtitle_overlay_subtitle_sink_setcaps (GstSubtitleOverlay * self,
     GstCaps * caps)
 {
   gboolean ret = TRUE;
-  GstPad *target = NULL;;
+  GstPad *target = NULL;
 
   GST_DEBUG_OBJECT (self, "Setting caps: %" GST_PTR_FORMAT, caps);
 
@@ -1961,7 +1835,7 @@ gst_subtitle_overlay_subtitle_sink_setcaps (GstSubtitleOverlay * self,
   GST_SUBTITLE_OVERLAY_LOCK (self);
   gst_caps_replace (&self->subcaps, caps);
 
-  if (target && gst_pad_query_accept_caps (target, caps)) {
+  if (target && pad_supports_caps (target, caps)) {
     GST_DEBUG_OBJECT (self, "Target accepts caps");
     GST_SUBTITLE_OVERLAY_UNLOCK (self);
     goto out;
@@ -2072,10 +1946,6 @@ gst_subtitle_overlay_subtitle_sink_event (GstPad * pad, GstObject * parent,
       break;
     }
     case GST_EVENT_FLUSH_STOP:
-      GST_DEBUG_OBJECT (pad,
-          "Resetting subtitle segment because of flush-stop");
-      gst_segment_init (&self->subtitle_segment, GST_FORMAT_UNDEFINED);
-      /* fall through */
     case GST_EVENT_FLUSH_START:
     case GST_EVENT_SEGMENT:
     case GST_EVENT_EOS:
@@ -2097,72 +1967,6 @@ gst_subtitle_overlay_subtitle_sink_event (GstPad * pad, GstObject * parent,
 
   ret = gst_pad_event_default (pad, parent, gst_event_ref (event));
 
-  if (GST_EVENT_TYPE (event) == GST_EVENT_SEGMENT) {
-    const GstSegment *eventsegment;
-    GST_DEBUG_OBJECT (pad, "segment event: %" GST_PTR_FORMAT, event);
-
-    gst_event_parse_segment (event, &eventsegment);
-
-    if (eventsegment->format == GST_FORMAT_TIME) {
-      gst_event_copy_segment (event, &self->subtitle_segment);
-    } else {
-      GstPad *peer;
-      gboolean res = FALSE;
-      gint64 tstart = 0;
-      gint64 tstop = GST_CLOCK_TIME_NONE;
-      gint64 tposition = 0;
-      gint64 tduration = 0;
-      gint64 ttime = 0;
-      gint64 tbase = 0;
-      GstFormat format = eventsegment->format;
-
-      GST_DEBUG_OBJECT (pad, "Subtitle newsegment event (%s) not in TIME "
-          "format, converting", gst_format_get_name (format));
-      peer = gst_pad_get_peer (pad);
-
-      if (peer) {
-        res =
-            _pad_query_convert_to_time (peer, format, eventsegment->start,
-            &tstart);
-        res = res
-            && _pad_query_convert_to_time (peer, format, eventsegment->stop,
-            &tstop);
-        res = res
-            && _pad_query_convert_to_time (peer, format, eventsegment->position,
-            &tposition);
-        res = res
-            && _pad_query_convert_to_time (peer, format, eventsegment->base,
-            &tbase);
-        res = res
-            && _pad_query_convert_to_time (peer, format, eventsegment->time,
-            &ttime);
-        res = res
-            && _pad_query_convert_to_time (peer, format, eventsegment->duration,
-            &tduration);
-
-        gst_object_unref (peer);
-      }
-
-      if (!res) {
-        tstart = 0;
-        tstop = GST_CLOCK_TIME_NONE;
-        tposition = 0;
-        tduration = GST_CLOCK_TIME_NONE;
-        ttime = 0;
-        tbase = 0;
-      }
-
-      gst_segment_init (&self->subtitle_segment, GST_FORMAT_TIME);
-      self->subtitle_segment.start = tstart;
-      self->subtitle_segment.stop = tstop;
-      self->subtitle_segment.base = tbase;
-      self->subtitle_segment.time = ttime;
-      self->subtitle_segment.position = tposition;
-      self->subtitle_segment.duration = tduration;
-    }
-    GST_DEBUG_OBJECT (pad, "New subtitle segment: %" GST_SEGMENT_FORMAT,
-        &self->subtitle_segment);
-  }
   gst_event_unref (event);
 
 out:

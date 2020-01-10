@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -47,7 +47,7 @@
  *   </varlistentry>
  *   <varlistentry>
  *     <term>delay()</term>
- *     <listitem><para>Get the number of samples written but not yet played 
+ *     <listitem><para>Get the number of samples written but not yet played
  *     by the device.</para></listitem>
  *   </varlistentry>
  *   <varlistentry>
@@ -63,12 +63,11 @@
  * All scheduling of samples and timestamps is done in this base class
  * together with #GstAudioBaseSink using a default implementation of a
  * #GstAudioRingBuffer that uses threads.
- *
- * Last reviewed on 2006-09-27 (0.10.12)
  */
 
 #include <string.h>
 
+#include <gst/audio/audio.h>
 #include "gstaudiosink.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_audio_sink_debug);
@@ -203,7 +202,7 @@ typedef gint (*WriteFunc) (GstAudioSink * sink, gpointer data, guint length);
 
 /* this internal thread does nothing else but write samples to the audio device.
  * It will write each segment in the ringbuffer and will update the play
- * pointer. 
+ * pointer.
  * The start/stop methods control the thread.
  */
 static void
@@ -230,11 +229,12 @@ audioringbuffer_thread_func (GstAudioRingBuffer * buf)
   if (writefunc == NULL)
     goto no_function;
 
-  g_value_init (&val, G_TYPE_POINTER);
-  g_value_set_pointer (&val, sink->thread);
   message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
       GST_STREAM_STATUS_TYPE_ENTER, GST_ELEMENT_CAST (sink));
+  g_value_init (&val, GST_TYPE_G_THREAD);
+  g_value_set_boxed (&val, g_thread_self ());
   gst_message_set_stream_status_object (message, &val);
+  g_value_unset (&val);
   GST_DEBUG_OBJECT (sink, "posting ENTER stream status");
   gst_element_post_message (GST_ELEMENT_CAST (sink), message);
 
@@ -306,7 +306,10 @@ stop_running:
     GST_DEBUG_OBJECT (sink, "stop running, exit thread");
     message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
         GST_STREAM_STATUS_TYPE_LEAVE, GST_ELEMENT_CAST (sink));
+    g_value_init (&val, GST_TYPE_G_THREAD);
+    g_value_set_boxed (&val, g_thread_self ());
     gst_message_set_stream_status_object (message, &val);
+    g_value_unset (&val);
     GST_DEBUG_OBJECT (sink, "posting LEAVE stream status");
     gst_element_post_message (GST_ELEMENT_CAST (sink), message);
     return;
@@ -409,7 +412,17 @@ gst_audio_sink_ring_buffer_acquire (GstAudioRingBuffer * buf,
   spec->seglatency = spec->segtotal + 1;
 
   buf->size = spec->segtotal * spec->segsize;
-  buf->memory = g_malloc0 (buf->size);
+
+  buf->memory = g_malloc (buf->size);
+
+  if (buf->spec.type == GST_AUDIO_RING_BUFFER_FORMAT_TYPE_RAW) {
+    gst_audio_format_fill_silence (buf->spec.info.finfo, buf->memory,
+        buf->size);
+  } else {
+    /* FIXME, non-raw formats get 0 as the empty sample */
+    memset (buf->memory, 0, buf->size);
+  }
+
 
   return TRUE;
 
@@ -467,6 +480,7 @@ thread_failed:
       GST_ERROR_OBJECT (sink, "could not create thread %s", error->message);
     else
       GST_ERROR_OBJECT (sink, "could not create thread for unknown reason");
+    g_clear_error (&error);
     return FALSE;
   }
 }

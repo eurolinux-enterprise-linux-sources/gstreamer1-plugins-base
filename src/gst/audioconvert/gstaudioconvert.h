@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_AUDIO_CONVERT_H__
@@ -25,8 +25,6 @@
 #include <gst/gst.h>
 #include <gst/base/gstbasetransform.h>
 #include <gst/audio/audio.h>
-
-#include "audioconvert.h"
 
 #define GST_TYPE_AUDIO_CONVERT            (gst_audio_convert_get_type())
 #define GST_AUDIO_CONVERT(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_AUDIO_CONVERT,GstAudioConvert))
@@ -46,10 +44,13 @@ struct _GstAudioConvert
 {
   GstBaseTransform element;
 
-  AudioConvertCtx ctx;
+  /* properties */
+  GstAudioDitherMethod dither;
+  GstAudioNoiseShapingMethod ns;
 
-  GstAudioConvertDithering dither;
-  GstAudioConvertNoiseShaping ns;
+  GstAudioInfo in_info;
+  GstAudioInfo out_info;
+  GstAudioConverter *convert;
 };
 
 struct _GstAudioConvertClass

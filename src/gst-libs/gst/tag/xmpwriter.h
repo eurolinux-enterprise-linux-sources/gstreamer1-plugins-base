@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __TAG_XMP_WRITER_H__
@@ -28,12 +28,8 @@ G_BEGIN_DECLS
   (gst_tag_xmp_writer_get_type ())
 #define GST_TAG_XMP_WRITER(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST ((obj), GST_TYPE_TAG_XMP_WRITER, GstTagXmpWriter))
-#define GST_TAG_XMP_WRITER_INTERFACE(iface) \
-  (G_TYPE_CHECK_INTERFACE_CAST ((iface), GST_TYPE_TAG_XMP_WRITER, GstTagXmpWriterInterface))
 #define GST_IS_TAG_XMP_WRITER(obj) \
   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_TAG_XMP_WRITER))
-#define GST_IS_TAG_XMP_WRITER_INTERFACE(iface) \
-  (G_TYPE_CHECK_INTERFACE_TYPE ((iface), GST_TYPE_TAG_XMP_WRITER))
 #define GST_TAG_XMP_WRITER_GET_INTERFACE(inst) \
   (G_TYPE_INSTANCE_GET_INTERFACE ((inst), GST_TYPE_TAG_XMP_WRITER, GstTagXmpWriterInterface))
 

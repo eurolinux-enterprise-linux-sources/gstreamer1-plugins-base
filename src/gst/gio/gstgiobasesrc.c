@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -64,8 +64,7 @@ gst_gio_base_src_class_init (GstGioBaseSrcClass * klass)
 
   gobject_class->finalize = gst_gio_base_src_finalize;
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&src_factory));
+  gst_element_class_add_static_pad_template (gstelement_class, &src_factory);
 
   gstbasesrc_class->start = GST_DEBUG_FUNCPTR (gst_gio_base_src_start);
   gstbasesrc_class->stop = GST_DEBUG_FUNCPTR (gst_gio_base_src_stop);
@@ -286,7 +285,8 @@ gst_gio_base_src_unlock_stop (GstBaseSrc * base_src)
 
   GST_LOG_OBJECT (src, "resetting cancellable");
 
-  g_cancellable_reset (src->cancel);
+  g_object_unref (src->cancel);
+  src->cancel = g_cancellable_new ();
 
   return TRUE;
 }
@@ -320,50 +320,75 @@ gst_gio_base_src_create (GstBaseSrc * base_src, guint64 offset, guint size,
   } else {
     guint cachesize = MAX (4096, size);
     GstMapInfo map;
-    gssize read, res;
+    gssize read, streamread, res;
+    guint64 readoffset;
     gboolean success, eos;
     GError *err = NULL;
+    GstBuffer *newbuffer;
+    GstMemory *mem;
 
-    if (src->cache) {
-      gst_buffer_unref (src->cache);
-      src->cache = NULL;
+    newbuffer = gst_buffer_new ();
+
+    /* copy any overlapping data from the cached buffer */
+    if (src->cache && offset >= GST_BUFFER_OFFSET (src->cache) &&
+        offset <= GST_BUFFER_OFFSET_END (src->cache)) {
+      read = GST_BUFFER_OFFSET_END (src->cache) - offset;
+      GST_LOG_OBJECT (src,
+          "Copying %" G_GSSIZE_FORMAT " bytes from cached buffer at %"
+          G_GUINT64_FORMAT, read, offset - GST_BUFFER_OFFSET (src->cache));
+      gst_buffer_copy_into (newbuffer, src->cache, GST_BUFFER_COPY_MEMORY,
+          offset - GST_BUFFER_OFFSET (src->cache), read);
+    } else {
+      read = 0;
     }
 
-    if (G_UNLIKELY (offset != src->position)) {
+    if (src->cache)
+      gst_buffer_unref (src->cache);
+    src->cache = newbuffer;
+
+    readoffset = offset + read;
+    GST_LOG_OBJECT (src,
+        "Reading %u bytes from offset %" G_GUINT64_FORMAT, cachesize,
+        readoffset);
+
+    if (G_UNLIKELY (readoffset != src->position)) {
       if (!GST_GIO_STREAM_IS_SEEKABLE (src->stream))
         return GST_FLOW_NOT_SUPPORTED;
 
-      GST_DEBUG_OBJECT (src, "Seeking to position %" G_GUINT64_FORMAT, offset);
-      ret = gst_gio_seek (src, G_SEEKABLE (src->stream), offset, src->cancel);
+      GST_DEBUG_OBJECT (src, "Seeking to position %" G_GUINT64_FORMAT,
+          readoffset);
+      ret =
+          gst_gio_seek (src, G_SEEKABLE (src->stream), readoffset, src->cancel);
 
       if (ret == GST_FLOW_OK)
-        src->position = offset;
+        src->position = readoffset;
       else
         return ret;
     }
-
-    src->cache = gst_buffer_new_and_alloc (cachesize);
-    if (G_UNLIKELY (src->cache == NULL)) {
-      GST_ERROR_OBJECT (src, "Failed to allocate %u bytes", cachesize);
-      return GST_FLOW_ERROR;
-    }
-
-    GST_LOG_OBJECT (src, "Reading %u bytes from offset %" G_GUINT64_FORMAT,
-        cachesize, offset);
 
     /* GIO sometimes gives less bytes than requested although
      * it's not at the end of file. SMB for example only
      * supports reads up to 64k. So we loop here until we get at
      * at least the requested amount of bytes or a read returns
      * nothing. */
-    gst_buffer_map (src->cache, &map, GST_MAP_WRITE);
-    read = 0;
+    mem = gst_allocator_alloc (NULL, cachesize, NULL);
+    if (mem == NULL) {
+      GST_ERROR_OBJECT (src, "Failed to allocate %u bytes", cachesize);
+      return GST_FLOW_ERROR;
+    }
+
+    gst_memory_map (mem, &map, GST_MAP_WRITE);
+    streamread = 0;
     while (size - read > 0 && (res =
             g_input_stream_read (G_INPUT_STREAM (src->stream),
-                map.data + read, cachesize - read, src->cancel, &err)) > 0) {
+                map.data + streamread, cachesize - streamread, src->cancel,
+                &err)) > 0) {
       read += res;
+      streamread += res;
+      src->position += res;
     }
-    gst_buffer_unmap (src->cache, &map);
+    gst_memory_unmap (mem, &map);
+    gst_buffer_append_memory (src->cache, mem);
 
     success = (read >= 0);
     eos = (cachesize > 0 && read == 0);
@@ -375,8 +400,6 @@ gst_gio_base_src_create (GstBaseSrc * base_src, guint64 offset, guint size,
     }
 
     if (success && !eos) {
-      src->position += read;
-
       GST_BUFFER_OFFSET (src->cache) = offset;
       GST_BUFFER_OFFSET_END (src->cache) = offset + read;
 

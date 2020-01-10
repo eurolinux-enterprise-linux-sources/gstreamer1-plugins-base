@@ -16,25 +16,28 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /* a base class for audio sources.
  */
+
+#ifndef __GST_AUDIO_AUDIO_H__
+#include <gst/audio/audio.h>
+#endif
 
 #ifndef __GST_AUDIO_BASE_SRC_H__
 #define __GST_AUDIO_BASE_SRC_H__
 
 #include <gst/gst.h>
 #include <gst/base/gstpushsrc.h>
-#include "gstaudioringbuffer.h"
-#include "gstaudioclock.h"
 
 G_BEGIN_DECLS
 
 #define GST_TYPE_AUDIO_BASE_SRC                 (gst_audio_base_src_get_type())
 #define GST_AUDIO_BASE_SRC(obj)                 (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_AUDIO_BASE_SRC,GstAudioBaseSrc))
+#define GST_AUDIO_BASE_SRC_CAST(obj)            ((GstAudioBaseSrc*)obj)
 #define GST_AUDIO_BASE_SRC_CLASS(klass)         (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_AUDIO_BASE_SRC,GstAudioBaseSrcClass))
 #define GST_AUDIO_BASE_SRC_GET_CLASS(obj)       (G_TYPE_INSTANCE_GET_CLASS ((obj), GST_TYPE_AUDIO_BASE_SRC, GstAudioBaseSrcClass))
 #define GST_IS_AUDIO_BASE_SRC(obj)              (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_AUDIO_BASE_SRC))
@@ -141,6 +144,10 @@ void       gst_audio_base_src_set_slave_method         (GstAudioBaseSrc *src,
 GstAudioBaseSrcSlaveMethod
            gst_audio_base_src_get_slave_method         (GstAudioBaseSrc *src);
 
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioBaseSrc, gst_object_unref)
+#endif
 
 G_END_DECLS
 

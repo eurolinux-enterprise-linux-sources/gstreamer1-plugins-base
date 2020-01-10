@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -199,6 +199,8 @@ struct _GstEncodeBinClass
 
   /* Action Signals */
   GstPad *(*request_pad) (GstEncodeBin * encodebin, GstCaps * caps);
+  GstPad *(*request_profile_pad) (GstEncodeBin * encodebin,
+      const gchar * profilename);
 };
 
 typedef struct _StreamGroup StreamGroup;
@@ -213,12 +215,15 @@ struct _StreamGroup
   GList *converters;            /* List of conversion GstElement */
   GstElement *capsfilter;       /* profile->restriction (if non-NULL/ANY) */
   GstElement *encoder;          /* Encoder (can be NULL) */
+  GstElement *fakesink;         /* Fakesink (can be NULL) */
   GstElement *combiner;
   GstElement *parser;
   GstElement *smartencoder;
   GstElement *outfilter;        /* Output capsfilter (streamprofile.format) */
+  gulong outputfilter_caps_sid;
   GstElement *formatter;
   GstElement *outqueue;         /* Queue just before the muxer */
+  gulong restriction_sid;
 };
 
 /* Default for queues (same defaults as queue element) */
@@ -246,14 +251,14 @@ enum
   PROP_QUEUE_TIME_MAX,
   PROP_AUDIO_JITTER_TOLERANCE,
   PROP_AVOID_REENCODING,
-  PROP_FLAGS,
-  PROP_LAST
+  PROP_FLAGS
 };
 
 /* Signals */
 enum
 {
   SIGNAL_REQUEST_PAD,
+  SIGNAL_REQUEST_PROFILE_PAD,
   LAST_SIGNAL
 };
 
@@ -312,8 +317,11 @@ static gboolean gst_encode_bin_setup_profile (GstEncodeBin * ebin,
 static StreamGroup *_create_stream_group (GstEncodeBin * ebin,
     GstEncodingProfile * sprof, const gchar * sinkpadname, GstCaps * sinkcaps);
 static void stream_group_remove (GstEncodeBin * ebin, StreamGroup * sgroup);
+static void stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup);
 static GstPad *gst_encode_bin_request_pad_signal (GstEncodeBin * encodebin,
     GstCaps * caps);
+static GstPad *gst_encode_bin_request_profile_pad_signal (GstEncodeBin *
+    encodebin, const gchar * profilename);
 
 static inline GstElement *_get_formatter (GstEncodeBin * ebin,
     GstEncodingProfile * sprof);
@@ -402,18 +410,36 @@ gst_encode_bin_class_init (GstEncodeBinClass * klass)
           request_pad), NULL, NULL, g_cclosure_marshal_generic,
       GST_TYPE_PAD, 1, GST_TYPE_CAPS);
 
-  klass->request_pad = gst_encode_bin_request_pad_signal;
+  /**
+   * GstEncodeBin::request-profile-pad
+   * @encodebin: a #GstEncodeBin instance
+   * @profilename: the name of a #GstEncodingProfile
+   *
+   * Use this method to request an unused sink request #GstPad from the profile
+   * @profilename. You must release the pad with
+   * gst_element_release_request_pad() when you are done with it.
+   *
+   * Returns: A compatible #GstPad, or %NULL if no compatible #GstPad could be
+   * created or is available.
+   */
+  gst_encode_bin_signals[SIGNAL_REQUEST_PROFILE_PAD] =
+      g_signal_new ("request-profile-pad", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION, G_STRUCT_OFFSET (GstEncodeBinClass,
+          request_profile_pad), NULL, NULL, g_cclosure_marshal_generic,
+      GST_TYPE_PAD, 1, G_TYPE_STRING);
 
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&muxer_src_template));
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&video_sink_template));
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&audio_sink_template));
-  /* gst_element_class_add_pad_template (gstelement_klass, */
-  /*     gst_static_pad_template_get (&text_sink_template)); */
-  gst_element_class_add_pad_template (gstelement_klass,
-      gst_static_pad_template_get (&private_sink_template));
+  klass->request_pad = gst_encode_bin_request_pad_signal;
+  klass->request_profile_pad = gst_encode_bin_request_profile_pad_signal;
+
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &muxer_src_template);
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &video_sink_template);
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &audio_sink_template);
+  /* gst_element_class_add_static_pad_template (gstelement_klass, &text_sink_template); */
+  gst_element_class_add_static_pad_template (gstelement_klass,
+      &private_sink_template);
 
   gstelement_klass->change_state =
       GST_DEBUG_FUNCPTR (gst_encode_bin_change_state);
@@ -436,22 +462,28 @@ gst_encode_bin_dispose (GObject * object)
 
   if (ebin->muxers)
     gst_plugin_feature_list_free (ebin->muxers);
+  ebin->muxers = NULL;
 
   if (ebin->formatters)
     gst_plugin_feature_list_free (ebin->formatters);
+  ebin->formatters = NULL;
 
   if (ebin->encoders)
     gst_plugin_feature_list_free (ebin->encoders);
+  ebin->encoders = NULL;
 
   if (ebin->parsers)
     gst_plugin_feature_list_free (ebin->parsers);
+  ebin->parsers = NULL;
 
   gst_encode_bin_tear_down_profile (ebin);
 
   if (ebin->raw_video_caps)
     gst_caps_unref (ebin->raw_video_caps);
+  ebin->raw_video_caps = NULL;
   if (ebin->raw_audio_caps)
     gst_caps_unref (ebin->raw_audio_caps);
+  ebin->raw_audio_caps = NULL;
   /* if (ebin->raw_text_caps) */
   /*   gst_caps_unref (ebin->raw_text_caps); */
 
@@ -494,6 +526,7 @@ gst_encode_bin_init (GstEncodeBin * encode_bin)
   tmpl = gst_static_pad_template_get (&muxer_src_template);
   encode_bin->srcpad = gst_ghost_pad_new_no_target_from_template ("src", tmpl);
   gst_object_unref (tmpl);
+  gst_pad_set_active (encode_bin->srcpad, TRUE);
   gst_element_add_pad (GST_ELEMENT_CAST (encode_bin), encode_bin->srcpad);
 }
 
@@ -598,7 +631,8 @@ stream_profile_used_count (GstEncodeBin * ebin, GstEncodingProfile * sprof)
 }
 
 static inline GstEncodingProfile *
-next_unused_stream_profile (GstEncodeBin * ebin, GType ptype, GstCaps * caps)
+next_unused_stream_profile (GstEncodeBin * ebin, GType ptype,
+    const gchar * name, GstCaps * caps)
 {
   GST_DEBUG_OBJECT (ebin, "ptype:%s, caps:%" GST_PTR_FORMAT,
       g_type_name (ptype), caps);
@@ -618,6 +652,39 @@ next_unused_stream_profile (GstEncodeBin * ebin, GType ptype, GstCaps * caps)
   if (GST_IS_ENCODING_CONTAINER_PROFILE (ebin->profile)) {
     const GList *tmp;
 
+    if (name) {
+      /* If we have a name, try to find a profile with the same name */
+      tmp =
+          gst_encoding_container_profile_get_profiles
+          (GST_ENCODING_CONTAINER_PROFILE (ebin->profile));
+
+      for (; tmp; tmp = tmp->next) {
+        GstEncodingProfile *sprof = (GstEncodingProfile *) tmp->data;
+        const gchar *profilename = gst_encoding_profile_get_name (sprof);
+
+        if (profilename && !strcmp (name, profilename)) {
+          guint presence = gst_encoding_profile_get_presence (sprof);
+
+          GST_DEBUG ("Found profile matching the requested name");
+
+          if (!gst_encoding_profile_is_enabled (sprof)) {
+            GST_INFO_OBJECT (ebin, "%p is disabled, not using it", sprof);
+
+            return NULL;
+          }
+
+          if (presence == 0
+              || presence > stream_profile_used_count (ebin, sprof))
+            return sprof;
+
+          GST_WARNING ("Matching stream already used");
+          return NULL;
+        }
+      }
+      GST_DEBUG
+          ("No profiles matching requested pad name, carrying on with normal stream matching");
+    }
+
     for (tmp =
         gst_encoding_container_profile_get_profiles
         (GST_ENCODING_CONTAINER_PROFILE (ebin->profile)); tmp;
@@ -625,16 +692,18 @@ next_unused_stream_profile (GstEncodeBin * ebin, GType ptype, GstCaps * caps)
       GstEncodingProfile *sprof = (GstEncodingProfile *) tmp->data;
 
       /* Pick an available Stream profile for which:
-       * * either it is of the compatibly raw type,
+       * * either it is of the compatible raw type,
        * * OR we can pass it through directly without encoding
        */
       if (G_TYPE_FROM_INSTANCE (sprof) == ptype) {
         guint presence = gst_encoding_profile_get_presence (sprof);
         GST_DEBUG ("Found a stream profile with the same type");
-        if ((presence == 0)
+        if (!gst_encoding_profile_is_enabled (sprof)) {
+          GST_INFO_OBJECT (ebin, "%p is disabled, not using it", sprof);
+        } else if (presence == 0
             || (presence > stream_profile_used_count (ebin, sprof)))
           return sprof;
-      } else if ((caps != NULL) && (ptype == G_TYPE_NONE)) {
+      } else if (caps && ptype == G_TYPE_NONE) {
         GstCaps *outcaps;
         gboolean res;
 
@@ -664,7 +733,7 @@ request_pad_for_stream (GstEncodeBin * encodebin, GType ptype,
 
   /* Figure out if we have a unused GstEncodingProfile we can use for
    * these caps */
-  sprof = next_unused_stream_profile (encodebin, ptype, caps);
+  sprof = next_unused_stream_profile (encodebin, ptype, name, caps);
 
   if (G_UNLIKELY (sprof == NULL))
     goto no_stream_profile;
@@ -697,8 +766,8 @@ gst_encode_bin_request_new_pad (GstElement * element,
 
   GST_DEBUG_OBJECT (element, "templ:%s, name:%s", templ->name_template, name);
 
-  /* Identify the stream group */
-  if (caps != NULL) {
+  /* Identify the stream group (if name or caps have been provided) */
+  if (caps != NULL || name != NULL) {
     res = request_pad_for_stream (ebin, G_TYPE_NONE, name, (GstCaps *) caps);
   }
 
@@ -727,6 +796,16 @@ static GstPad *
 gst_encode_bin_request_pad_signal (GstEncodeBin * encodebin, GstCaps * caps)
 {
   GstPad *pad = request_pad_for_stream (encodebin, G_TYPE_NONE, NULL, caps);
+
+  return pad ? GST_PAD_CAST (gst_object_ref (pad)) : NULL;
+}
+
+static GstPad *
+gst_encode_bin_request_profile_pad_signal (GstEncodeBin * encodebin,
+    const gchar * profilename)
+{
+  GstPad *pad =
+      request_pad_for_stream (encodebin, G_TYPE_NONE, profilename, NULL);
 
   return pad ? GST_PAD_CAST (gst_object_ref (pad)) : NULL;
 }
@@ -817,19 +896,34 @@ beach:
 
 static GstElement *
 _create_element_and_set_preset (GstElementFactory * factory,
-    const gchar * preset, const gchar * name)
+    const gchar * preset, const gchar * name, const gchar * preset_name)
 {
   GstElement *res = NULL;
 
-  GST_DEBUG ("Creating element from factory %s", GST_OBJECT_NAME (factory));
+  GST_DEBUG ("Creating element from factory %s (preset factory name: %s"
+      " preset name: %s)", GST_OBJECT_NAME (factory), preset, preset_name);
+
   res = gst_element_factory_create (factory, name);
-  if (preset && GST_IS_PRESET (res) &&
-      !gst_preset_load_preset (GST_PRESET (res), preset)) {
-    GST_WARNING ("Couldn't set preset [%s] on element [%s]",
-        preset, GST_OBJECT_NAME (factory));
+
+  if (preset && GST_IS_PRESET (res)) {
+    if (preset_name == NULL ||
+        g_strcmp0 (GST_OBJECT_NAME (factory), preset_name) == 0) {
+
+      if (!gst_preset_load_preset (GST_PRESET (res), preset)) {
+        GST_WARNING ("Couldn't set preset [%s] on element [%s]",
+            preset, GST_OBJECT_NAME (factory));
+        gst_object_unref (res);
+        res = NULL;
+      }
+    } else {
+      GST_DEBUG ("Using a preset with no preset name, making use of the"
+          " proper element without setting any property");
+    }
+  } else if (preset_name && g_strcmp0 (GST_OBJECT_NAME (factory), preset_name)) {
     gst_object_unref (res);
     res = NULL;
   }
+  /* Else we keep it */
 
   return res;
 }
@@ -842,10 +936,11 @@ _get_encoder (GstEncodeBin * ebin, GstEncodingProfile * sprof)
   GstElement *encoder = NULL;
   GstElementFactory *encoderfact = NULL;
   GstCaps *format;
-  const gchar *preset;
+  const gchar *preset, *preset_name;
 
   format = gst_encoding_profile_get_format (sprof);
   preset = gst_encoding_profile_get_preset (sprof);
+  preset_name = gst_encoding_profile_get_preset_name (sprof);
 
   GST_DEBUG ("Getting list of encoders for format %" GST_PTR_FORMAT, format);
 
@@ -860,6 +955,14 @@ _get_encoder (GstEncodeBin * ebin, GstEncodingProfile * sprof)
       gst_element_factory_list_filter (ebin->encoders, format,
       GST_PAD_SRC, FALSE);
 
+  if (G_UNLIKELY (encoders == NULL) && sprof == ebin->profile) {
+    /* Special case: if the top-level profile is an encoder,
+     * it could be listed in our muxers (for example wavenc)
+     */
+    encoders = gst_element_factory_list_filter (ebin->muxers, format,
+        GST_PAD_SRC, FALSE);
+  }
+
   if (G_UNLIKELY (encoders == NULL)) {
     GST_DEBUG ("Couldn't find any compatible encoders");
     goto beach;
@@ -867,7 +970,8 @@ _get_encoder (GstEncodeBin * ebin, GstEncodingProfile * sprof)
 
   for (tmp = encoders; tmp; tmp = tmp->next) {
     encoderfact = (GstElementFactory *) tmp->data;
-    if ((encoder = _create_element_and_set_preset (encoderfact, preset, NULL)))
+    if ((encoder = _create_element_and_set_preset (encoderfact, preset,
+                NULL, preset_name)))
       break;
   }
 
@@ -981,11 +1085,94 @@ _has_class (GstElement * element, const gchar * classname)
 
   klass = GST_ELEMENT_GET_CLASS (element);
   value = gst_element_class_get_metadata (klass, GST_ELEMENT_METADATA_KLASS);
+  if (!value)
+    return FALSE;
 
   return strstr (value, classname) != NULL;
 }
 
-/* FIXME : Add handling of streams that don't need encoding  */
+static void
+_profile_restriction_caps_cb (GstEncodingProfile * profile,
+    GParamSpec * arg G_GNUC_UNUSED, StreamGroup * group)
+{
+  GstCaps *restriction = gst_encoding_profile_get_restriction (profile);
+
+  g_object_set (group->capsfilter, "caps", restriction, NULL);
+}
+
+static void
+_outfilter_caps_set_cb (GstPad * outfilter_sinkpad,
+    GParamSpec * arg G_GNUC_UNUSED, StreamGroup * group)
+{
+  GstCaps *caps;
+  GstStructure *structure;
+
+  g_object_get (outfilter_sinkpad, "caps", &caps, NULL);
+  caps = gst_caps_copy (caps);
+
+  structure = gst_caps_get_structure (caps, 0);
+  gst_structure_remove_field (structure, "streamheader");
+  GST_INFO_OBJECT (group->ebin, "Forcing caps to %" GST_PTR_FORMAT, caps);
+  g_object_set (group->outfilter, "caps", caps, NULL);
+  g_signal_handler_disconnect (outfilter_sinkpad, group->outputfilter_caps_sid);
+  group->outputfilter_caps_sid = 0;
+  gst_caps_unref (caps);
+}
+
+static void
+_set_group_caps_format (StreamGroup * sgroup, GstEncodingProfile * prof,
+    GstCaps * format)
+{
+  g_object_set (sgroup->outfilter, "caps", format, NULL);
+
+  if (!gst_encoding_profile_get_allow_dynamic_output (prof)) {
+    if (!sgroup->outputfilter_caps_sid) {
+      sgroup->outputfilter_caps_sid =
+          g_signal_connect (sgroup->outfilter->sinkpads->data,
+          "notify::caps", G_CALLBACK (_outfilter_caps_set_cb), sgroup);
+    }
+  }
+}
+
+static void
+_post_missing_plugin_message (GstEncodeBin * ebin, GstEncodingProfile * prof)
+{
+  GstCaps *format;
+  format = gst_encoding_profile_get_format (prof);
+
+  GST_ERROR_OBJECT (ebin, "Couldn't create encoder for format %" GST_PTR_FORMAT,
+      format);
+  /* missing plugin support */
+  gst_element_post_message (GST_ELEMENT_CAST (ebin),
+      gst_missing_encoder_message_new (GST_ELEMENT_CAST (ebin), format));
+  GST_ELEMENT_ERROR (ebin, CORE, MISSING_PLUGIN, (NULL),
+      ("Couldn't create encoder for format %" GST_PTR_FORMAT, format));
+
+  gst_caps_unref (format);
+}
+
+static GstPadProbeReturn
+_missing_plugin_probe (GstPad * pad, GstPadProbeInfo * info, gpointer udata)
+{
+  StreamGroup *sgroup = udata;
+  GstEncodeBin *ebin = sgroup->ebin;
+
+  _post_missing_plugin_message (ebin, sgroup->profile);
+
+  return GST_PAD_PROBE_OK;
+}
+
+static void
+_set_up_fake_encoder_pad_probe (GstEncodeBin * ebin, StreamGroup * sgroup)
+{
+  GstPad *pad = gst_element_get_static_pad (sgroup->fakesink, "sink");
+
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, _missing_plugin_probe,
+      sgroup, NULL);
+
+  gst_object_unref (pad);
+}
+
 /* FIXME : Add handling of streams that don't require conversion elements */
 /*
  * Create the elements, StreamGroup, add the sink pad, link it to the muxer
@@ -1000,6 +1187,7 @@ _create_stream_group (GstEncodeBin * ebin, GstEncodingProfile * sprof,
   GstPad *sinkpad, *srcpad, *muxerpad = NULL;
   /* Element we will link to the encoder */
   GstElement *last = NULL;
+  GstElement *encoder = NULL;
   GList *tmp, *tosync = NULL;
   GstCaps *format, *restriction;
   const gchar *missing_element_name;
@@ -1024,14 +1212,6 @@ _create_stream_group (GstEncodeBin * ebin, GstEncodingProfile * sprof,
    * * One for raw data which goes through converters and encoders
    * * One for already encoded data
    */
-
-  /* Exception to the rule above:
-   * We check if we have an available encoder so we can abort early */
-  /* FIXME : What if we only want to do passthrough ??? */
-  GST_LOG ("Checking for encoder availability");
-  sgroup->encoder = _get_encoder (ebin, sprof);
-  if (G_UNLIKELY (sgroup->encoder == NULL))
-    goto no_encoder;
 
   /* Muxer.
    * If we are handling a container profile, figure out if the muxer has a
@@ -1087,7 +1267,7 @@ _create_stream_group (GstEncodeBin * ebin, GstEncodingProfile * sprof,
    * This will receive the format caps from the streamprofile */
   GST_DEBUG ("Adding output capsfilter for %" GST_PTR_FORMAT, format);
   sgroup->outfilter = gst_element_factory_make ("capsfilter", NULL);
-  g_object_set (sgroup->outfilter, "caps", format, NULL);
+  _set_group_caps_format (sgroup, sprof, format);
 
   gst_bin_add (GST_BIN (ebin), sgroup->outfilter);
   tosync = g_list_append (tosync, sgroup->outfilter);
@@ -1126,8 +1306,8 @@ _create_stream_group (GstEncodeBin * ebin, GstEncodingProfile * sprof,
    * FIXME : figure out what max-size to use for the input queue */
   sgroup->inqueue = gst_element_factory_make ("queue", NULL);
   g_object_set (sgroup->inqueue, "max-size-buffers",
-      (guint32) ebin->queue_buffers_max, "max-size-bytes",
-      (guint32) ebin->queue_bytes_max, "max-size-time",
+      (guint) ebin->queue_buffers_max, "max-size-bytes",
+      (guint) ebin->queue_bytes_max, "max-size-time",
       (guint64) ebin->queue_time_max, "silent", TRUE, NULL);
 
   gst_bin_add (GST_BIN (ebin), sgroup->inqueue);
@@ -1196,33 +1376,58 @@ _create_stream_group (GstEncodeBin * ebin, GstEncodingProfile * sprof,
 
   /* 1. Create the encoder */
   GST_LOG ("Adding encoder");
-  last = sgroup->encoder;
-  gst_bin_add ((GstBin *) ebin, sgroup->encoder);
-  tosync = g_list_append (tosync, sgroup->encoder);
+  sgroup->encoder = _get_encoder (ebin, sprof);
+  if (sgroup->encoder != NULL) {
+    gst_bin_add ((GstBin *) ebin, sgroup->encoder);
+    tosync = g_list_append (tosync, sgroup->encoder);
 
-  sinkpad =
-      local_element_request_pad (sgroup->combiner, NULL, "encodingsink", NULL);
-  if (G_UNLIKELY (sinkpad == NULL))
-    goto no_combiner_sinkpad;
-  srcpad = gst_element_get_static_pad (sgroup->encoder, "src");
-  if (G_UNLIKELY (fast_pad_link (srcpad, sinkpad) != GST_PAD_LINK_OK))
-    goto encoder_link_failure;
-  g_object_unref (sinkpad);
-  g_object_unref (srcpad);
+    sinkpad =
+        local_element_request_pad (sgroup->combiner, NULL, "encodingsink",
+        NULL);
+    if (G_UNLIKELY (sinkpad == NULL))
+      goto no_combiner_sinkpad;
+    srcpad = gst_element_get_static_pad (sgroup->encoder, "src");
+    if (G_UNLIKELY (fast_pad_link (srcpad, sinkpad) != GST_PAD_LINK_OK))
+      goto encoder_link_failure;
+    g_object_unref (sinkpad);
+    g_object_unref (srcpad);
+  } else if (gst_encoding_profile_get_preset (sgroup->profile)
+      || gst_encoding_profile_get_preset_name (sgroup->profile)) {
+    _post_missing_plugin_message (ebin, sprof);
+    goto cleanup;
+  } else {
+    /* passthrough can still work, if we discover that *
+     * encoding is required we post a missing plugin message */
+  }
 
 
   /* 3. Create the conversion/restriction elements */
   /* 3.1. capsfilter */
-  if (restriction && !gst_caps_is_any (restriction)) {
-    GST_LOG ("Adding capsfilter for restriction caps : %" GST_PTR_FORMAT,
-        restriction);
+  GST_LOG ("Adding capsfilter for restriction caps : %" GST_PTR_FORMAT,
+      restriction);
 
-    last = sgroup->capsfilter = gst_element_factory_make ("capsfilter", NULL);
+  last = sgroup->capsfilter = gst_element_factory_make ("capsfilter", NULL);
+  if (restriction && !gst_caps_is_any (restriction))
     g_object_set (sgroup->capsfilter, "caps", restriction, NULL);
-    gst_bin_add ((GstBin *) ebin, sgroup->capsfilter);
-    tosync = g_list_append (tosync, sgroup->capsfilter);
-    fast_element_link (sgroup->capsfilter, sgroup->encoder);
+  gst_bin_add ((GstBin *) ebin, sgroup->capsfilter);
+  tosync = g_list_append (tosync, sgroup->capsfilter);
+  if (sgroup->encoder == NULL) {
+    /* no encoder available but it might be possible to just do passthrough, so
+     * let's just set up a fake pad to detect that encoding was attempted and
+     * if so it posts the missing plugin message */
+    sgroup->fakesink = gst_element_factory_make ("fakesink", NULL);
+    g_object_set (sgroup->fakesink, "async", FALSE, NULL);
+    gst_bin_add (GST_BIN_CAST (ebin), sgroup->fakesink);
+    tosync = g_list_append (tosync, sgroup->fakesink);
+    encoder = sgroup->fakesink;
+
+    _set_up_fake_encoder_pad_probe (ebin, sgroup);
+  } else {
+    encoder = sgroup->encoder;
   }
+  fast_element_link (sgroup->capsfilter, encoder);
+  sgroup->restriction_sid = g_signal_connect (sprof, "notify::restriction-caps",
+      G_CALLBACK (_profile_restriction_caps_cb), sgroup);
 
   /* 3.2. restriction elements */
   /* FIXME : Once we have properties for specific converters, use those */
@@ -1372,16 +1577,6 @@ splitter_encoding_failure:
   GST_ERROR_OBJECT (ebin, "Error linking splitter to encoding stream");
   goto cleanup;
 
-no_encoder:
-  GST_ERROR_OBJECT (ebin, "Couldn't create encoder for format %" GST_PTR_FORMAT,
-      format);
-  /* missing plugin support */
-  gst_element_post_message (GST_ELEMENT_CAST (ebin),
-      gst_missing_encoder_message_new (GST_ELEMENT_CAST (ebin), format));
-  GST_ELEMENT_ERROR (ebin, CORE, MISSING_PLUGIN, (NULL),
-      ("Couldn't create encoder for format %" GST_PTR_FORMAT, format));
-  goto cleanup;
-
 no_muxer_pad:
   GST_ERROR_OBJECT (ebin,
       "Couldn't find a compatible muxer pad to link encoder to");
@@ -1447,7 +1642,8 @@ cleanup:
     gst_caps_unref (format);
   if (restriction)
     gst_caps_unref (restriction);
-  g_slice_free (StreamGroup, sgroup);
+  stream_group_free (ebin, sgroup);
+  g_list_free (tosync);
   return NULL;
 }
 
@@ -1524,10 +1720,11 @@ _get_formatter (GstEncodeBin * ebin, GstEncodingProfile * sprof)
   GstElement *formatter = NULL;
   GstElementFactory *formatterfact = NULL;
   GstCaps *format;
-  const gchar *preset;
+  const gchar *preset, *preset_name;
 
   format = gst_encoding_profile_get_format (sprof);
   preset = gst_encoding_profile_get_preset (sprof);
+  preset_name = gst_encoding_profile_get_preset_name (sprof);
 
   GST_DEBUG ("Getting list of formatters for format %" GST_PTR_FORMAT, format);
 
@@ -1546,7 +1743,8 @@ _get_formatter (GstEncodeBin * ebin, GstEncodingProfile * sprof)
         GST_OBJECT_NAME (formatterfact));
 
     if ((formatter =
-            _create_element_and_set_preset (formatterfact, preset, NULL)))
+            _create_element_and_set_preset (formatterfact, preset,
+                NULL, preset_name)))
       break;
   }
 
@@ -1591,10 +1789,11 @@ _get_muxer (GstEncodeBin * ebin)
   GstElementFactory *muxerfact = NULL;
   const GList *tmp;
   GstCaps *format;
-  const gchar *preset;
+  const gchar *preset, *preset_name;
 
   format = gst_encoding_profile_get_format (ebin->profile);
   preset = gst_encoding_profile_get_preset (ebin->profile);
+  preset_name = gst_encoding_profile_get_preset_name (ebin->profile);
 
   GST_DEBUG ("Getting list of muxers for format %" GST_PTR_FORMAT, format);
 
@@ -1645,7 +1844,8 @@ _get_muxer (GstEncodeBin * ebin)
     /* Only use a muxer than can use all streams and than can accept the
      * preset (which may be present or not) */
     if (cansinkstreams && (muxer =
-            _create_element_and_set_preset (muxerfact, preset, "muxer")))
+            _create_element_and_set_preset (muxerfact, preset, "muxer",
+                preset_name)))
       break;
   }
 
@@ -1701,7 +1901,8 @@ create_elements_and_pads (GstEncodeBin * ebin)
       GST_DEBUG ("Trying stream profile with presence %d",
           gst_encoding_profile_get_presence (sprof));
 
-      if (gst_encoding_profile_get_presence (sprof) != 0) {
+      if (gst_encoding_profile_get_presence (sprof) != 0 &&
+          gst_encoding_profile_is_enabled (sprof)) {
         if (G_UNLIKELY (_create_stream_group (ebin, sprof, NULL, NULL) == NULL))
           goto stream_error;
       }
@@ -1778,7 +1979,7 @@ release_pads (const GValue * item, GstElement * elt)
   gst_element_release_request_pad (elt, pad);
 }
 
-static void inline
+static void
 stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup)
 {
   GList *tmp;
@@ -1787,21 +1988,27 @@ stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup)
 
   GST_DEBUG_OBJECT (ebin, "Freeing StreamGroup %p", sgroup);
 
-  if (ebin->muxer) {
-    /* outqueue - Muxer */
-    tmppad = gst_element_get_static_pad (sgroup->outqueue, "src");
-    pad = gst_pad_get_peer (tmppad);
+  if (sgroup->restriction_sid != 0)
+    g_signal_handler_disconnect (sgroup->profile, sgroup->restriction_sid);
 
-    /* Remove muxer request sink pad */
-    gst_pad_unlink (tmppad, pad);
-    if (GST_PAD_TEMPLATE_PRESENCE (GST_PAD_PAD_TEMPLATE (pad)) ==
-        GST_PAD_REQUEST)
-      gst_element_release_request_pad (ebin->muxer, pad);
-    gst_object_unref (tmppad);
-    gst_object_unref (pad);
-  }
-  if (sgroup->outqueue)
+  if (sgroup->outqueue) {
+    if (ebin->muxer) {
+      /* outqueue - Muxer */
+      tmppad = gst_element_get_static_pad (sgroup->outqueue, "src");
+      pad = gst_pad_get_peer (tmppad);
+
+      if (pad) {
+        /* Remove muxer request sink pad */
+        gst_pad_unlink (tmppad, pad);
+        if (GST_PAD_TEMPLATE_PRESENCE (GST_PAD_PAD_TEMPLATE (pad)) ==
+            GST_PAD_REQUEST)
+          gst_element_release_request_pad (ebin->muxer, pad);
+        gst_object_unref (pad);
+      }
+      gst_object_unref (tmppad);
+    }
     gst_element_set_state (sgroup->outqueue, GST_STATE_NULL);
+  }
 
   if (sgroup->formatter) {
     /* capsfilter - formatter - outqueue */
@@ -1809,13 +2016,16 @@ stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup)
     gst_element_set_state (sgroup->outfilter, GST_STATE_NULL);
     gst_element_unlink (sgroup->formatter, sgroup->outqueue);
     gst_element_unlink (sgroup->outfilter, sgroup->formatter);
-  } else {
+  } else if (sgroup->outfilter) {
     /* Capsfilter - outqueue */
     gst_element_set_state (sgroup->outfilter, GST_STATE_NULL);
     gst_element_unlink (sgroup->outfilter, sgroup->outqueue);
   }
-  gst_element_set_state (sgroup->outqueue, GST_STATE_NULL);
-  gst_bin_remove (GST_BIN (ebin), sgroup->outqueue);
+
+  if (sgroup->outqueue) {
+    gst_element_set_state (sgroup->outqueue, GST_STATE_NULL);
+    gst_bin_remove (GST_BIN (ebin), sgroup->outqueue);
+  }
 
   /* streamcombiner - parser - capsfilter */
   if (sgroup->parser) {
@@ -1826,22 +2036,38 @@ stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup)
   }
 
   /* Sink Ghostpad */
-  if (sgroup->ghostpad)
-    gst_element_remove_pad (GST_ELEMENT_CAST (ebin), sgroup->ghostpad);
+  if (sgroup->ghostpad) {
+    if (GST_PAD_PARENT (sgroup->ghostpad) != NULL)
+      gst_element_remove_pad (GST_ELEMENT_CAST (ebin), sgroup->ghostpad);
+    else
+      gst_object_unref (sgroup->ghostpad);
+  }
 
   if (sgroup->inqueue)
     gst_element_set_state (sgroup->inqueue, GST_STATE_NULL);
 
   if (sgroup->encoder)
     gst_element_set_state (sgroup->encoder, GST_STATE_NULL);
-  if (sgroup->outfilter)
+  if (sgroup->fakesink)
+    gst_element_set_state (sgroup->fakesink, GST_STATE_NULL);
+  if (sgroup->outfilter) {
     gst_element_set_state (sgroup->outfilter, GST_STATE_NULL);
+
+    if (sgroup->outputfilter_caps_sid) {
+      g_signal_handler_disconnect (sgroup->outfilter->sinkpads->data,
+          sgroup->outputfilter_caps_sid);
+      sgroup->outputfilter_caps_sid = 0;
+    }
+  }
   if (sgroup->smartencoder)
     gst_element_set_state (sgroup->smartencoder, GST_STATE_NULL);
 
   if (sgroup->capsfilter) {
     gst_element_set_state (sgroup->capsfilter, GST_STATE_NULL);
-    gst_element_unlink (sgroup->capsfilter, sgroup->encoder);
+    if (sgroup->encoder)
+      gst_element_unlink (sgroup->capsfilter, sgroup->encoder);
+    else
+      gst_element_unlink (sgroup->capsfilter, sgroup->fakesink);
     gst_bin_remove ((GstBin *) ebin, sgroup->capsfilter);
   }
 
@@ -1889,6 +2115,9 @@ stream_group_free (GstEncodeBin * ebin, StreamGroup * sgroup)
 
   if (sgroup->encoder)
     gst_bin_remove ((GstBin *) ebin, sgroup->encoder);
+
+  if (sgroup->fakesink)
+    gst_bin_remove ((GstBin *) ebin, sgroup->fakesink);
 
   if (sgroup->smartencoder)
     gst_bin_remove ((GstBin *) ebin, sgroup->smartencoder);
@@ -1941,16 +2170,16 @@ gst_encode_bin_setup_profile (GstEncodeBin * ebin, GstEncodingProfile * profile)
 
   g_return_val_if_fail (ebin->profile == NULL, FALSE);
 
-  GST_DEBUG ("Setting up profile %s (type:%s)",
+  GST_DEBUG ("Setting up profile %p:%s (type:%s)", profile,
       gst_encoding_profile_get_name (profile),
       gst_encoding_profile_get_type_nick (profile));
 
   ebin->profile = profile;
-  gst_mini_object_ref ((GstMiniObject *) ebin->profile);
+  gst_object_ref (ebin->profile);
 
   /* Create elements */
   res = create_elements_and_pads (ebin);
-  if (res == FALSE)
+  if (!res)
     gst_encode_bin_tear_down_profile (ebin);
 
   return res;
@@ -1961,7 +2190,7 @@ gst_encode_bin_set_profile (GstEncodeBin * ebin, GstEncodingProfile * profile)
 {
   g_return_val_if_fail (GST_IS_ENCODING_PROFILE (profile), FALSE);
 
-  GST_DEBUG_OBJECT (ebin, "profile : %s",
+  GST_DEBUG_OBJECT (ebin, "profile (%p) : %s", profile,
       gst_encoding_profile_get_name (profile));
 
   if (G_UNLIKELY (ebin->active)) {
@@ -1987,6 +2216,18 @@ gst_encode_bin_activate (GstEncodeBin * ebin)
 static void
 gst_encode_bin_deactivate (GstEncodeBin * ebin)
 {
+  GList *tmp;
+
+  for (tmp = ebin->streams; tmp; tmp = tmp->next) {
+    StreamGroup *sgroup = tmp->data;
+    GstCaps *format = gst_encoding_profile_get_format (sgroup->profile);
+
+    _set_group_caps_format (sgroup, sgroup->profile, format);
+
+    if (format)
+      gst_caps_unref (format);
+  }
+
   ebin->active = FALSE;
 }
 

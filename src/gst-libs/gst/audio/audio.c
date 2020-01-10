@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 /**
  * SECTION:gstaudio
@@ -32,14 +32,36 @@
 #include "audio.h"
 #include "audio-enumtypes.h"
 
+#ifndef GST_DISABLE_GST_DEBUG
+#define GST_CAT_DEFAULT ensure_debug_category()
+static GstDebugCategory *
+ensure_debug_category (void)
+{
+  static gsize cat_gonce = 0;
+
+  if (g_once_init_enter (&cat_gonce)) {
+    gsize cat_done;
+
+    cat_done = (gsize) _gst_debug_category_new ("audio", 0, "audio library");
+
+    g_once_init_leave (&cat_gonce, cat_done);
+  }
+
+  return (GstDebugCategory *) cat_gonce;
+}
+#else
+#define ensure_debug_category() /* NOOP */
+#endif /* GST_DISABLE_GST_DEBUG */
+
+
 /**
  * gst_audio_buffer_clip:
  * @buffer: (transfer full): The buffer to clip.
  * @segment: Segment in %GST_FORMAT_TIME or %GST_FORMAT_DEFAULT to which
  *           the buffer should be clipped.
  * @rate: sample rate.
- * @bpf: size of one audio frame in bytes. This is the size of one sample
- * * channels.
+ * @bpf: size of one audio frame in bytes. This is the size of one sample * 
+ * number of channels.
  *
  * Clip the buffer to the given %GstSegment.
  *
@@ -53,8 +75,8 @@
  * is not clipped
  */
 GstBuffer *
-gst_audio_buffer_clip (GstBuffer * buffer, GstSegment * segment, gint rate,
-    gint bpf)
+gst_audio_buffer_clip (GstBuffer * buffer, const GstSegment * segment,
+    gint rate, gint bpf)
 {
   GstBuffer *ret;
   GstClockTime timestamp = GST_CLOCK_TIME_NONE, duration = GST_CLOCK_TIME_NONE;
@@ -71,7 +93,7 @@ gst_audio_buffer_clip (GstBuffer * buffer, GstSegment * segment, gint rate,
     /* No timestamp - assume the buffer is completely in the segment */
     return buffer;
 
-  /* Get copies of the buffer metadata to change later. 
+  /* Get copies of the buffer metadata to change later.
    * Calculate the missing values for the calculations,
    * they won't be changed later though. */
 
@@ -185,8 +207,16 @@ gst_audio_buffer_clip (GstBuffer * buffer, GstSegment * segment, gint rate,
   }
 
   if (trim == 0 && size == osize) {
-    /* nothing changed */
     ret = buffer;
+
+    if (GST_BUFFER_TIMESTAMP (ret) != timestamp) {
+      ret = gst_buffer_make_writable (ret);
+      GST_BUFFER_TIMESTAMP (ret) = timestamp;
+    }
+    if (GST_BUFFER_DURATION (ret) != duration) {
+      ret = gst_buffer_make_writable (ret);
+      GST_BUFFER_DURATION (ret) = duration;
+    }
   } else {
     /* Get a writable buffer and apply all changes */
     GST_DEBUG ("trim %" G_GSIZE_FORMAT " size %" G_GSIZE_FORMAT, trim, size);
@@ -194,14 +224,18 @@ gst_audio_buffer_clip (GstBuffer * buffer, GstSegment * segment, gint rate,
     gst_buffer_unref (buffer);
 
     GST_DEBUG ("timestamp %" GST_TIME_FORMAT, GST_TIME_ARGS (timestamp));
-    GST_BUFFER_TIMESTAMP (ret) = timestamp;
+    if (ret) {
+      GST_BUFFER_TIMESTAMP (ret) = timestamp;
 
-    if (change_duration)
-      GST_BUFFER_DURATION (ret) = duration;
-    if (change_offset)
-      GST_BUFFER_OFFSET (ret) = offset;
-    if (change_offset_end)
-      GST_BUFFER_OFFSET_END (ret) = offset_end;
+      if (change_duration)
+        GST_BUFFER_DURATION (ret) = duration;
+      if (change_offset)
+        GST_BUFFER_OFFSET (ret) = offset;
+      if (change_offset_end)
+        GST_BUFFER_OFFSET_END (ret) = offset_end;
+    } else {
+      GST_ERROR ("copy_region failed");
+    }
   }
   return ret;
 }

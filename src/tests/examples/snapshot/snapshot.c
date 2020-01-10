@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #include <gst/gst.h>
@@ -104,6 +104,7 @@ main (int argc, char *argv[])
   /* get the preroll buffer from appsink, this block untils appsink really
    * prerolls */
   g_signal_emit_by_name (sink, "pull-preroll", &sample, NULL);
+  gst_object_unref (sink);
 
   /* if we have a buffer now, convert it to a pixbuf. It's possible that we
    * don't have a buffer because we went EOS right away or had an error. */

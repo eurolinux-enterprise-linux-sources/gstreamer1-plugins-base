@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -43,6 +43,24 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+
+#define GST_CAT_DEFAULT gst_tag_ensure_debug_category()
+
+static GstDebugCategory *
+gst_tag_ensure_debug_category (void)
+{
+  static gsize cat_gonce = 0;
+
+  if (g_once_init_enter (&cat_gonce)) {
+    GstDebugCategory *cat = NULL;
+
+    GST_DEBUG_CATEGORY_INIT (cat, "xmp-tags", 0, "XMP GstTag helper functions");
+
+    g_once_init_leave (&cat_gonce, (gsize) cat);
+  }
+
+  return (GstDebugCategory *) cat_gonce;
+}
 
 static const gchar *schema_list[] = {
   "dc",
@@ -1163,7 +1181,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
   gchar *xps, *xp1, *xp2, *xpe, *ns, *ne;
   gsize len, max_ft_len;
   gboolean in_tag;
-  gchar *part, *pp;
+  gchar *part = NULL, *pp;
   guint i;
   XmpTag *last_xmp_tag = NULL;
   GSList *pending_tags = NULL;
@@ -1219,7 +1237,6 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
   if (len < max_ft_len)
     goto missing_footer;
 
-  GST_DEBUG ("checking footer: [%s]", &xps[len - max_ft_len]);
   xp2 = g_strstr_len (&xps[len - max_ft_len], max_ft_len, "<?xpacket ");
   if (!xp2)
     goto missing_footer;
@@ -1231,7 +1248,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
   while (*xp1 != '<' && xp1 < xpe)
     xp1++;
 
-  /* no tag can be longer that the whole buffer */
+  /* no tag can be longer than the whole buffer */
   part = g_malloc (xp2 - xp1);
   list = gst_tag_list_new_empty ();
 
@@ -1296,6 +1313,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
                 }
                 if (ns_match[i].ns_prefix) {
                   if (strcmp (ns_map[i].original_ns, &as[6])) {
+                    g_free (ns_map[i].gstreamer_ns);
                     ns_map[i].gstreamer_ns = g_strdup (&as[6]);
                   }
                 }
@@ -1338,7 +1356,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
                   ptag->xmp_tag = xmp_tag;
                   ptag->str = g_strdup (v);
 
-                  pending_tags = g_slist_append (pending_tags, ptag);
+                  pending_tags = g_slist_prepend (pending_tags, ptag);
                 }
               }
               /* restore chars overwritten by '\0' */
@@ -1431,7 +1449,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
             ptag->xmp_tag = last_xmp_tag;
             ptag->str = g_strdup (part);
 
-            pending_tags = g_slist_append (pending_tags, ptag);
+            pending_tags = g_slist_prepend (pending_tags, ptag);
           }
         }
       }
@@ -1441,6 +1459,10 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
       pp = part;
     }
   }
+
+  pending_tags = g_slist_reverse (pending_tags);
+
+  GST_DEBUG ("Done accumulating tags, now handling them");
 
   while (pending_tags) {
     PendingXmpTag *ptag = (PendingXmpTag *) pending_tags->data;
@@ -1455,12 +1477,15 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
 
   GST_INFO ("xmp packet parsed, %d entries", gst_tag_list_n_tags (list));
 
+out:
+
   /* free resources */
   i = 0;
   while (ns_map[i].original_ns) {
     g_free (ns_map[i].gstreamer_ns);
     i++;
   }
+
   g_free (part);
 
   gst_buffer_unmap (buffer, &info);
@@ -1470,13 +1495,15 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
   /* Errors */
 missing_header:
   GST_WARNING ("malformed xmp packet header");
-  return NULL;
+  goto out;
 missing_footer:
   GST_WARNING ("malformed xmp packet footer");
-  return NULL;
+  goto out;
 broken_xml:
   GST_WARNING ("malformed xml tag: %s", part);
-  return NULL;
+  gst_tag_list_unref (list);
+  list = NULL;
+  goto out;
 }
 
 

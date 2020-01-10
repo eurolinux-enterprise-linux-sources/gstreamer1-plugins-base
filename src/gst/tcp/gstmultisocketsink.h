@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -43,8 +43,6 @@ G_BEGIN_DECLS
   (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_MULTI_SOCKET_SINK))
 #define GST_IS_MULTI_SOCKET_SINK_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MULTI_SOCKET_SINK))
-#define GST_MULTI_SOCKET_SINK_GET_CLASS(klass) \
-  (G_TYPE_INSTANCE_GET_CLASS ((klass), GST_TYPE_MULTI_SOCKET_SINK, GstMultiSocketSinkClass))
 
 
 typedef struct _GstMultiSocketSink GstMultiSocketSink;
@@ -56,6 +54,7 @@ typedef struct {
   GstMultiHandleClient client;
 
   GSource *source;
+  GIOCondition condition;
 } GstSocketClient;
 
 /**
@@ -69,6 +68,8 @@ struct _GstMultiSocketSink {
   /*< private >*/
   GMainContext *main_context;
   GCancellable *cancellable;
+  gboolean send_messages;
+  gboolean send_dispatched;
 };
 
 struct _GstMultiSocketSinkClass {

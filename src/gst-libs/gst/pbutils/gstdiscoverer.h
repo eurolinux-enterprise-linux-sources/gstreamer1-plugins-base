@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef _GST_DISCOVERER_H_
@@ -62,6 +62,7 @@ GstDiscovererStreamInfo* gst_discoverer_stream_info_get_next(GstDiscovererStream
 GstCaps*                 gst_discoverer_stream_info_get_caps(GstDiscovererStreamInfo* info);
 const GstTagList*        gst_discoverer_stream_info_get_tags(GstDiscovererStreamInfo* info);
 const GstToc*            gst_discoverer_stream_info_get_toc(GstDiscovererStreamInfo* info);
+const gchar*             gst_discoverer_stream_info_get_stream_id(GstDiscovererStreamInfo* info);
 const GstStructure*      gst_discoverer_stream_info_get_misc(GstDiscovererStreamInfo* info);
 const gchar *            gst_discoverer_stream_info_get_stream_type_nick(GstDiscovererStreamInfo* info);
 
@@ -172,6 +173,29 @@ typedef enum {
   GST_DISCOVERER_MISSING_PLUGINS  = 5
 } GstDiscovererResult;
 
+/**
+ * GstDiscovererSerializeFlags:
+ * @GST_DISCOVERER_SERIALIZE_BASIC: Serialize only basic information, excluding
+ * caps, tags and miscellaneous information
+ * @GST_DISCOVERER_SERIALIZE_CAPS: Serialize the caps for each stream
+ * @GST_DISCOVERER_SERIALIZE_TAGS: Serialize the tags for each stream
+ * @GST_DISCOVERER_SERIALIZE_MISC: Serialize miscellaneous information for each stream
+ * @GST_DISCOVERER_SERIALIZE_ALL: Serialize all the available info, including
+ * caps, tags and miscellaneous information
+ *
+ * You can use these flags to control what is serialized by
+ * gst_discoverer_info_to_variant()
+ *
+ * Since: 1.6
+ */
+
+typedef enum {
+  GST_DISCOVERER_SERIALIZE_BASIC = 0,
+  GST_DISCOVERER_SERIALIZE_CAPS  = 1 << 0,
+  GST_DISCOVERER_SERIALIZE_TAGS  = 1 << 1,
+  GST_DISCOVERER_SERIALIZE_MISC  = 1 << 2,
+  GST_DISCOVERER_SERIALIZE_ALL   = GST_DISCOVERER_SERIALIZE_CAPS | GST_DISCOVERER_SERIALIZE_TAGS | GST_DISCOVERER_SERIALIZE_MISC
+} GstDiscovererSerializeFlags;
 
 /**
  * GstDiscovererInfo:
@@ -190,7 +214,7 @@ typedef GObjectClass GstDiscovererInfoClass;
 GType gst_discoverer_info_get_type (void);
 
 #define gst_discoverer_info_unref(info) (g_object_unref((GObject*)info))
-#define gst_discoverer_info_ref(info) (g_object_ref((Gbject*)info))
+#define gst_discoverer_info_ref(info) (g_object_ref((GObject*)info))
 
 GstDiscovererInfo*        gst_discoverer_info_copy (GstDiscovererInfo * ptr);
 
@@ -203,6 +227,7 @@ gboolean                  gst_discoverer_info_get_seekable(const GstDiscovererIn
 const GstStructure*       gst_discoverer_info_get_misc(const GstDiscovererInfo* info);
 const GstTagList*         gst_discoverer_info_get_tags(const GstDiscovererInfo* info); 
 const GstToc*             gst_discoverer_info_get_toc(const GstDiscovererInfo* info);
+const gchar**             gst_discoverer_info_get_missing_elements_installer_details(const GstDiscovererInfo* info);
 
 GList *                   gst_discoverer_info_get_streams (GstDiscovererInfo *info,
 							   GType streamtype);
@@ -210,6 +235,10 @@ GList *                   gst_discoverer_info_get_audio_streams (GstDiscovererIn
 GList *                   gst_discoverer_info_get_video_streams (GstDiscovererInfo *info);
 GList *                   gst_discoverer_info_get_subtitle_streams (GstDiscovererInfo *info);
 GList *                   gst_discoverer_info_get_container_streams (GstDiscovererInfo *info);
+
+GVariant *                gst_discoverer_info_to_variant (GstDiscovererInfo *info,
+                                                          GstDiscovererSerializeFlags flags);
+GstDiscovererInfo *       gst_discoverer_info_from_variant (GVariant *variant);
 
 void                      gst_discoverer_stream_info_list_free (GList *infos);
 
@@ -271,6 +300,34 @@ GstDiscovererInfo *
 gst_discoverer_discover_uri (GstDiscoverer * discoverer,
 			     const gchar * uri,
 			     GError ** err);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscoverer, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererAudioInfo, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererContainerInfo, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererInfo, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererStreamInfo, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererSubtitleInfo, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstDiscovererVideoInfo, gst_object_unref)
+#endif
 
 G_END_DECLS
 

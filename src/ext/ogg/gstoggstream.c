@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -27,6 +27,7 @@
 #include "vorbis_parse.h"
 
 #include <gst/riff/riff-media.h>
+#include <gst/pbutils/pbutils.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,8 @@ typedef struct _GstOggMap GstOggMap;
 
 typedef gboolean (*GstOggMapSetupFunc) (GstOggStream * pad,
     ogg_packet * packet);
+typedef gboolean (*GstOggMapSetupFromCapsFunc) (GstOggStream * pad,
+    const GstCaps * caps);
 typedef GstClockTime (*GstOggMapToTimeFunc) (GstOggStream * pad,
     gint64 granulepos);
 typedef gint64 (*GstOggMapToGranuleFunc) (GstOggStream * pad,
@@ -65,6 +68,10 @@ typedef void (*GstOggMapExtractTagsFunc) (GstOggStream * pad,
 typedef gint64 (*GstOggMapGranuleposToKeyGranuleFunc) (GstOggStream * pad,
     gint64 granulepos);
 
+typedef GstBuffer *(*GstOggMapGetHeadersFunc) (GstOggStream * pad);
+typedef void (*GstOggMapUpdateStatsFunc) (GstOggStream * pad,
+    ogg_packet * packet);
+
 #define SKELETON_FISBONE_MIN_SIZE  52
 #define SKELETON_FISHEAD_3_3_MIN_SIZE 112
 #define SKELETON_FISHEAD_4_0_MIN_SIZE 80
@@ -76,6 +83,7 @@ struct _GstOggMap
   int min_packet_size;
   const gchar *media_type;
   GstOggMapSetupFunc setup_func;
+  GstOggMapSetupFromCapsFunc setup_from_caps_func;
   GstOggMapToGranuleFunc granulepos_to_granule_func;
   GstOggMapToGranuleposFunc granule_to_granulepos_func;
   GstOggMapIsGranuleposKeyFrameFunc is_granulepos_key_frame_func;
@@ -84,6 +92,8 @@ struct _GstOggMap
   GstOggMapPacketDurationFunc packet_duration_func;
   GstOggMapGranuleposToKeyGranuleFunc granulepos_to_key_granule_func;
   GstOggMapExtractTagsFunc extract_tags_func;
+  GstOggMapGetHeadersFunc get_headers_func;
+  GstOggMapUpdateStatsFunc update_stats_func;
 };
 
 extern const GstOggMap mappers[];
@@ -262,6 +272,24 @@ gst_ogg_stream_get_media_type (GstOggStream * pad)
   if (!structure)
     return NULL;
   return gst_structure_get_name (structure);
+}
+
+GstBuffer *
+gst_ogg_stream_get_headers (GstOggStream * pad)
+{
+  if (!mappers[pad->map].get_headers_func)
+    return NULL;
+
+  return mappers[pad->map].get_headers_func (pad);
+}
+
+void
+gst_ogg_stream_update_stats (GstOggStream * pad, ogg_packet * packet)
+{
+  if (!mappers[pad->map].get_headers_func)
+    return;
+
+  return mappers[pad->map].update_stats_func (pad, packet);
 }
 
 /* some generic functions */
@@ -470,7 +498,7 @@ is_granulepos_keyframe_theora (GstOggStream * pad, gint64 granulepos)
   if (granulepos == (gint64) - 1)
     return FALSE;
 
-  frame_mask = (1 << pad->granuleshift) - 1;
+  frame_mask = (G_GUINT64_CONSTANT (1) << pad->granuleshift) - 1;
 
   return ((granulepos & frame_mask) == 0);
 }
@@ -499,6 +527,9 @@ extract_tags_theora (GstOggStream * pad, ogg_packet * packet)
     if (!pad->taglist)
       pad->taglist = gst_tag_list_new_empty ();
 
+    gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+        GST_TAG_VIDEO_CODEC, "Theora", NULL);
+
     if (pad->bitrate)
       gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
           GST_TAG_BITRATE, (guint) pad->bitrate, NULL);
@@ -513,7 +544,7 @@ setup_dirac_mapper (GstOggStream * pad, ogg_packet * packet)
   int ret;
   DiracSequenceHeader header;
 
-  ret = dirac_sequence_header_parse (&header, packet->packet + 13,
+  ret = gst_dirac_sequence_header_parse (&header, packet->packet + 13,
       packet->bytes - 13);
   if (ret == 0) {
     GST_DEBUG ("Failed to parse Dirac sequence header");
@@ -647,6 +678,50 @@ setup_vp8_mapper (GstOggStream * pad, ogg_packet * packet)
 }
 
 static gboolean
+vp8_fill_header (GstOggStream * pad, const GstCaps * caps, guint8 * data)
+{
+  gint width, height, par_n, par_d, fps_n, fps_d;
+  GstStructure *structure = gst_caps_get_structure (caps, 0);
+
+  if (!(gst_structure_get_int (structure, "width", &width) &&
+          gst_structure_get_int (structure, "height", &height) &&
+          gst_structure_get_fraction (structure, "framerate", &fps_n,
+              &fps_d))) {
+    GST_DEBUG ("Failed to get width, height or framerate from caps %"
+        GST_PTR_FORMAT, caps);
+    return FALSE;
+  }
+  if (!gst_structure_get_fraction (structure, "pixel-aspect-ratio", &par_n,
+          &par_d)) {
+    par_n = par_d = 1;
+  }
+
+  memcpy (data, "OVP80\1\1", 8);
+  GST_WRITE_UINT16_BE (data + 8, width);
+  GST_WRITE_UINT16_BE (data + 10, height);
+  GST_WRITE_UINT24_BE (data + 12, par_n);
+  GST_WRITE_UINT24_BE (data + 15, par_d);
+  GST_WRITE_UINT32_BE (data + 18, fps_n);
+  GST_WRITE_UINT32_BE (data + 22, fps_d);
+
+  return TRUE;
+}
+
+static gboolean
+setup_vp8_mapper_from_caps (GstOggStream * pad, const GstCaps * caps)
+{
+  guint8 data[26];
+  ogg_packet packet;
+
+  if (!vp8_fill_header (pad, caps, data))
+    return FALSE;
+
+  packet.packet = data;
+  packet.bytes = 26;
+  return setup_vp8_mapper (pad, &packet);
+}
+
+static gboolean
 is_keyframe_vp8 (GstOggStream * pad, gint64 granulepos)
 {
   guint64 gpos = granulepos;
@@ -679,11 +754,14 @@ static gint64
 granule_to_granulepos_vp8 (GstOggStream * pad, gint64 granule,
     gint64 keyframe_granule)
 {
-  /* FIXME: This requires to look into the content of the packets
-   * because the simple granule counter doesn't know about invisible
-   * frames...
-   */
-  return -1;
+  guint inv;
+  gint64 granulepos;
+
+  inv = (pad->invisible_count <= 0) ? 0x3 : pad->invisible_count - 1;
+
+  granulepos =
+      (granule << 32) | (inv << 30) | ((granule - keyframe_granule) << 3);
+  return granulepos;
 }
 
 /* Check if this packet contains an invisible frame or not */
@@ -732,6 +810,33 @@ extract_tags_vp8 (GstOggStream * pad, ogg_packet * packet)
   if (packet->bytes >= 7 && memcmp (packet->packet, "OVP80\2 ", 7) == 0) {
     tag_list_from_vorbiscomment_packet (packet,
         (const guint8 *) "OVP80\2 ", 7, &pad->taglist);
+
+    gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+        GST_TAG_VIDEO_CODEC, "VP8", NULL);
+  }
+}
+
+static GstBuffer *
+get_headers_vp8 (GstOggStream * pad)
+{
+  guint8 *data = g_malloc (26);
+
+  if (vp8_fill_header (pad, pad->caps, data)) {
+    return gst_buffer_new_wrapped (data, 26);
+  }
+  g_free (data);
+  return NULL;
+}
+
+static void
+update_stats_vp8 (GstOggStream * pad, ogg_packet * packet)
+{
+  if (packet_duration_vp8 (pad, packet)) {
+    /* set to -1 as when we get thefirst invisible it should be
+     * set to 0 */
+    pad->invisible_count = -1;
+  } else {
+    pad->invisible_count++;
   }
 }
 
@@ -778,7 +883,7 @@ setup_vorbis_mapper (GstOggStream * pad, ogg_packet * packet)
   if (pad->granulerate_n == 0)
     return FALSE;
 
-  parse_vorbis_header_packet (pad, packet);
+  gst_parse_vorbis_header_packet (pad, packet);
 
   pad->caps = gst_caps_new_simple ("audio/x-vorbis",
       "rate", G_TYPE_INT, pad->granulerate_n, "channels", G_TYPE_INT, chans,
@@ -794,7 +899,7 @@ is_header_vorbis (GstOggStream * pad, ogg_packet * packet)
     return FALSE;
 
   if (packet->packet[0] == 5) {
-    parse_vorbis_setup_packet (pad, packet);
+    gst_parse_vorbis_setup_packet (pad, packet);
   }
 
   return TRUE;
@@ -814,7 +919,8 @@ extract_tags_vorbis (GstOggStream * pad, ogg_packet * packet)
       pad->taglist = gst_tag_list_new_empty ();
 
     gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
-        GST_TAG_ENCODER_VERSION, pad->version, NULL);
+        GST_TAG_ENCODER_VERSION, pad->version,
+        GST_TAG_AUDIO_CODEC, "Vorbis", NULL);
 
     if (pad->bitrate_nominal > 0)
       gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
@@ -904,6 +1010,16 @@ extract_tags_count (GstOggStream * pad, ogg_packet * packet)
     if (!pad->taglist)
       pad->taglist = gst_tag_list_new_empty ();
 
+    if (pad->is_video) {
+      gst_pb_utils_add_codec_description_to_tag_list (pad->taglist,
+          GST_TAG_VIDEO_CODEC, pad->caps);
+    } else if (!pad->is_sparse && !pad->is_ogm_text && !pad->is_ogm) {
+      gst_pb_utils_add_codec_description_to_tag_list (pad->taglist,
+          GST_TAG_AUDIO_CODEC, pad->caps);
+    } else {
+      GST_FIXME ("not adding codec tag, not sure about codec type");
+    }
+
     if (pad->bitrate)
       gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
           GST_TAG_BITRATE, (guint) pad->bitrate, NULL);
@@ -989,7 +1105,7 @@ packet_duration_flac (GstOggStream * pad, ogg_packet * packet)
     return 576 << (block_size_index - 2);
   }
   if (block_size_index >= 8) {
-    return 256 << (block_size_index - 8);
+    return G_GUINT64_CONSTANT (256) << (block_size_index - 8);
   }
   if (block_size_index == 6 || block_size_index == 7) {
     guint len, bytes = (block_size_index - 6) + 1;
@@ -1025,6 +1141,9 @@ extract_tags_flac (GstOggStream * pad, ogg_packet * packet)
   if (packet->bytes > 4 && ((packet->packet[0] & 0x7F) == 0x4)) {
     tag_list_from_vorbiscomment_packet (packet,
         packet->packet, 4, &pad->taglist);
+
+    gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+        GST_TAG_AUDIO_CODEC, "FLAC", NULL);
   }
 }
 
@@ -1387,6 +1506,9 @@ gst_ogg_map_search_index (GstOggStream * pad, gboolean before,
   guint64 ts;
   GstOggIndex *best;
 
+  g_return_val_if_fail (timestamp != NULL, FALSE);
+  g_return_val_if_fail (offset != NULL, FALSE);
+
   n_index = pad->n_index;
   if (n_index == 0 || pad->index == NULL)
     return FALSE;
@@ -1404,11 +1526,9 @@ gst_ogg_map_search_index (GstOggStream * pad, gboolean before,
 
   GST_INFO ("found at index %u", (guint) (best - pad->index));
 
-  if (offset)
-    *offset = best->offset;
-  if (timestamp)
-    *timestamp =
-        gst_util_uint64_scale (best->timestamp, GST_SECOND, pad->kp_denom);
+  *offset = best->offset;
+  *timestamp =
+      gst_util_uint64_scale (best->timestamp, GST_SECOND, pad->kp_denom);
 
   return TRUE;
 }
@@ -1846,6 +1966,11 @@ extract_tags_kate (GstOggStream * pad, ogg_packet * packet)
     case 0x81:
       tag_list_from_vorbiscomment_packet (packet,
           (const guint8 *) "\201kate\0\0\0\0", 9, &list);
+
+      if (list != NULL) {
+        gst_tag_list_add (list, GST_TAG_MERGE_REPLACE,
+            GST_TAG_SUBTITLE_CODEC, "Kate", NULL);
+      }
       break;
     default:
       break;
@@ -1867,6 +1992,8 @@ extract_tags_kate (GstOggStream * pad, ogg_packet * packet)
 static gboolean
 setup_opus_mapper (GstOggStream * pad, ogg_packet * packet)
 {
+  GstBuffer *buffer;
+
   if (packet->bytes < 19)
     return FALSE;
 
@@ -1875,14 +2002,18 @@ setup_opus_mapper (GstOggStream * pad, ogg_packet * packet)
   pad->granuleshift = 0;
   pad->n_header_packets = 2;
   pad->first_granpos = -1;
-  pad->forbid_start_clamping = TRUE;
+  pad->audio_clipping = TRUE;
 
   /* pre-skip is in samples at 48000 Hz, which matches granule one for one */
   pad->granule_offset = -GST_READ_UINT16_LE (packet->packet + 10);
   GST_INFO ("Opus has a pre-skip of %" G_GINT64_FORMAT " samples",
       -pad->granule_offset);
 
-  pad->caps = gst_caps_new_empty_simple ("audio/x-opus");
+  buffer =
+      gst_buffer_new_wrapped (g_memdup (packet->packet, packet->bytes),
+      packet->bytes);
+  pad->caps = gst_codec_utils_opus_create_caps_from_header (buffer, NULL);
+  gst_buffer_unref (buffer);
 
   return TRUE;
 }
@@ -1981,9 +2112,132 @@ extract_tags_opus (GstOggStream * pad, ogg_packet * packet)
   if (packet->bytes >= 8 && memcmp (packet->packet, "OpusTags", 8) == 0) {
     tag_list_from_vorbiscomment_packet (packet,
         (const guint8 *) "OpusTags", 8, &pad->taglist);
+
+    gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+        GST_TAG_AUDIO_CODEC, "Opus", NULL);
   }
 }
 
+/* daala */
+
+static gboolean
+setup_daala_mapper (GstOggStream * pad, ogg_packet * packet)
+{
+  guint8 *data = packet->packet;
+  guint w, h, par_d, par_n;
+  guint8 vmaj, vmin, vrev;
+  guint frame_duration;
+
+  vmaj = data[6];
+  vmin = data[7];
+  vrev = data[8];
+
+  GST_LOG ("daala %d.%d.%d", vmaj, vmin, vrev);
+
+  w = GST_READ_UINT32_LE (data + 9);
+  h = GST_READ_UINT32_LE (data + 13);
+
+  par_n = GST_READ_UINT32_LE (data + 17);
+  par_d = GST_READ_UINT32_LE (data + 21);
+
+  pad->granulerate_n = GST_READ_UINT32_LE (data + 25);
+  pad->granulerate_d = GST_READ_UINT32_LE (data + 29);
+  frame_duration = GST_READ_UINT32_LE (data + 33);
+
+  GST_LOG ("fps = %d/%d, dur %d, PAR = %u/%u, width = %u, height = %u",
+      pad->granulerate_n, pad->granulerate_d, frame_duration, par_n, par_d, w,
+      h);
+
+  pad->granuleshift = GST_READ_UINT8 (data + 37);
+  GST_LOG ("granshift: %d", pad->granuleshift);
+
+  pad->is_video = TRUE;
+  pad->n_header_packets = 3;
+  pad->frame_size = 1;
+
+  if (pad->granulerate_n == 0 || pad->granulerate_d == 0) {
+    GST_WARNING ("frame rate %d/%d", pad->granulerate_n, pad->granulerate_d);
+    return FALSE;
+  }
+
+  pad->caps = gst_caps_new_empty_simple ("video/x-daala");
+
+  if (w > 0 && h > 0) {
+    gst_caps_set_simple (pad->caps, "width", G_TYPE_INT, w, "height",
+        G_TYPE_INT, h, NULL);
+  }
+
+  /* PAR of 0:N, N:0 and 0:0 is allowed and maps to 1:1 */
+  if (par_n == 0 || par_d == 0)
+    par_n = par_d = 1;
+
+  /* only add framerate now so caps look prettier, with width/height first */
+  gst_caps_set_simple (pad->caps, "framerate", GST_TYPE_FRACTION,
+      pad->granulerate_n, pad->granulerate_d, "pixel-aspect-ratio",
+      GST_TYPE_FRACTION, par_n, par_d, NULL);
+
+  return TRUE;
+}
+
+static gint64
+granulepos_to_granule_daala (GstOggStream * pad, gint64 granulepos)
+{
+  gint64 keyindex, keyoffset;
+
+  if (pad->granuleshift != 0) {
+    keyindex = granulepos >> pad->granuleshift;
+    keyoffset = granulepos - (keyindex << pad->granuleshift);
+    return keyindex + keyoffset;
+  } else {
+    return granulepos;
+  }
+}
+
+static gboolean
+is_granulepos_keyframe_daala (GstOggStream * pad, gint64 granulepos)
+{
+  gint64 frame_mask;
+
+  if (granulepos == (gint64) - 1)
+    return FALSE;
+
+  frame_mask = (G_GUINT64_CONSTANT (1) << pad->granuleshift) - 1;
+
+  return ((granulepos & frame_mask) == 0);
+}
+
+static gboolean
+is_packet_keyframe_daala (GstOggStream * pad, ogg_packet * packet)
+{
+  if (packet->bytes == 0)
+    return FALSE;
+  return (packet->packet[0] & 0x40);
+}
+
+static gboolean
+is_header_daala (GstOggStream * pad, ogg_packet * packet)
+{
+  return (packet->bytes > 0 && (packet->packet[0] & 0x80) == 0x80);
+}
+
+static void
+extract_tags_daala (GstOggStream * pad, ogg_packet * packet)
+{
+  if (packet->bytes > 0 && packet->packet[0] == 0x81) {
+    tag_list_from_vorbiscomment_packet (packet,
+        (const guint8 *) "\201daala", 5, &pad->taglist);
+
+    if (!pad->taglist)
+      pad->taglist = gst_tag_list_new_empty ();
+
+    gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+        GST_TAG_VIDEO_CODEC, "Daala", NULL);
+
+    if (pad->bitrate)
+      gst_tag_list_add (pad->taglist, GST_TAG_MERGE_REPLACE,
+          GST_TAG_BITRATE, (guint) pad->bitrate, NULL);
+  }
+}
 
 /* *INDENT-OFF* */
 /* indent hates our freedoms */
@@ -1992,6 +2246,7 @@ const GstOggMap mappers[] = {
     "\200theora", 7, 42,
     "video/x-theora",
     setup_theora_mapper,
+    NULL,
     granulepos_to_granule_theora,
     granule_to_granulepos_default,
     is_granulepos_keyframe_theora,
@@ -1999,12 +2254,15 @@ const GstOggMap mappers[] = {
     is_header_theora,
     packet_duration_constant,
     NULL,
-    extract_tags_theora
+    extract_tags_theora,
+    NULL,
+    NULL
   },
   {
     "\001vorbis", 7, 22,
     "audio/x-vorbis",
     setup_vorbis_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
@@ -2012,12 +2270,15 @@ const GstOggMap mappers[] = {
     is_header_vorbis,
     packet_duration_vorbis,
     NULL,
-    extract_tags_vorbis
+    extract_tags_vorbis,
+    NULL,
+    NULL
   },
   {
     "Speex", 5, 80,
     "audio/x-speex",
     setup_speex_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
@@ -2025,7 +2286,9 @@ const GstOggMap mappers[] = {
     is_header_count,
     packet_duration_constant,
     NULL,
-    extract_tags_count
+    extract_tags_count,
+    NULL,
+    NULL
   },
   {
     "PCM     ", 8, 0,
@@ -2035,7 +2298,10 @@ const GstOggMap mappers[] = {
     NULL,
     NULL,
     NULL,
+    NULL,
     is_header_count,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL
@@ -2048,7 +2314,10 @@ const GstOggMap mappers[] = {
     NULL,
     NULL,
     NULL,
+    NULL,
     is_header_count,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL
@@ -2057,11 +2326,14 @@ const GstOggMap mappers[] = {
     "Annodex", 7, 0,
     "application/x-annodex",
     setup_fishead_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     NULL,
     NULL,
     is_header_count,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL
@@ -2074,7 +2346,10 @@ const GstOggMap mappers[] = {
     NULL,
     NULL,
     NULL,
+    NULL,
     is_header_true,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL
@@ -2083,6 +2358,7 @@ const GstOggMap mappers[] = {
     "fLaC", 4, 0,
     "audio/x-flac",
     setup_fLaC_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
@@ -2090,12 +2366,15 @@ const GstOggMap mappers[] = {
     is_header_fLaC,
     packet_duration_flac,
     NULL,
+    NULL,
+    NULL,
     NULL
   },
   {
     "\177FLAC", 5, 36,
     "audio/x-flac",
     setup_flac_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
@@ -2103,11 +2382,16 @@ const GstOggMap mappers[] = {
     is_header_flac,
     packet_duration_flac,
     NULL,
-    extract_tags_flac
+    extract_tags_flac,
+    NULL,
+    NULL
   },
   {
     "AnxData", 7, 0,
     "application/octet-stream",
+    NULL,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL,
@@ -2121,6 +2405,7 @@ const GstOggMap mappers[] = {
     "CELT    ", 8, 0,
     "audio/x-celt",
     setup_celt_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     NULL,
@@ -2128,12 +2413,15 @@ const GstOggMap mappers[] = {
     is_header_count,
     packet_duration_constant,
     NULL,
-    extract_tags_count
+    extract_tags_count,
+    NULL,
+    NULL
   },
   {
     "\200kate\0\0\0", 8, 0,
     "text/x-kate",
     setup_kate_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     NULL,
@@ -2141,12 +2429,15 @@ const GstOggMap mappers[] = {
     is_header_count,
     packet_duration_kate,
     NULL,
-    extract_tags_kate
+    extract_tags_kate,
+    NULL,
+    NULL
   },
   {
     "BBCD\0", 5, 13,
     "video/x-dirac",
     setup_dirac_mapper,
+    NULL,
     granulepos_to_granule_dirac,
     granule_to_granulepos_dirac,
     is_keyframe_dirac,
@@ -2154,12 +2445,15 @@ const GstOggMap mappers[] = {
     is_header_count,
     packet_duration_constant,
     granulepos_to_key_granule_dirac,
+    NULL,
+    NULL,
     NULL
   },
   {
     "OVP80\1\1", 7, 4,
     "video/x-vp8",
     setup_vp8_mapper,
+    setup_vp8_mapper_from_caps,
     granulepos_to_granule_vp8,
     granule_to_granulepos_vp8,
     is_keyframe_vp8,
@@ -2167,31 +2461,39 @@ const GstOggMap mappers[] = {
     is_header_vp8,
     packet_duration_vp8,
     granulepos_to_key_granule_vp8,
-    extract_tags_vp8
+    extract_tags_vp8,
+    get_headers_vp8,
+    update_stats_vp8
   },
   {
     "OpusHead", 8, 0,
     "audio/x-opus",
     setup_opus_mapper,
+    NULL,
     granulepos_to_granule_opus,
     granule_to_granulepos_default,
     NULL,
-    NULL,
+    is_packet_keyframe_true,
     is_header_opus,
     packet_duration_opus,
     NULL,
-    extract_tags_opus
+    extract_tags_opus,
+    NULL,
+    NULL
   },
   {
     "\001audio\0\0\0", 9, 53,
     "application/x-ogm-audio",
     setup_ogmaudio_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
     is_packet_keyframe_true,
     is_header_ogm,
     packet_duration_ogm,
+    NULL,
+    NULL,
     NULL,
     NULL
   },
@@ -2199,6 +2501,7 @@ const GstOggMap mappers[] = {
     "\001video\0\0\0", 9, 53,
     "application/x-ogm-video",
     setup_ogmvideo_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     NULL,
@@ -2206,12 +2509,15 @@ const GstOggMap mappers[] = {
     is_header_ogm,
     packet_duration_constant,
     NULL,
+    NULL,
+    NULL,
     NULL
   },
   {
     "\001text\0\0\0", 9, 9,
     "application/x-ogm-text",
     setup_ogmtext_mapper,
+    NULL,
     granulepos_to_granule_default,
     granule_to_granulepos_default,
     is_granulepos_keyframe_true,
@@ -2219,8 +2525,27 @@ const GstOggMap mappers[] = {
     is_header_ogm,
     packet_duration_ogm,
     NULL,
-    extract_tags_ogm
-  }
+    extract_tags_ogm,
+    NULL,
+    NULL
+  },
+  {
+    "\200daala", 6, 42,
+    "video/x-daala",
+    setup_daala_mapper,
+    NULL,
+    granulepos_to_granule_daala,
+    granule_to_granulepos_default,
+    is_granulepos_keyframe_daala,
+    is_packet_keyframe_daala,
+    is_header_daala,
+    packet_duration_constant,
+    NULL,
+    extract_tags_daala,
+    NULL,
+    NULL
+  },
+ 
 };
 /* *INDENT-ON* */
 
@@ -2249,6 +2574,42 @@ gst_ogg_stream_setup_map (GstOggStream * pad, ogg_packet * packet)
       } else {
         GST_WARNING ("mapper '%s' did not accept setup header",
             mappers[i].media_type);
+      }
+    }
+  }
+
+  return FALSE;
+}
+
+gboolean
+gst_ogg_stream_setup_map_from_caps (GstOggStream * pad, const GstCaps * caps)
+{
+  int i;
+  gboolean ret;
+  GstStructure *structure;
+
+  g_return_val_if_fail (caps != NULL, FALSE);
+
+  structure = gst_caps_get_structure (caps, 0);
+
+  for (i = 0; i < G_N_ELEMENTS (mappers); i++) {
+    if (mappers[i].setup_from_caps_func &&
+        gst_structure_has_name (structure, mappers[i].media_type)) {
+
+      GST_DEBUG ("found mapper for '%s'", mappers[i].id);
+
+      if (mappers[i].setup_from_caps_func)
+        ret = mappers[i].setup_from_caps_func (pad, caps);
+      else
+        continue;
+
+      if (ret) {
+        GST_DEBUG ("got stream type %" GST_PTR_FORMAT, pad->caps);
+        pad->map = i;
+        return TRUE;
+      } else {
+        GST_WARNING ("mapper '%s' did not accept caps %" GST_PTR_FORMAT,
+            mappers[i].media_type, caps);
       }
     }
   }

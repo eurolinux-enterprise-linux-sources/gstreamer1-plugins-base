@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -235,7 +235,8 @@ gst_riff_parse_file_header (GstElement * element,
     goto too_small;
 
   tag = GST_READ_UINT32_LE (info.data);
-  if (tag != GST_RIFF_TAG_RIFF && tag != GST_RIFF_TAG_AVF0)
+  if (tag != GST_RIFF_TAG_RIFF && tag != GST_RIFF_TAG_AVF0
+      && tag != GST_RIFF_TAG_RF64)
     goto not_riff;
 
   *doctype = GST_READ_UINT32_LE (info.data + 8);
@@ -258,8 +259,7 @@ too_small:
 not_riff:
   {
     GST_ELEMENT_ERROR (element, STREAM, WRONG_TYPE, (NULL),
-        ("Stream is no RIFF stream: %" GST_FOURCC_FORMAT,
-            GST_FOURCC_ARGS (tag)));
+        ("Stream is no RIFF stream: 0x%" G_GINT32_MODIFIER "x", tag));
     gst_buffer_unmap (buf, &info);
     gst_buffer_unref (buf);
     return FALSE;
@@ -501,7 +501,7 @@ gst_riff_parse_strf_auds (GstElement * element,
     len = GST_READ_UINT16_LE (&info.data[16]);
     if (len + 2 + sizeof (gst_riff_strf_auds) > info.size) {
       GST_WARNING_OBJECT (element,
-          "Extradata indicated %d bytes, but only %" G_GSSIZE_FORMAT
+          "Extradata indicated %d bytes, but only %" G_GSIZE_FORMAT
           " available", len, info.size - 2 - sizeof (gst_riff_strf_auds));
       len = info.size - 2 - sizeof (gst_riff_strf_auds);
     }
@@ -534,7 +534,7 @@ too_small:
   {
     GST_ERROR_OBJECT (element,
         "Too small strf_auds (%" G_GSIZE_FORMAT " available"
-        ", %" G_GSSIZE_FORMAT " needed)", info.size,
+        ", %" G_GSIZE_FORMAT " needed)", info.size,
         sizeof (gst_riff_strf_auds));
     gst_buffer_unmap (buf, &info);
     gst_buffer_unref (buf);
@@ -611,11 +611,45 @@ too_small:
   {
     GST_ERROR_OBJECT (element,
         "Too small strf_iavs (%" G_GSIZE_FORMAT "available"
-        ", %" G_GSSIZE_FORMAT " needed)", info.size,
+        ", %" G_GSIZE_FORMAT " needed)", info.size,
         sizeof (gst_riff_strf_iavs));
     gst_buffer_unmap (buf, &info);
     gst_buffer_unref (buf);
     return FALSE;
+  }
+}
+
+static void
+parse_tag_value (GstElement * element, GstTagList * taglist, const gchar * type,
+    guint8 * ptr, guint tsize)
+{
+  static const gchar *env_vars[] = { "GST_AVI_TAG_ENCODING",
+    "GST_RIFF_TAG_ENCODING", "GST_TAG_ENCODING", NULL
+  };
+  GType tag_type;
+  gchar *val;
+
+  tag_type = gst_tag_get_type (type);
+  val = gst_tag_freeform_string_to_utf8 ((gchar *) ptr, tsize, env_vars);
+
+  if (val != NULL) {
+    if (tag_type == G_TYPE_STRING) {
+      gst_tag_list_add (taglist, GST_TAG_MERGE_APPEND, type, val, NULL);
+    } else {
+      GValue tag_val = { 0, };
+
+      g_value_init (&tag_val, tag_type);
+      if (gst_value_deserialize (&tag_val, val)) {
+        gst_tag_list_add_value (taglist, GST_TAG_MERGE_APPEND, type, &tag_val);
+      } else {
+        GST_WARNING_OBJECT (element, "could not deserialize '%s' into a "
+            "tag %s of type %s", val, type, g_type_name (tag_type));
+      }
+      g_value_unset (&tag_val);
+    }
+    g_free (val);
+  } else {
+    GST_WARNING_OBJECT (element, "could not extract %s tag", type);
   }
 }
 
@@ -762,38 +796,10 @@ gst_riff_parse_info (GstElement * element,
     }
 
     if (type != NULL && ptr[0] != '\0') {
-      static const gchar *env_vars[] = { "GST_AVI_TAG_ENCODING",
-        "GST_RIFF_TAG_ENCODING", "GST_TAG_ENCODING", NULL
-      };
-      GType tag_type;
-      gchar *val;
-
       GST_DEBUG_OBJECT (element, "mapped tag %" GST_FOURCC_FORMAT " to tag %s",
           GST_FOURCC_ARGS (tag), type);
 
-      tag_type = gst_tag_get_type (type);
-      val = gst_tag_freeform_string_to_utf8 ((gchar *) ptr, tsize, env_vars);
-
-      if (val != NULL) {
-        if (tag_type == G_TYPE_STRING) {
-          gst_tag_list_add (taglist, GST_TAG_MERGE_APPEND, type, val, NULL);
-        } else {
-          GValue tag_val = { 0, };
-
-          g_value_init (&tag_val, tag_type);
-          if (gst_value_deserialize (&tag_val, val)) {
-            gst_tag_list_add_value (taglist, GST_TAG_MERGE_APPEND, type,
-                &tag_val);
-          } else {
-            GST_WARNING_OBJECT (element, "could not deserialize '%s' into a "
-                "tag %s of type %s", val, type, g_type_name (tag_type));
-          }
-          g_value_unset (&tag_val);
-        }
-        g_free (val);
-      } else {
-        GST_WARNING_OBJECT (element, "could not extract %s tag", type);
-      }
+      parse_tag_value (element, taglist, type, ptr, tsize);
     }
 
     if (tsize & 1) {

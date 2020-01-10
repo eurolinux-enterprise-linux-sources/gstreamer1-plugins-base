@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -43,18 +43,18 @@
  * <refsect2>
  * <title>Example launch lines</title>
  * |[
- * gst-launch -v giosrc location=file:///home/joe/foo.xyz ! fakesink
+ * gst-launch-1.0 -v giosrc location=file:///home/joe/foo.xyz ! fakesink
  * ]| The above pipeline will simply read a local file and do nothing with the
  * data read. Instead of giosrc, we could just as well have used the
  * filesrc element here.
  * |[
- * gst-launch -v giosrc location=smb://othercomputer/foo.xyz ! filesink location=/home/joe/foo.xyz
+ * gst-launch-1.0 -v giosrc location=smb://othercomputer/foo.xyz ! filesink location=/home/joe/foo.xyz
  * ]| The above pipeline will copy a file from a remote host to the local file
  * system using the Samba protocol.
  * |[
- * gst-launch -v giosrc location=http://music.foobar.com/demo.mp3 ! mad ! audioconvert ! audioresample ! alsasink
+ * gst-launch-1.0 -v giosrc location=smb://othercomputer/demo.mp3 ! decodebin ! audioconvert ! audioresample ! autoaudiosink
  * ]| The above pipeline will read and decode and play an mp3 file from a
- * web server using the http protocol.
+ * SAMBA server.
  * </refsect2>
  */
 
@@ -117,12 +117,10 @@ gst_gio_src_class_init (GstGioSrcClass * klass)
           NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
-   * GstGioSrc:file
+   * GstGioSrc:file:
    * 
    * %GFile to read from.
-   * 
-   * Since: 0.10.20
-   **/
+   */
   g_object_class_install_property (gobject_class, PROP_FILE,
       g_param_spec_object ("file", "File", "GFile to read from",
           G_TYPE_FILE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));

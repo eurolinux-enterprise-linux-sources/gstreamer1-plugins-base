@@ -1,4 +1,7 @@
-/* Example application for using GstProfile and encodebin
+/* GStreamer
+ *
+ * encoding.c: example application for using GstProfile and encodebin
+ *
  * Copyright (C) 2009 Edward Hervey <edward.hervey@collabora.co.uk>
  *
  * This library is free software; you can redistribute it and/or
@@ -13,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -34,9 +37,10 @@ static gboolean silent = FALSE;
 static void
 list_codecs (void)
 {
-  GstCaps *l;
-  GstCaps *caps;
+  GstCaps *l, *caps;
+  GstStructure *st;
   guint i, len;
+  gchar *tmpstr, *desc;
 
   caps = gst_caps_new_empty ();
 
@@ -44,17 +48,14 @@ list_codecs (void)
   l = gst_caps_list_container_formats (GST_RANK_NONE);
   len = gst_caps_get_size (l);
   for (i = 0; i < len; i++) {
-    GstStructure *st = gst_caps_steal_structure (l, 0);
-    gchar *tmpstr, *desc;
-
+    st = gst_caps_steal_structure (l, 0);
     gst_caps_append_structure (caps, st);
 
     tmpstr = gst_caps_to_string (caps);
     desc = gst_pb_utils_get_codec_description (caps);
     g_print ("  %s - %s\n", desc, tmpstr);
     g_free (tmpstr);
-    if (desc)
-      g_free (desc);
+    g_free (desc);
     gst_caps_remove_structure (caps, 0);
   }
   g_print ("\n");
@@ -64,17 +65,14 @@ list_codecs (void)
   l = gst_caps_list_video_encoding_formats (GST_RANK_NONE);
   len = gst_caps_get_size (l);
   for (i = 0; i < len; i++) {
-    GstStructure *st = gst_caps_steal_structure (l, 0);
-    gchar *tmpstr, *desc;
-
+    st = gst_caps_steal_structure (l, 0);
     gst_caps_append_structure (caps, st);
 
     tmpstr = gst_caps_to_string (caps);
     desc = gst_pb_utils_get_codec_description (caps);
     g_print ("  %s - %s\n", desc, tmpstr);
     g_free (tmpstr);
-    if (desc)
-      g_free (desc);
+    g_free (desc);
     gst_caps_remove_structure (caps, 0);
   }
   g_print ("\n");
@@ -84,17 +82,14 @@ list_codecs (void)
   l = gst_caps_list_audio_encoding_formats (GST_RANK_NONE);
   len = gst_caps_get_size (l);
   for (i = 0; i < len; i++) {
-    GstStructure *st = gst_caps_steal_structure (l, 0);
-    gchar *tmpstr, *desc;
-
+    st = gst_caps_steal_structure (l, 0);
     gst_caps_append_structure (caps, st);
 
     tmpstr = gst_caps_to_string (caps);
     desc = gst_pb_utils_get_codec_description (caps);
     g_print ("  %s - %s\n", desc, tmpstr);
     g_free (tmpstr);
-    if (desc)
-      g_free (desc);
+    g_free (desc);
     gst_caps_remove_structure (caps, 0);
   }
   g_print ("\n");
@@ -401,6 +396,8 @@ main (int argc, char **argv)
 
   if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
     g_print ("Error initializing: %s\n", err->message);
+    g_option_context_free (ctx);
+    g_clear_error (&err);
     exit (1);
   }
 

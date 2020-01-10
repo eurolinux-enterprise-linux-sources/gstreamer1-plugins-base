@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -48,15 +48,15 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch -v filesrc location=input.xyz ! giosink location=file:///home/joe/out.xyz
+ * gst-launch-1.0 -v filesrc location=input.xyz ! giosink location=file:///home/joe/out.xyz
  * ]| The above pipeline will simply copy a local file. Instead of giosink,
  * we could just as well have used the filesink element here.
  * |[
- * gst-launch -v filesrc location=foo.mp3 ! mad ! flacenc ! giosink location=smb://othercomputer/foo.flac
- * ]| The above pipeline will re-encode an mp3 file into FLAC format and store
+ * gst-launch-1.0 -v uridecodebin uri=file:///path/to/audio.file ! audioconvert ! flacenc ! giosink location=smb://othercomputer/foo.flac
+ * ]| The above pipeline will re-encode an audio file into FLAC format and store
  * it on a remote host using the Samba protocol.
  * |[
- * gst-launch -v audiotestsrc num-buffers=100 ! vorbisenc ! oggmux ! giosink location=file:///home/foo/bar.ogg
+ * gst-launch-1.0 -v audiotestsrc num-buffers=100 ! vorbisenc ! oggmux ! giosink location=file:///home/foo/bar.ogg
  * ]| The above pipeline will encode a 440Hz sine wave to Ogg Vorbis and stores
  * it in the home directory of user foo.
  * </refsect2>
@@ -65,7 +65,7 @@
 /* FIXME: We would like to mount the enclosing volume of an URL
  *        if it isn't mounted yet but this is possible async-only.
  *        Unfortunately this requires a running main loop from the
- *        default context and we can't guarantuee this!
+ *        default context and we can't guarantee this!
  *
  *        We would also like to do authentication while mounting.
  */
@@ -121,12 +121,10 @@ gst_gio_sink_class_init (GstGioSinkClass * klass)
           NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
-   * GstGioSink:file
+   * GstGioSink:file:
    *
    * %GFile to write to.
-   * 
-   * Since: 0.10.20
-   **/
+   */
   g_object_class_install_property (gobject_class, PROP_FILE,
       g_param_spec_object ("file", "File", "GFile to write to",
           G_TYPE_FILE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));

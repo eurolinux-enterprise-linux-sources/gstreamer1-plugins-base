@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_RTCPBUFFER_H__
@@ -59,6 +59,9 @@ typedef enum
   GST_RTCP_TYPE_PSFB    = 206
 } GstRTCPType;
 
+/* FIXME 2.0: backwards compatibility define for enum typo */
+#define GST_RTCP_RTPFB_TYPE_RCTP_SR_REQ GST_RTCP_RTPFB_TYPE_RTCP_SR_REQ
+
 /**
  * GstRTCPFBType:
  * @GST_RTCP_FB_TYPE_INVALID: Invalid type
@@ -66,6 +69,8 @@ typedef enum
  * @GST_RTCP_RTPFB_TYPE_TMMBR: Temporary Maximum Media Stream Bit Rate Request
  * @GST_RTCP_RTPFB_TYPE_TMMBN: Temporary Maximum Media Stream Bit Rate
  *    Notification
+ * @GST_RTCP_RTPFB_TYPE_RTCP_SR_REQ: Request an SR packet for early
+ *    synchronization
  * @GST_RTCP_PSFB_TYPE_PLI: Picture Loss Indication
  * @GST_RTCP_PSFB_TYPE_SLI: Slice Loss Indication
  * @GST_RTCP_PSFB_TYPE_RPSI: Reference Picture Selection Indication
@@ -80,22 +85,24 @@ typedef enum
 typedef enum
 {
   /* generic */
-  GST_RTCP_FB_TYPE_INVALID    = 0,
+  GST_RTCP_FB_TYPE_INVALID        = 0,
   /* RTPFB types */
-  GST_RTCP_RTPFB_TYPE_NACK    = 1,
+  GST_RTCP_RTPFB_TYPE_NACK        = 1,
   /* RTPFB types assigned in RFC 5104 */
-  GST_RTCP_RTPFB_TYPE_TMMBR   = 3,
-  GST_RTCP_RTPFB_TYPE_TMMBN   = 4,
+  GST_RTCP_RTPFB_TYPE_TMMBR       = 3,
+  GST_RTCP_RTPFB_TYPE_TMMBN       = 4,
+  /* RTPFB types assigned in RFC 6051 */
+  GST_RTCP_RTPFB_TYPE_RTCP_SR_REQ = 5,
   /* PSFB types */
-  GST_RTCP_PSFB_TYPE_PLI      = 1,
-  GST_RTCP_PSFB_TYPE_SLI      = 2,
-  GST_RTCP_PSFB_TYPE_RPSI     = 3,
-  GST_RTCP_PSFB_TYPE_AFB      = 15,
+  GST_RTCP_PSFB_TYPE_PLI          = 1,
+  GST_RTCP_PSFB_TYPE_SLI          = 2,
+  GST_RTCP_PSFB_TYPE_RPSI         = 3,
+  GST_RTCP_PSFB_TYPE_AFB          = 15,
   /* PSFB types assigned in RFC 5104 */
-  GST_RTCP_PSFB_TYPE_FIR      = 4,
-  GST_RTCP_PSFB_TYPE_TSTR     = 5,
-  GST_RTCP_PSFB_TYPE_TSTN     = 6,
-  GST_RTCP_PSFB_TYPE_VBCN     = 7,
+  GST_RTCP_PSFB_TYPE_FIR          = 4,
+  GST_RTCP_PSFB_TYPE_TSTR         = 5,
+  GST_RTCP_PSFB_TYPE_TSTN         = 6,
+  GST_RTCP_PSFB_TYPE_VBCN         = 7,
 } GstRTCPFBType;
 
 /**
@@ -161,6 +168,15 @@ typedef enum
  * Mask for version, padding bit and packet type pair
  */
 #define GST_RTCP_VALID_MASK (0xc000 | 0x2000 | 0xfe)
+
+/**
+ * GST_RTCP_REDUCED_SIZE_VALID_MASK:
+ *
+ * Mask for version, padding bit and packet type pair allowing reduced size
+ * packets, basically it accepts other types than RR and SR
+ */
+#define GST_RTCP_REDUCED_SIZE_VALID_MASK (0xc000 | 0x2000 | 0xf8)
+
 /**
  * GST_RTCP_VALID_VALUE:
  *
@@ -211,6 +227,10 @@ GstBuffer*      gst_rtcp_buffer_new_copy_data     (gpointer data, guint len);
 gboolean        gst_rtcp_buffer_validate_data     (guint8 *data, guint len);
 gboolean        gst_rtcp_buffer_validate          (GstBuffer *buffer);
 
+gboolean        gst_rtcp_buffer_validate_data_reduced   (guint8 *data, guint len);
+gboolean        gst_rtcp_buffer_validate_reduced        (GstBuffer *buffer);
+
+
 GstBuffer*      gst_rtcp_buffer_new               (guint mtu);
 
 gboolean        gst_rtcp_buffer_map               (GstBuffer *buffer, GstMapFlags flags, GstRTCPBuffer *rtcp);
@@ -259,6 +279,15 @@ void            gst_rtcp_packet_set_rb                (GstRTCPPacket *packet, gu
                                                        guint32 exthighestseq, guint32 jitter,
                                                        guint32 lsr, guint32 dlsr);
 
+/* profile-specific extensions for SR and RR */
+gboolean        gst_rtcp_packet_add_profile_specific_ext        (GstRTCPPacket * packet,
+                                                                 const guint8 * data, guint len);
+guint16         gst_rtcp_packet_get_profile_specific_ext_length (GstRTCPPacket * packet);
+gboolean        gst_rtcp_packet_get_profile_specific_ext        (GstRTCPPacket * packet,
+                                                                 guint8 ** data, guint * len);
+gboolean        gst_rtcp_packet_copy_profile_specific_ext       (GstRTCPPacket * packet,
+                                                                 guint8 ** data, guint * len);
+
 /* source description packet */
 guint           gst_rtcp_packet_sdes_get_item_count   (GstRTCPPacket *packet);
 gboolean        gst_rtcp_packet_sdes_first_item       (GstRTCPPacket *packet);
@@ -285,6 +314,17 @@ gboolean        gst_rtcp_packet_bye_add_ssrcs         (GstRTCPPacket *packet, gu
 guint8          gst_rtcp_packet_bye_get_reason_len    (GstRTCPPacket *packet);
 gchar*          gst_rtcp_packet_bye_get_reason        (GstRTCPPacket *packet);
 gboolean        gst_rtcp_packet_bye_set_reason        (GstRTCPPacket *packet, const gchar *reason);
+
+/* app packets */
+void            gst_rtcp_packet_app_set_subtype       (GstRTCPPacket * packet, guint8 subtype);
+guint8          gst_rtcp_packet_app_get_subtype       (GstRTCPPacket * packet);
+void            gst_rtcp_packet_app_set_ssrc          (GstRTCPPacket * packet, guint32 ssrc);
+guint32         gst_rtcp_packet_app_get_ssrc          (GstRTCPPacket * packet);
+void            gst_rtcp_packet_app_set_name          (GstRTCPPacket * packet, const gchar *name);
+const gchar*    gst_rtcp_packet_app_get_name          (GstRTCPPacket * packet);
+guint16         gst_rtcp_packet_app_get_data_length   (GstRTCPPacket * packet);
+gboolean        gst_rtcp_packet_app_set_data_length   (GstRTCPPacket * packet, guint16 wordlen);
+guint8*         gst_rtcp_packet_app_get_data          (GstRTCPPacket * packet);
 
 /* feedback packets */
 guint32         gst_rtcp_packet_fb_get_sender_ssrc    (GstRTCPPacket *packet);

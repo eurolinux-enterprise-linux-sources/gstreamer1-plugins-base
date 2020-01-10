@@ -15,8 +15,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -34,7 +34,7 @@
  * <refsect2>
  * <title>Example launch lines</title>
  * |[
- * gst-launch -v filesrc location=subtitles.srt ! subparse ! textrender ! xvimagesink
+ * gst-launch-1.0 -v filesrc location=subtitles.srt ! subparse ! textrender ! videoconvert ! autovideosink
  * ]|
  * </refsect2>
  */
@@ -188,16 +188,16 @@ gst_text_render_class_init (GstTextRenderClass * klass)
   gobject_class->set_property = gst_text_render_set_property;
   gobject_class->get_property = gst_text_render_get_property;
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&src_template_factory));
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&sink_template_factory));
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &src_template_factory);
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &sink_template_factory);
 
   gst_element_class_set_static_metadata (gstelement_class, "Text renderer",
       "Filter/Editor/Video",
       "Renders a text string to an image bitmap",
       "David Schleef <ds@schleef.org>, "
-      "GStreamer maintainers <gstreamer-devel@lists.sourceforge.net>");
+      "GStreamer maintainers <gstreamer-devel@lists.freedesktop.org>");
 
   fontmap = pango_cairo_font_map_get_default ();
   klass->pango_context =
@@ -391,6 +391,7 @@ gst_text_render_fixate_caps (GstTextRender * render, GstCaps * caps)
           DEFAULT_RENDER_WIDTH));
   gst_structure_fixate_field_nearest_int (s, "height",
       MAX (render->image_height + render->ypad, DEFAULT_RENDER_HEIGHT));
+  caps = gst_caps_fixate (caps);
   GST_DEBUG ("Fixated to    %" GST_PTR_FORMAT, caps);
 
   return caps;
@@ -520,6 +521,11 @@ gst_text_render_chain (GstPad * pad, GstObject * parent, GstBuffer * inbuf)
     goto done;
   }
 
+  if (render->segment_event) {
+    gst_pad_push_event (render->srcpad, render->segment_event);
+    render->segment_event = NULL;
+  }
+
   GST_DEBUG ("Allocating buffer WxH = %dx%d", render->width, render->height);
   outbuf = gst_buffer_new_and_alloc (render->width * render->height * 4);
 
@@ -588,10 +594,37 @@ done:
   return ret;
 }
 
+static gboolean
+gst_text_render_event (GstPad * pad, GstObject * parent, GstEvent * event)
+{
+  GstTextRender *render = GST_TEXT_RENDER (parent);
+  gboolean ret = TRUE;
+
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_SEGMENT:
+    {
+      if (gst_pad_has_current_caps (render->srcpad)) {
+        ret = gst_pad_push_event (render->srcpad, event);
+      } else {
+        gst_event_replace (&render->segment_event, event);
+        gst_event_unref (event);
+      }
+      break;
+    }
+    default:
+      ret = gst_pad_push_event (render->srcpad, event);
+      break;
+  }
+
+  return ret;
+}
+
 static void
 gst_text_render_finalize (GObject * object)
 {
   GstTextRender *render = GST_TEXT_RENDER (object);
+
+  gst_event_replace (&render->segment_event, NULL);
 
   g_free (render->text_image);
 
@@ -612,6 +645,9 @@ gst_text_render_init (GstTextRender * render)
   gst_object_unref (template);
   gst_pad_set_chain_function (render->sinkpad,
       GST_DEBUG_FUNCPTR (gst_text_render_chain));
+  gst_pad_set_event_function (render->sinkpad,
+      GST_DEBUG_FUNCPTR (gst_text_render_event));
+
   gst_element_add_pad (GST_ELEMENT (render), render->sinkpad);
 
   /* source */

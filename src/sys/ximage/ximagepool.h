@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_XIMAGEPOOL_H__
@@ -39,33 +39,26 @@
 
 G_BEGIN_DECLS
 
-typedef struct _GstXImageMeta GstXImageMeta;
+typedef struct _GstXImageMemory GstXImageMemory;
 
 typedef struct _GstXImageBufferPool GstXImageBufferPool;
 typedef struct _GstXImageBufferPoolClass GstXImageBufferPoolClass;
-typedef struct _GstXImageBufferPoolPrivate GstXImageBufferPoolPrivate;
 
 #include "ximagesink.h"
-GType gst_ximage_meta_api_get_type (void);
-#define GST_XIMAGE_META_API_TYPE  (gst_ximage_meta_api_get_type())
-const GstMetaInfo * gst_ximage_meta_get_info (void);
-#define GST_XIMAGE_META_INFO  (gst_ximage_meta_get_info())
-
-#define gst_buffer_get_ximage_meta(b) ((GstXImageMeta*)gst_buffer_get_meta((b),GST_XIMAGE_META_API_TYPE))
 
 /**
- * GstXImageMeta:
- * @simagesink: a reference to the our #GstXImageSink
+ * GstXImageMemory:
+ * @sink: a reference to the our #GstXImageSink
  * @ximage: the XImage of this buffer
  * @width: the width in pixels of XImage @ximage
  * @height: the height in pixels of XImage @ximage
  * @size: the size in bytes of XImage @ximage
  *
- * Subclass of #GstMeta containing additional information about an XImage.
+ * Subclass of #GstMemory containing additional information about an XImage.
  */
-struct _GstXImageMeta
+struct _GstXImageMemory
 {
-  GstMeta meta;
+  GstMemory parent;
 
   /* Reference to the ximagesink we belong to */
   GstXImageSink *sink;
@@ -92,8 +85,15 @@ struct _GstXImageBufferPool
   GstBufferPool bufferpool;
 
   GstXImageSink *sink;
+  GstAllocator *allocator;
 
-  GstXImageBufferPoolPrivate *priv;
+  GstCaps *caps;
+  GstVideoInfo info;
+  GstVideoAlignment align;
+  guint    padded_width;
+  guint    padded_height;
+  gboolean add_metavideo;
+  gboolean need_alignment;
 };
 
 struct _GstXImageBufferPoolClass
@@ -105,7 +105,7 @@ GType gst_ximage_buffer_pool_get_type (void);
 
 GstBufferPool * gst_ximage_buffer_pool_new     (GstXImageSink * ximagesink);
 
-gboolean gst_ximagesink_check_xshm_calls (GstXImageSink * ximagesink,
+gboolean gst_x_image_sink_check_xshm_calls (GstXImageSink * ximagesink,
         GstXContext * xcontext);
 
 G_END_DECLS

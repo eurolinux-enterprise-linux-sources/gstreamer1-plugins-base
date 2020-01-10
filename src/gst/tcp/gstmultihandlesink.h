@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 
@@ -201,9 +201,6 @@ struct _GstMultiHandleSink {
 
   GMainContext *main_context;
   GCancellable *cancellable;
-
-  GSList *streamheader; /* GSList of GstBuffers to use as streamheader */
-  gboolean previous_buffer_in_caps;
 
   gint qos_dscp;
 

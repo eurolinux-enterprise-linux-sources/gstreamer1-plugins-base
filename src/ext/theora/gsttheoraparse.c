@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -43,17 +43,15 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch -v filesrc location=video.ogg ! oggdemux ! theoraparse ! fakesink
+ * gst-launch-1.0 -v filesrc location=video.ogg ! oggdemux ! theoraparse ! fakesink
  * ]| This pipeline shows that the streamheader is set in the caps, and that each
  * buffer has the timestamp, duration, offset, and offset_end set.
  * |[
- * gst-launch filesrc location=video.ogg ! oggdemux ! theoraparse \
+ * gst-launch-1.0 filesrc location=video.ogg ! oggdemux ! theoraparse \
  *            ! oggmux ! filesink location=video-remuxed.ogg
  * ]| This pipeline shows remuxing. video-remuxed.ogg might not be exactly the same
  * as video.ogg, but they should produce exactly the same decoded data.
  * </refsect2>
- *
- * Last reviewed on 2008-05-28 (0.10.20)
  */
 
 /* FIXME 0.11: suppress warnings for deprecated API such as GValueArray
@@ -126,8 +124,6 @@ gst_theora_parse_class_init (GstTheoraParseClass * klass)
    * GstTheoraParse:sychronization-points
    *
    * An array of (granuletime, buffertime) pairs
-   *
-   * Since: 0.10.10
    */
   g_object_class_install_property (gobject_class, PROP_SYNCHRONIZATION_POINTS,
       g_param_spec_value_array ("synchronization-points",
@@ -139,13 +135,13 @@ gst_theora_parse_class_init (GstTheoraParseClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 #endif
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&theora_parse_src_factory));
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&theora_parse_sink_factory));
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &theora_parse_src_factory);
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &theora_parse_sink_factory);
   gst_element_class_set_static_metadata (gstelement_class,
-      "Theora video parser", "Codec/Parser/Video",
-      "parse raw theora streams", "Andy Wingo <wingo@pobox.com>");
+      "Theora video parser", "Codec/Parser/Video", "parse raw theora streams",
+      "Andy Wingo <wingo@pobox.com>");
 
   gstelement_class->change_state = theora_parse_change_state;
 
@@ -285,8 +281,7 @@ theora_parse_set_header_on_caps (GstTheoraParse * parse, GstCaps * caps)
     g_value_unset (&value);
   }
 
-  gst_structure_set_value (structure, "streamheader", &array);
-  g_value_unset (&array);
+  gst_structure_take_value (structure, "streamheader", &array);
 }
 
 /* two tasks to do here: set the streamheader on the caps, and use libtheora to
@@ -368,10 +363,10 @@ theora_parse_push_headers (GstTheoraParse * parse)
 {
   gint i;
 
-  theora_parse_drain_event_queue (parse);
-
   if (!parse->streamheader_received)
     theora_parse_set_streamheader (parse);
+
+  theora_parse_drain_event_queue (parse);
 
   /* ignore return values, we pass along the result of pushing data packets only
    */
@@ -722,7 +717,8 @@ theora_parse_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       ret = gst_pad_event_default (pad, parent, event);
       break;
     default:
-      if (parse->send_streamheader && GST_EVENT_IS_SERIALIZED (event))
+      if (parse->send_streamheader && GST_EVENT_IS_SERIALIZED (event)
+          && GST_EVENT_TYPE (event) > GST_EVENT_CAPS)
         ret = theora_parse_queue_event (parse, event);
       else
         ret = gst_pad_event_default (pad, parent, event);

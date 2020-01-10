@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_RTP_BASE_AUDIO_PAYLOAD_H__
@@ -100,6 +100,10 @@ GstFlowReturn   gst_rtp_base_audio_payload_push                   (GstRTPBaseAud
                                                                    GstClockTime timestamp);
 GstFlowReturn   gst_rtp_base_audio_payload_flush                  (GstRTPBaseAudioPayload * baseaudiopayload,
                                                                    guint payload_len, GstClockTime timestamp);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstRTPBaseAudioPayload, gst_object_unref)
+#endif
 
 G_END_DECLS
 

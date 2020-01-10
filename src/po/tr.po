@@ -1,18 +1,22 @@
-# translation of gst-plugins-base-0.10.32.2.po to Turkish
+# translation of gst-plugins-base-1.0.3.po to Turkish
 # This file is put in the public domain.
+# This file is distributed under the same license as the gst-plugins-base package.
 # Server Acim <serveracim@gmail.com>, 2010.
+# Server Acim <serveracim@gmail.com>, 2013, 2015.
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 0.10.32.2\n"
+"Project-Id-Version: gst-plugins-base 1.4.1\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2013-04-26 12:33+0200\n"
-"PO-Revision-Date: 2011-04-26 19:22+0200\n"
-"Last-Translator: Server Acim <serveracim@gmail.com>\n"
+"POT-Creation-Date: 2017-02-23 15:14+0200\n"
+"PO-Revision-Date: 2015-01-10 21:07+0100\n"
+"Last-Translator: Volkan Gezer <volkangezer@gmail.com>\n"
 "Language-Team: Turkish <gnu-tr-u12a@lists.sourceforge.net>\n"
 "Language: tr\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=utf-8\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Generator: Lokalize 1.5\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Mono kipte çalmak için aygıt açılamıyor."
@@ -35,7 +39,7 @@ msgid "Could not open audio device for playback."
 msgstr "Aygıtı çalma için açamıyor."
 
 msgid "Error outputting to audio device. The device has been disconnected."
-msgstr ""
+msgstr "Ses aygıtına çıktı gönderilirken hata. Aygıt bağlantısı kesildi."
 
 msgid "Could not open device for recording in mono mode."
 msgstr "Mono kipte kaydetmek için aygıtı açamıyor."
@@ -58,7 +62,7 @@ msgid "Could not open audio device for recording."
 msgstr "Kayıt için ses aygıtı açılamıyor."
 
 msgid "Error recording from audio device. The device has been disconnected."
-msgstr ""
+msgstr "Ses aygıtından kayıt sırasında hata. Aygıt bağlantısı kesildi."
 
 msgid "Could not open CD device for reading."
 msgstr "Okumak için CD aygıtı açılamıyor."
@@ -69,12 +73,9 @@ msgstr "CD bulunamıyor."
 msgid "Could not read CD."
 msgstr "CD okunamıyor."
 
-msgid "Internal data stream error."
-msgstr "İç veri akışı hatası."
-
 #, c-format
-msgid "A %s plugin is required to play this stream, but not installed."
-msgstr "Bir %s eklenti bu akışı çalmak için gerekli, fakat kurulu değil."
+msgid "Missing element '%s' - check your GStreamer installation."
+msgstr "Kayıp öğe '%s' - GStreamer kurulumunu denetleyin."
 
 msgid "Could not determine type of stream"
 msgstr "Akışın türü belirlenemiyor"
@@ -82,9 +83,16 @@ msgstr "Akışın türü belirlenemiyor"
 msgid "This appears to be a text file"
 msgstr "Bu bir metin dosyasına benziyor"
 
-#, c-format
-msgid "Missing element '%s' - check your GStreamer installation."
-msgstr "Kayıp öğe '%s' - GStreamer kurulumunu denetleyin."
+msgid "Could not create \"uridecodebin\" element."
+msgstr "\"uridecodebin\" ögesi oluşturulamıyor."
+
+#, fuzzy
+msgid "Could not create \"decodebin3\" element."
+msgstr "Bir \"decodebin2\" öğesi oluşturamıyor."
+
+#, fuzzy
+msgid "Could not create \"urisourcebin\" element."
+msgstr "\"uridecodebin\" ögesi oluşturulamıyor."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -156,11 +164,187 @@ msgstr "Kaynak öğesi geçersiz."
 msgid "Error while sending data to \"%s:%d\"."
 msgstr "Dosyayı şuraya gönderirken hata \"%s:%d\"."
 
+msgid "Can't record audio fast enough"
+msgstr "Sesi yeterince hızlı kaydedemiyor"
+
 msgid "This CD has no audio tracks"
 msgstr "Bu CD hiç ses izi içermiyor"
 
-msgid "Can't record audio fast enough"
-msgstr "Sesi yeterince hızlı kaydedemiyor"
+msgid "ID3 tag"
+msgstr "ID3 etiketi"
+
+msgid "APE tag"
+msgstr "APE etiketi"
+
+msgid "ICY internet radio"
+msgstr "ICY internet radyosu"
+
+msgid "Apple Lossless Audio (ALAC)"
+msgstr "Apple Lossless Audio (ALAC)"
+
+msgid "Free Lossless Audio Codec (FLAC)"
+msgstr "Free Lossless Audio Codec (FLAC)"
+
+msgid "Lossless True Audio (TTA)"
+msgstr "Lossless True Audio (TTA)"
+
+msgid "Windows Media Speech"
+msgstr "Windows Media Hecelemesi"
+
+msgid "CYUV Lossless"
+msgstr "CYUV Kayıpsız"
+
+msgid "FFMpeg v1"
+msgstr "FFMpeg v1"
+
+msgid "Lossless MSZH"
+msgstr "Kayıpsız MSZH"
+
+msgid "Run-length encoding"
+msgstr "Çalıştırma-uzunluğu kodlaması"
+
+msgid "Timed Text"
+msgstr "Zamanlanmış Metin"
+
+msgid "Subtitle"
+msgstr "Altyazı"
+
+msgid "MPL2 subtitle format"
+msgstr "MPL2 altyazı kipi"
+
+msgid "DKS subtitle format"
+msgstr "DKS altyazı kipi"
+
+msgid "QTtext subtitle format"
+msgstr "QTtext altyazı kipi"
+
+msgid "Sami subtitle format"
+msgstr "Sami altyazı kipi"
+
+msgid "TMPlayer subtitle format"
+msgstr "TMPlayer altyazı kipi"
+
+msgid "Kate subtitle format"
+msgstr "Kate altyazı kipi"
+
+#, fuzzy
+msgid "WebVTT subtitle format"
+msgstr "Kate altyazı kipi"
+
+msgid "Uncompressed video"
+msgstr "Sıkıştırılmamış video"
+
+msgid "Uncompressed gray"
+msgstr "Sıkıştırılmamış gri resim"
+
+#, c-format
+msgid "Uncompressed packed YUV %s"
+msgstr "Sıkıştırılmamış paket YUV %s"
+
+#, c-format
+msgid "Uncompressed semi-planar YUV %s"
+msgstr "Sıkıştırılmamış yarı düzlem YUV %s"
+
+#, c-format
+msgid "Uncompressed planar YUV %s"
+msgstr "Sıkıştırılmamış düzlem YUV %s"
+
+#, c-format
+msgid "Uncompressed palettized %d-bit %s"
+msgstr "Sıkıştırılmamış paletlenmiş %d-bit %s"
+
+#, c-format
+msgid "Uncompressed %d-bit %s"
+msgstr "Şıkıştırılmamış %d-bit %s"
+
+#, c-format
+msgid "DivX MPEG-4 Version %d"
+msgstr "DivX MPEG-4 Versiyonu %d"
+
+msgid "Uncompressed audio"
+msgstr "Sıkıştırılmamış ses"
+
+#, c-format
+msgid "Raw %d-bit %s audio"
+msgstr "Ham %d-bit %s audio"
+
+msgid "Audio CD source"
+msgstr "Ses CD'si kaynağı"
+
+msgid "DVD source"
+msgstr "DVD kaynağı"
+
+msgid "Real Time Streaming Protocol (RTSP) source"
+msgstr "Gerçek Zamanlı Akış Protokolu (RTSP) kaynağı"
+
+msgid "Microsoft Media Server (MMS) protocol source"
+msgstr "Microsoft Medya Sunucusu (MMS) protokol kaynağı"
+
+#, c-format
+msgid "%s protocol source"
+msgstr "%s protokol kaynağı"
+
+#, c-format
+msgid "%s video RTP depayloader"
+msgstr "%s video RTP depayloader"
+
+#, c-format
+msgid "%s audio RTP depayloader"
+msgstr "%s audio RTP depayloader"
+
+#, c-format
+msgid "%s RTP depayloader"
+msgstr "%s RTP depayloader"
+
+#, c-format
+msgid "%s demuxer"
+msgstr "%s demuxer"
+
+#, c-format
+msgid "%s decoder"
+msgstr "%s kod çözücü"
+
+#, c-format
+msgid "%s video RTP payloader"
+msgstr "%s video RTP payloader"
+
+#, c-format
+msgid "%s audio RTP payloader"
+msgstr "%s audio RTP payloader"
+
+#, c-format
+msgid "%s RTP payloader"
+msgstr "%s RTP payloader"
+
+#, c-format
+msgid "%s muxer"
+msgstr "%s muxer"
+
+#, c-format
+msgid "%s encoder"
+msgstr "%s kodlayıcı"
+
+#, c-format
+msgid "GStreamer element %s"
+msgstr "GStreamer öğesi %s"
+
+msgid "Unknown source element"
+msgstr "Bilinmeyen kaynak öğesi"
+
+msgid "Unknown sink element"
+msgstr "Bilinmeyen gömme öğesi"
+
+msgid "Unknown element"
+msgstr "Bilinmeyen öğe"
+
+msgid "Unknown decoder element"
+msgstr "Bilinmeyen kod çözücü öğesi"
+
+msgid "Unknown encoder element"
+msgstr "Bilinmeyen kodlama öğesi"
+
+msgid "Plugin or element of unknown type"
+msgstr "Bilinmeyen türde eklenti veya öğe"
 
 msgid "Failed to read tag: not enough data"
 msgstr "Etiketi okunamadı: yetersiz veri"
@@ -211,6 +395,15 @@ msgid "capturing focal length"
 msgstr "odaksal uzunluğu yakalıyor"
 
 msgid "Focal length of the lens used capturing the image, in mm"
+msgstr "Mm bazında, resim çekerken kullanılan odaksal uzunluk"
+
+#, fuzzy
+msgid "capturing 35 mm equivalent focal length"
+msgstr "odaksal uzunluğu yakalıyor"
+
+#, fuzzy
+msgid ""
+"35 mm equivalent focal length of the lens used capturing the image, in mm"
 msgstr "Mm bazında, resim çekerken kullanılan odaksal uzunluk"
 
 msgid "capturing digital zoom ratio"
@@ -317,173 +510,178 @@ msgid "Media (image/video) intended vertical pixel density in ppi"
 msgstr "Medya (resim/vidyo)'nun ppi değerinden dikey piksel yoğunluğu"
 
 msgid "ID3v2 frame"
-msgstr ""
+msgstr "ID3v2 çerçevesi"
 
 msgid "unparsed id3v2 tag frame"
+msgstr "ayrıştırılmamış id3v2 etiket çerçevesi"
+
+msgid "musical-key"
+msgstr "müzik anahtarı"
+
+msgid "Initial key in which the sound starts"
+msgstr "Sesin başladığı başlangıç anahtarı"
+
+msgid "Print version information and exit"
+msgstr "Sürüm bilgisini yaz ve çık"
+
+msgid ""
+"Don't exit after showing the initial device list, but wait for devices to "
+"added/removed."
+msgstr ""
+"Başlangıç aygıt listesini gösterdikten sonra kapanma, eklenecek/çıkartılacak "
+"aygıtları bekle."
+
+#, fuzzy, c-format
+msgid "Volume: %.0f%%"
+msgstr "Ses"
+
+msgid "Buffering..."
+msgstr "Tampon belleğe alınıyor..."
+
+msgid "Clock lost, selecting a new one\n"
+msgstr "Saat kayboldu, yenisi seçiliyor\n"
+
+msgid "Reached end of play list."
 msgstr ""
 
-msgid "ID3 tag"
-msgstr "ID3 etiketi"
+msgid "Paused"
+msgstr ""
 
-msgid "APE tag"
-msgstr "APE etiketi"
+#, c-format
+msgid "Now playing %s\n"
+msgstr ""
 
-msgid "ICY internet radio"
-msgstr "ICY internet radyosu"
+#, c-format
+msgid "About to finish, preparing next title: %s"
+msgstr ""
 
-msgid "Apple Lossless Audio (ALAC)"
-msgstr "Apple Lossless Audio (ALAC)"
+#, c-format
+msgid "Playback rate: %.2f"
+msgstr ""
 
-msgid "Free Lossless Audio Codec (FLAC)"
-msgstr "Free Lossless Audio Codec (FLAC)"
+#, fuzzy, c-format
+msgid "Could not change playback rate to %.2f"
+msgstr "Stereo kipte çalmak için aygıt açılamıyor."
 
-msgid "Lossless True Audio (TTA)"
-msgstr "Lossless True Audio (TTA)"
+msgid "space"
+msgstr ""
 
-msgid "Windows Media Speech"
-msgstr "Windows Media Hecelemesi"
+msgid "pause/unpause"
+msgstr ""
 
-msgid "CYUV Lossless"
-msgstr "CYUV Kayıpsız"
+msgid "q or ESC"
+msgstr ""
 
-msgid "FFMpeg v1"
-msgstr "FFMpeg v1"
+msgid "quit"
+msgstr ""
 
-msgid "Lossless MSZH"
-msgstr "Kayıpsız MSZH"
+msgid "> or n"
+msgstr ""
 
-msgid "Run-length encoding"
-msgstr "Çalıştırma-uzunluğu kodlaması"
+msgid "play next"
+msgstr ""
 
-msgid "Subtitle"
+msgid "< or b"
+msgstr ""
+
+msgid "play previous"
+msgstr ""
+
+msgid "seek forward"
+msgstr ""
+
+msgid "seek backward"
 msgstr ""
 
 #, fuzzy
-msgid "MPL2 subtitle format"
-msgstr "TMPlayer altyazı kipi"
+msgid "volume up"
+msgstr "Ses"
+
+msgid "volume down"
+msgstr ""
+
+msgid "increase playback rate"
+msgstr ""
+
+msgid "decrease playback rate"
+msgstr ""
+
+msgid "change playback direction"
+msgstr ""
+
+msgid "enable/disable trick modes"
+msgstr ""
 
 #, fuzzy
-msgid "DKS subtitle format"
-msgstr "Sami altyazı kipi"
+msgid "change audio track"
+msgstr "Bu CD hiç ses izi içermiyor"
+
+msgid "change video track"
+msgstr ""
 
 #, fuzzy
-msgid "QTtext subtitle format"
+msgid "change subtitle track"
 msgstr "Kate altyazı kipi"
 
-msgid "Sami subtitle format"
-msgstr "Sami altyazı kipi"
+msgid "seek to beginning"
+msgstr ""
 
-msgid "TMPlayer subtitle format"
-msgstr "TMPlayer altyazı kipi"
-
-msgid "Kate subtitle format"
-msgstr "Kate altyazı kipi"
+msgid "show keyboard shortcuts"
+msgstr ""
 
 #, fuzzy
-msgid "Uncompressed video"
-msgstr "Sıkıştırılmamış YUV"
+msgid "Interactive mode - keyboard controls:"
+msgstr "Klavye ile etkileşimli kontrol"
+
+msgid "Output status information and property notifications"
+msgstr ""
+
+msgid "Control playback behaviour setting playbin 'flags' property"
+msgstr ""
+
+msgid "Video sink to use (default is autovideosink)"
+msgstr "Kullanılacak video alıcı (varsayılan autovideosink)"
+
+msgid "Audio sink to use (default is autoaudiosink)"
+msgstr "Kullanılacak ses alıcı (varsayılan autoaudiosink)"
+
+msgid "Enable gapless playback"
+msgstr "Aralıksız çalmayı etkinleştir"
+
+msgid "Shuffle playlist"
+msgstr "Çalma listesini karıştır"
 
 #, fuzzy
-msgid "Uncompressed gray"
-msgstr "Sıkıştırılmamış Gri Resim"
+msgid "Disable interactive control via the keyboard"
+msgstr "Klavye ile etkileşimli kontrol"
 
-#, fuzzy, c-format
-msgid "Uncompressed %s YUV %s"
-msgstr "Sıkıştırılmamış YUV"
+msgid "Volume"
+msgstr "Ses"
 
-#, fuzzy, c-format
-msgid "Uncompressed %s%d-bit %s"
-msgstr "Şıkıştırılmamış seviyesi şuna düşürülmüş %d-bit %s"
+msgid "Playlist file containing input media files"
+msgstr "Çalma listesi dosyası girdi medya dosyaları içeriyor"
 
-#, c-format
-msgid "DivX MPEG-4 Version %d"
-msgstr "DivX MPEG-4 Versiyonu %d"
-
-#, fuzzy
-msgid "Uncompressed audio"
-msgstr "Sıkıştırılmamış YUV"
-
-#, fuzzy, c-format
-msgid "Raw %d-bit %s audio"
-msgstr "Ham %d-bit PCM ses"
-
-msgid "Audio CD source"
-msgstr "Ses CD'si kaynağı"
-
-msgid "DVD source"
-msgstr "DVD kaynağı"
-
-msgid "Real Time Streaming Protocol (RTSP) source"
-msgstr "Gerçek Zamanlı Akış Protokolu (RTSP) kaynağı"
-
-msgid "Microsoft Media Server (MMS) protocol source"
-msgstr "Microsoft Medya Sunucusu (MMS) protokol kaynağı"
+msgid "Do not print any output (apart from errors)"
+msgstr ""
 
 #, c-format
-msgid "%s protocol source"
-msgstr "%s protokol kaynağı"
+msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
+msgstr "Kullanım: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 
-#, c-format
-msgid "%s video RTP depayloader"
-msgstr "%s video RTP depayloader"
+msgid "You must provide at least one filename or URI to play."
+msgstr "Çalmak için en azından bir dosya adı veya URI sağlamalısınız."
 
-#, c-format
-msgid "%s audio RTP depayloader"
-msgstr "%s audio RTP depayloader"
+msgid "Press 'k' to see a list of keyboard shortcuts.\n"
+msgstr ""
 
-#, c-format
-msgid "%s RTP depayloader"
-msgstr "%s RTP depayloader"
+#~ msgid "Internal data stream error."
+#~ msgstr "İç veri akışı hatası."
 
-#, c-format
-msgid "%s demuxer"
-msgstr "%s demuxer"
+#~ msgid "A %s plugin is required to play this stream, but not installed."
+#~ msgstr "Bir %s eklenti bu akışı çalmak için gerekli, fakat kurulu değil."
 
-#, c-format
-msgid "%s decoder"
-msgstr "%s kod çözücü"
-
-#, c-format
-msgid "%s video RTP payloader"
-msgstr "%s video RTP payloader"
-
-#, c-format
-msgid "%s audio RTP payloader"
-msgstr "%s audio RTP payloader"
-
-#, c-format
-msgid "%s RTP payloader"
-msgstr "%s RTP payloader"
-
-#, c-format
-msgid "%s muxer"
-msgstr "%s muxer"
-
-#, c-format
-msgid "%s encoder"
-msgstr "%s kodlayıcı"
-
-#, c-format
-msgid "GStreamer element %s"
-msgstr "GStreamer öğesi %s"
-
-msgid "Unknown source element"
-msgstr "Bilinmeyen kaynak öğesi"
-
-msgid "Unknown sink element"
-msgstr "Bilinmeyen gömme öğesi"
-
-msgid "Unknown element"
-msgstr "Bilinmeyen öğe"
-
-msgid "Unknown decoder element"
-msgstr "Bilinmeyen kod çözücü öğesi"
-
-msgid "Unknown encoder element"
-msgstr "Bilinmeyen kodlama öğesi"
-
-msgid "Plugin or element of unknown type"
-msgstr "Bilinmeyen türde eklenti veya öğe"
+#~ msgid "Uncompressed %s YUV %s"
+#~ msgstr "Sıkıştırılmamış %s YUV %s"
 
 #~ msgid "Master"
 #~ msgstr "Ana"
@@ -536,9 +734,6 @@ msgstr "Bilinmeyen türde eklenti veya öğe"
 #~ msgid "RTSP streams cannot be played yet."
 #~ msgstr "RTSP akışları henüz çalınamıyor."
 
-#~ msgid "Could not create \"decodebin\" element."
-#~ msgstr "\"decodebin\" öğesi oluşturulamıyor."
-
 #~ msgid ""
 #~ "Only a subtitle stream was detected. Either you are loading a subtitle "
 #~ "file or some other type of text file, or the media file was not "
@@ -575,14 +770,8 @@ msgstr "Bilinmeyen türde eklenti veya öğe"
 #~ msgid "Connection to %s:%d refused."
 #~ msgstr "Şuraya bağlantı %s:%d reddedildi."
 
-#~ msgid "Uncompressed planar YUV 4:2:0"
-#~ msgstr "Sıkıştırılmamış planar YUV 4:2:0"
-
 #~ msgid "Uncompressed planar YVU 4:2:0"
 #~ msgstr "Sıkıştırılmamış planar YVU 4:2:0"
-
-#~ msgid "Uncompressed packed YUV 4:2:2"
-#~ msgstr "Sıkıştırılmamış paket YUV 4:2:2"
 
 #~ msgid "Uncompressed packed YUV 4:1:0"
 #~ msgstr "Sıkıştırılmamış paket YUV 4:1:0"
@@ -640,9 +829,6 @@ msgstr "Bilinmeyen türde eklenti veya öğe"
 
 #~ msgid "Internal data flow error."
 #~ msgstr "İç veri akışı hatası."
-
-#~ msgid "Could not create \"decodebin2\" element."
-#~ msgstr "Bir \"decodebin2\" öğesi oluşturamıyor."
 
 #~ msgid "Could not create \"queue2\" element."
 #~ msgstr "Bir \"queue2\" öğesi oluşturamıyor."

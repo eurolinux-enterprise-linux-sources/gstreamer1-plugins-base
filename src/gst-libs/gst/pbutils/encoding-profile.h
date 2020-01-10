@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifndef __GST_PROFILE_H__
@@ -23,10 +23,10 @@
 
 #include <gst/gst.h>
 
-G_BEGIN_DECLS
-
 #include <gst/pbutils/pbutils-enumtypes.h>
 #include <gst/pbutils/gstdiscoverer.h>
+
+G_BEGIN_DECLS
 
 /**
  * GstEncodingProfile:
@@ -125,12 +125,18 @@ void            gst_encoding_profile_set_description    (GstEncodingProfile *pro
 GstCaps *       gst_encoding_profile_get_format         (GstEncodingProfile *profile);
 void            gst_encoding_profile_set_format         (GstEncodingProfile *profile,
                                                          GstCaps *format);
+gboolean  gst_encoding_profile_get_allow_dynamic_output (GstEncodingProfile *profile);
+void      gst_encoding_profile_set_allow_dynamic_output (GstEncodingProfile *profile,
+                                                         gboolean allow_dynamic_output);
 const gchar *   gst_encoding_profile_get_preset         (GstEncodingProfile *profile);
+const gchar *   gst_encoding_profile_get_preset_name    (GstEncodingProfile *profile);
 void            gst_encoding_profile_set_preset         (GstEncodingProfile *profile,
                                                          const gchar *preset);
 guint           gst_encoding_profile_get_presence       (GstEncodingProfile *profile);
 void            gst_encoding_profile_set_presence       (GstEncodingProfile *profile,
                                                          guint presence);
+void            gst_encoding_profile_set_preset_name    (GstEncodingProfile * profile,
+                                                         const gchar * preset_name);
 GstCaps *       gst_encoding_profile_get_restriction    (GstEncodingProfile *profile);
 void            gst_encoding_profile_set_restriction    (GstEncodingProfile *profile,
                                                          GstCaps *restriction);
@@ -140,10 +146,15 @@ gboolean        gst_encoding_profile_is_equal           (GstEncodingProfile *a,
 GstCaps *       gst_encoding_profile_get_input_caps     (GstEncodingProfile *profile);
 const gchar *   gst_encoding_profile_get_type_nick      (GstEncodingProfile *profile);
 
+const gchar *   gst_encoding_profile_get_file_extension (GstEncodingProfile * profile);
+
 GstEncodingProfile * gst_encoding_profile_find (const gchar *targetname,
                                                 const gchar *profilename,
                                                 const gchar *category);
 
+gboolean        gst_encoding_profile_is_enabled        (GstEncodingProfile *profile);
+void            gst_encoding_profile_set_enabled       (GstEncodingProfile *profile,
+                                                         gboolean enabled);
 /* GstEncodingContainerProfile API */
 gboolean        gst_encoding_container_profile_add_profile       (GstEncodingContainerProfile *container,
                                                                   GstEncodingProfile *profile);
@@ -177,6 +188,22 @@ void     gst_encoding_video_profile_set_variableframerate (GstEncodingVideoProfi
                                                            gboolean variableframerate);
 
 GstEncodingProfile * gst_encoding_profile_from_discoverer (GstDiscovererInfo *info);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstEncodingAudioProfile, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstEncodingContainerProfile, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstEncodingProfile, gst_object_unref)
+#endif
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstEncodingVideoProfile, gst_object_unref)
+#endif
 
 G_END_DECLS
 

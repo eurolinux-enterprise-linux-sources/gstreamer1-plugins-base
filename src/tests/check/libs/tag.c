@@ -16,8 +16,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -686,6 +686,65 @@ GST_START_TEST (test_id3v1_utf8_tag)
 
 GST_END_TEST;
 
+GST_START_TEST (test_id3v2_priv_tag)
+{
+  const guint8 id3v2[] = {
+    0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x3f, 0x50, 0x52, 0x49, 0x56, 0x00, 0x00,
+    0x00, 0x35, 0x00, 0x00, 0x63, 0x6f, 0x6d, 0x2e,
+    0x61, 0x70, 0x70, 0x6c, 0x65, 0x2e, 0x73, 0x74,
+    0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x2e,
+    0x74, 0x72, 0x61, 0x6e, 0x73, 0x70, 0x6f, 0x72,
+    0x74, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x54,
+    0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xbb,
+    0xa0
+  };
+  const GstStructure *s;
+  GstTagList *tags;
+  GstSample *sample = NULL;
+  GstBuffer *buf;
+  GstMapInfo map;
+  gchar *owner = NULL;
+
+  buf = gst_buffer_new_allocate (NULL, sizeof (id3v2), NULL);
+  gst_buffer_fill (buf, 0, id3v2, sizeof (id3v2));
+
+  tags = gst_tag_list_from_id3v2_tag (buf);
+  gst_buffer_unref (buf);
+
+  fail_if (tags == NULL, "Failed to parse ID3 tag");
+
+  GST_LOG ("tags: %" GST_PTR_FORMAT, tags);
+
+  if (!gst_tag_list_get_sample (tags, GST_TAG_PRIVATE_DATA, &sample))
+    g_error ("Failed to get PRIVATE_DATA tag");
+
+  s = gst_sample_get_info (sample);
+  buf = gst_sample_get_buffer (sample);
+
+  if (!gst_structure_has_name (s, "ID3PrivateFrame"))
+    g_error ("wrong info name");
+
+  gst_structure_get (s, "owner", G_TYPE_STRING, &owner, NULL);
+  fail_unless (owner != NULL);
+
+  fail_unless_equals_string (owner,
+      "com.apple.streaming.transportStreamTimestamp");
+
+  fail_unless_equals_int (gst_buffer_get_size (buf), 8);
+
+  gst_buffer_map (buf, &map, GST_MAP_READ);
+  GST_MEMDUMP ("private data", map.data, map.size);
+  fail_unless_equals_uint64 (GST_READ_UINT64_BE (map.data), 0x0dbba0);
+  gst_buffer_unmap (buf, &map);
+  g_free (owner);
+
+  gst_sample_unref (sample);
+  gst_tag_list_unref (tags);
+}
+
+GST_END_TEST
 GST_START_TEST (test_language_utils)
 {
   gchar **lang_codes, **c;
@@ -1617,10 +1676,11 @@ GST_START_TEST (test_exif_tags_serialization_deserialization)
   g_value_unset (&value);
 
   g_value_init (&value, G_TYPE_DOUBLE);
-  g_value_set_double (&value, 30.5);
+  g_value_set_double (&value, 40.3456784);
   do_simple_exif_tag_serialization_deserialization
       (GST_TAG_GEO_LOCATION_LATITUDE, &value);
-  g_value_set_double (&value, -12.125);
+  g_value_set_double (&value, -12.1250865);
+
   do_simple_exif_tag_serialization_deserialization
       (GST_TAG_GEO_LOCATION_LATITUDE, &value);
   g_value_set_double (&value, 0);
@@ -1716,6 +1776,10 @@ GST_START_TEST (test_exif_tags_serialization_deserialization)
   g_value_set_double (&value, -2.5);
   do_simple_exif_tag_serialization_deserialization
       (GST_TAG_CAPTURING_EXPOSURE_COMPENSATION, &value);
+
+  g_value_set_double (&value, 50.0);
+  do_simple_exif_tag_serialization_deserialization
+      (GST_TAG_CAPTURING_FOCAL_LENGTH_35_MM, &value);
   g_value_unset (&value);
 
   g_value_init (&value, G_TYPE_INT);
@@ -1799,6 +1863,7 @@ tag_suite (void)
   tcase_add_test (tc_chain, test_vorbis_tags);
   tcase_add_test (tc_chain, test_id3_tags);
   tcase_add_test (tc_chain, test_id3v1_utf8_tag);
+  tcase_add_test (tc_chain, test_id3v2_priv_tag);
   tcase_add_test (tc_chain, test_language_utils);
   tcase_add_test (tc_chain, test_license_utils);
   tcase_add_test (tc_chain, test_xmp_formatting);
@@ -1811,19 +1876,4 @@ tag_suite (void)
   return s;
 }
 
-int
-main (int argc, char **argv)
-{
-  int nf;
-
-  Suite *s = tag_suite ();
-  SRunner *sr = srunner_create (s);
-
-  gst_check_init (&argc, &argv);
-
-  srunner_run_all (sr, CK_NORMAL);
-  nf = srunner_ntests_failed (sr);
-  srunner_free (sr);
-
-  return nf;
-}
+GST_CHECK_MAIN (tag);

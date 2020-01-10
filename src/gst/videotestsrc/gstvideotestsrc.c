@@ -14,8 +14,8 @@
  *
  * You should have received a copy of the GNU Library General Public
  * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -28,8 +28,8 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch -v videotestsrc pattern=snow ! ximagesink
- * ]| Shows random noise in an X window.
+ * gst-launch-1.0 -v videotestsrc pattern=snow ! video/x-raw,width=1280,height=720 ! autovideosink
+ * ]| Shows random noise in a video window.
  * </refsect2>
  */
 
@@ -74,8 +74,7 @@ enum
   PROP_YOFFSET,
   PROP_FOREGROUND_COLOR,
   PROP_BACKGROUND_COLOR,
-  PROP_HORIZONTAL_SPEED,
-  PROP_LAST
+  PROP_HORIZONTAL_SPEED
 };
 
 
@@ -149,6 +148,10 @@ gst_video_test_src_pattern_get_type (void)
     {GST_VIDEO_TEST_SRC_BALL, "Moving ball", "ball"},
     {GST_VIDEO_TEST_SRC_SMPTE100, "SMPTE 100% color bars", "smpte100"},
     {GST_VIDEO_TEST_SRC_BAR, "Bar", "bar"},
+    {GST_VIDEO_TEST_SRC_PINWHEEL, "Pinwheel", "pinwheel"},
+    {GST_VIDEO_TEST_SRC_SPOKES, "Spokes", "spokes"},
+    {GST_VIDEO_TEST_SRC_GRADIENT, "Gradient", "gradient"},
+    {GST_VIDEO_TEST_SRC_COLORS, "Colors", "colors"},
     {0, NULL, NULL}
   };
 
@@ -181,8 +184,9 @@ gst_video_test_src_class_init (GstVideoTestSrcClass * klass)
           DEFAULT_PATTERN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_TIMESTAMP_OFFSET,
       g_param_spec_int64 ("timestamp-offset", "Timestamp offset",
-          "An offset added to timestamps set on buffers (in ns)", G_MININT64,
-          G_MAXINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "An offset added to timestamps set on buffers (in ns)", 0,
+          (G_MAXLONG == G_MAXINT64) ? G_MAXINT64 : (G_MAXLONG * GST_SECOND - 1),
+          0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_IS_LIVE,
       g_param_spec_boolean ("is-live", "Is Live",
           "Whether to act as a live source", DEFAULT_IS_LIVE,
@@ -247,27 +251,23 @@ gst_video_test_src_class_init (GstVideoTestSrcClass * klass)
    *
    * Color to use for solid-color pattern and foreground color of other
    * patterns.  Default is white (0xffffffff).
-   *
-   * Since: 0.10.31
-   **/
+   */
   g_object_class_install_property (gobject_class, PROP_FOREGROUND_COLOR,
       g_param_spec_uint ("foreground-color", "Foreground Color",
           "Foreground color to use (big-endian ARGB)", 0, G_MAXUINT32,
           DEFAULT_FOREGROUND_COLOR,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
   /**
    * GstVideoTestSrc:background-color
    *
    * Color to use for background color of some patterns.  Default is
    * black (0xff000000).
-   *
-   * Since: 0.10.31
-   **/
+   */
   g_object_class_install_property (gobject_class, PROP_BACKGROUND_COLOR,
       g_param_spec_uint ("background-color", "Background Color",
           "Background color to use (big-endian ARGB)", 0, G_MAXUINT32,
           DEFAULT_BACKGROUND_COLOR,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_HORIZONTAL_SPEED,
       g_param_spec_int ("horizontal-speed", "Horizontal Speed",
@@ -279,8 +279,8 @@ gst_video_test_src_class_init (GstVideoTestSrcClass * klass)
       "Video test source", "Source/Video",
       "Creates a test video stream", "David A. Schleef <ds@schleef.org>");
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_video_test_src_template));
+  gst_element_class_add_static_pad_template (gstelement_class,
+      &gst_video_test_src_template);
 
   gstbasesrc_class->set_caps = gst_video_test_src_setcaps;
   gstbasesrc_class->fixate = gst_video_test_src_src_fixate;
@@ -313,18 +313,90 @@ gst_video_test_src_init (GstVideoTestSrc * src)
 static GstCaps *
 gst_video_test_src_src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 {
+  GstVideoTestSrc *src = GST_VIDEO_TEST_SRC (bsrc);
   GstStructure *structure;
 
-  caps = gst_caps_make_writable (caps);
+  /* Check if foreground color has alpha, if it is the case,
+   * force color format with an alpha channel downstream */
+  if (src->foreground_color >> 24 != 255) {
+    guint i;
+    GstCaps *alpha_only_caps = gst_caps_new_empty ();
 
+    for (i = 0; i < gst_caps_get_size (caps); i++) {
+      const GstVideoFormatInfo *info;
+      const GValue *formats =
+          gst_structure_get_value (gst_caps_get_structure (caps, i),
+          "format");
+
+      if (GST_VALUE_HOLDS_LIST (formats)) {
+        GValue possible_formats = { 0, };
+        guint list_size = gst_value_list_get_size (formats);
+        guint index;
+
+        g_value_init (&possible_formats, GST_TYPE_LIST);
+        for (index = 0; index < list_size; index++) {
+          const GValue *list_item = gst_value_list_get_value (formats, index);
+          info =
+              gst_video_format_get_info (gst_video_format_from_string
+              (g_value_get_string (list_item)));
+          if (GST_VIDEO_FORMAT_INFO_HAS_ALPHA (info)) {
+            GValue tmp = { 0, };
+
+            gst_value_init_and_copy (&tmp, list_item);
+            gst_value_list_append_value (&possible_formats, &tmp);
+          }
+        }
+
+        if (gst_value_list_get_size (&possible_formats)) {
+          GstStructure *astruct =
+              gst_structure_copy (gst_caps_get_structure (caps, i));
+
+          gst_structure_set_value (astruct, "format", &possible_formats);
+          gst_caps_append_structure (alpha_only_caps, astruct);
+        }
+
+      } else if (G_VALUE_HOLDS_STRING (formats)) {
+        info =
+            gst_video_format_get_info (gst_video_format_from_string
+            (g_value_get_string (formats)));
+
+        if (GST_VIDEO_FORMAT_INFO_HAS_ALPHA (info)) {
+          gst_caps_append_structure (alpha_only_caps,
+              gst_structure_copy (gst_caps_get_structure (caps, i)));
+        }
+      } else {
+        g_assert_not_reached ();
+        GST_WARNING ("Unexpected type for video 'format' field: %s",
+            G_VALUE_TYPE_NAME (formats));
+      }
+    }
+
+    if (gst_caps_is_empty (alpha_only_caps)) {
+      GST_WARNING_OBJECT (src,
+          "Foreground color contains alpha, but downstream can't support alpha.");
+    } else {
+      gst_caps_replace (&caps, alpha_only_caps);
+    }
+  }
+
+  caps = gst_caps_make_writable (caps);
   structure = gst_caps_get_structure (caps, 0);
 
   gst_structure_fixate_field_nearest_int (structure, "width", 320);
   gst_structure_fixate_field_nearest_int (structure, "height", 240);
-  gst_structure_fixate_field_nearest_fraction (structure, "framerate", 30, 1);
+
+  if (gst_structure_has_field (structure, "framerate"))
+    gst_structure_fixate_field_nearest_fraction (structure, "framerate", 30, 1);
+  else
+    gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, 30, 1, NULL);
+
   if (gst_structure_has_field (structure, "pixel-aspect-ratio"))
     gst_structure_fixate_field_nearest_fraction (structure,
         "pixel-aspect-ratio", 1, 1);
+  else
+    gst_structure_set (structure, "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
+        NULL);
+
   if (gst_structure_has_field (structure, "colorimetry"))
     gst_structure_fixate_field_string (structure, "colorimetry", "bt601");
   if (gst_structure_has_field (structure, "chroma-site"))
@@ -333,6 +405,9 @@ gst_video_test_src_src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
   if (gst_structure_has_field (structure, "interlace-mode"))
     gst_structure_fixate_field_string (structure, "interlace-mode",
         "progressive");
+  else
+    gst_structure_set (structure, "interlace-mode", G_TYPE_STRING,
+        "progressive", NULL);
 
   caps = GST_BASE_SRC_CLASS (parent_class)->fixate (bsrc, caps);
 
@@ -411,6 +486,18 @@ gst_video_test_src_set_pattern (GstVideoTestSrc * videotestsrc,
     case GST_VIDEO_TEST_SRC_BAR:
       videotestsrc->make_image = gst_video_test_src_bar;
       break;
+    case GST_VIDEO_TEST_SRC_PINWHEEL:
+      videotestsrc->make_image = gst_video_test_src_pinwheel;
+      break;
+    case GST_VIDEO_TEST_SRC_SPOKES:
+      videotestsrc->make_image = gst_video_test_src_spokes;
+      break;
+    case GST_VIDEO_TEST_SRC_GRADIENT:
+      videotestsrc->make_image = gst_video_test_src_gradient;
+      break;
+    case GST_VIDEO_TEST_SRC_COLORS:
+      videotestsrc->make_image = gst_video_test_src_colors;
+      break;
     default:
       g_assert_not_reached ();
   }
@@ -476,6 +563,7 @@ gst_video_test_src_set_property (GObject * object, guint prop_id,
       break;
     case PROP_HORIZONTAL_SPEED:
       src->horizontal_speed = g_value_get_int (value);
+      break;
     default:
       break;
   }
@@ -583,7 +671,7 @@ gst_video_test_src_parse_caps (const GstCaps * caps,
     } else if (g_str_equal (str, "grbg")) {
       *x_inv = 0;
       *y_inv = 1;
-    } else if (g_str_equal (str, "grbg")) {
+    } else if (g_str_equal (str, "gbrg")) {
       *x_inv = 1;
       *y_inv = 0;
     } else
@@ -612,6 +700,7 @@ gst_video_test_src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   gboolean update;
   guint size, min, max;
   GstStructure *config;
+  GstCaps *caps = NULL;
 
   videotestsrc = GST_VIDEO_TEST_SRC (bsrc);
 
@@ -637,6 +726,11 @@ gst_video_test_src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   }
 
   config = gst_buffer_pool_get_config (pool);
+
+  gst_query_parse_allocation (query, &caps, NULL);
+  if (caps)
+    gst_buffer_pool_config_set_params (config, caps, size, min, max);
+
   if (gst_query_find_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL)) {
     gst_buffer_pool_config_add_option (config,
         GST_BUFFER_POOL_OPTION_VIDEO_META);
@@ -654,34 +748,15 @@ gst_video_test_src_decide_allocation (GstBaseSrc * bsrc, GstQuery * query)
   return GST_BASE_SRC_CLASS (parent_class)->decide_allocation (bsrc, query);
 }
 
-static void
-fill_palette_RGB8P (guint32 * palette)
-{
-  /* build poor man's palette, taken from ffmpegcolorspace */
-  static const guint8 pal_value[6] = { 0x00, 0x33, 0x66, 0x99, 0xcc, 0xff };
-  gint i, r, g, b;
-
-  i = 0;
-  for (r = 0; r < 6; r++) {
-    for (g = 0; g < 6; g++) {
-      for (b = 0; b < 6; b++) {
-        palette[i++] =
-            (0xffU << 24) | (pal_value[r] << 16) | (pal_value[g] << 8) |
-            pal_value[b];
-      }
-    }
-  }
-  palette[i++] = 0;             /* 100% transparent, i == 6*6*6 */
-  while (i < 256)
-    palette[i++] = 0xff000000;
-}
-
 static gboolean
 gst_video_test_src_setcaps (GstBaseSrc * bsrc, GstCaps * caps)
 {
   const GstStructure *structure;
   GstVideoTestSrc *videotestsrc;
   GstVideoInfo info;
+  guint i;
+  guint n_lines;
+  gint offset;
 
   videotestsrc = GST_VIDEO_TEST_SRC (bsrc);
 
@@ -709,7 +784,34 @@ gst_video_test_src_setcaps (GstBaseSrc * bsrc, GstCaps * caps)
     videotestsrc->bayer = TRUE;
     videotestsrc->x_invert = x_inv;
     videotestsrc->y_invert = y_inv;
+  } else {
+    goto unsupported_caps;
   }
+
+  /* create chroma subsampler */
+  if (videotestsrc->subsample)
+    gst_video_chroma_resample_free (videotestsrc->subsample);
+  videotestsrc->subsample = gst_video_chroma_resample_new (0,
+      info.chroma_site, 0, info.finfo->unpack_format, -info.finfo->w_sub[2],
+      -info.finfo->h_sub[2]);
+
+  for (i = 0; i < videotestsrc->n_lines; i++)
+    g_free (videotestsrc->lines[i]);
+  g_free (videotestsrc->lines);
+
+  if (videotestsrc->subsample != NULL) {
+    gst_video_chroma_resample_get_info (videotestsrc->subsample,
+        &n_lines, &offset);
+  } else {
+    n_lines = 1;
+    offset = 0;
+  }
+
+  videotestsrc->lines = g_malloc (sizeof (gpointer) * n_lines);
+  for (i = 0; i < n_lines; i++)
+    videotestsrc->lines[i] = g_malloc ((info.width + 16) * 8);
+  videotestsrc->n_lines = n_lines;
+  videotestsrc->offset = offset;
 
   /* looks ok here */
   videotestsrc->info = info;
@@ -721,18 +823,10 @@ gst_video_test_src_setcaps (GstBaseSrc * bsrc, GstCaps * caps)
   g_free (videotestsrc->tmpline2);
   g_free (videotestsrc->tmpline_u8);
   g_free (videotestsrc->tmpline_u16);
-  g_free (videotestsrc->palette);
   videotestsrc->tmpline_u8 = g_malloc (info.width + 8);
   videotestsrc->tmpline = g_malloc ((info.width + 8) * 4);
   videotestsrc->tmpline2 = g_malloc ((info.width + 8) * 4);
   videotestsrc->tmpline_u16 = g_malloc ((info.width + 16) * 8);
-
-  if (GST_VIDEO_INFO_FORMAT (&info) == GST_VIDEO_FORMAT_RGB8P) {
-    videotestsrc->palette = g_new (guint32, 256);
-    fill_palette_RGB8P (videotestsrc->palette);
-  } else {
-    videotestsrc->palette = NULL;
-  }
 
   videotestsrc->accum_rtime += videotestsrc->running_time;
   videotestsrc->accum_frames += videotestsrc->n_frames;
@@ -748,12 +842,17 @@ parse_failed:
     GST_DEBUG_OBJECT (bsrc, "failed to parse caps");
     return FALSE;
   }
+unsupported_caps:
+  {
+    GST_DEBUG_OBJECT (bsrc, "unsupported caps: %" GST_PTR_FORMAT, caps);
+    return FALSE;
+  }
 }
 
 static gboolean
 gst_video_test_src_query (GstBaseSrc * bsrc, GstQuery * query)
 {
-  gboolean res;
+  gboolean res = FALSE;
   GstVideoTestSrc *src;
 
   src = GST_VIDEO_TEST_SRC (bsrc);
@@ -771,10 +870,52 @@ gst_video_test_src_query (GstBaseSrc * bsrc, GstQuery * query)
       gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
       break;
     }
+    case GST_QUERY_LATENCY:
+    {
+      if (src->info.fps_n > 0) {
+        GstClockTime latency;
+
+        latency =
+            gst_util_uint64_scale (GST_SECOND, src->info.fps_d,
+            src->info.fps_n);
+        gst_query_set_latency (query,
+            gst_base_src_is_live (GST_BASE_SRC_CAST (src)), latency,
+            GST_CLOCK_TIME_NONE);
+        GST_DEBUG_OBJECT (src, "Reporting latency of %" GST_TIME_FORMAT,
+            GST_TIME_ARGS (latency));
+        res = TRUE;
+      }
+      break;
+    }
+    case GST_QUERY_DURATION:{
+      if (bsrc->num_buffers != -1) {
+        GstFormat format;
+
+        gst_query_parse_duration (query, &format, NULL);
+        switch (format) {
+          case GST_FORMAT_TIME:{
+            gint64 dur = gst_util_uint64_scale_int_round (bsrc->num_buffers
+                * GST_SECOND, src->info.fps_d, src->info.fps_n);
+            res = TRUE;
+            gst_query_set_duration (query, GST_FORMAT_TIME, dur);
+            goto done;
+          }
+          case GST_FORMAT_BYTES:
+            res = TRUE;
+            gst_query_set_duration (query, GST_FORMAT_BYTES,
+                bsrc->num_buffers * src->info.size);
+            goto done;
+          default:
+            break;
+        }
+      }
+      /* fall through */
+    }
     default:
       res = GST_BASE_SRC_CLASS (parent_class)->query (bsrc, query);
       break;
   }
+done:
   return res;
 }
 
@@ -784,7 +925,7 @@ gst_video_test_src_get_times (GstBaseSrc * basesrc, GstBuffer * buffer,
 {
   /* for live sources, sync on the timestamp of the buffer */
   if (gst_base_src_is_live (basesrc)) {
-    GstClockTime timestamp = GST_BUFFER_DTS (buffer);
+    GstClockTime timestamp = GST_BUFFER_PTS (buffer);
 
     if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
       /* get duration to calculate end time */
@@ -811,6 +952,7 @@ gst_video_test_src_do_seek (GstBaseSrc * bsrc, GstSegment * segment)
 
   segment->time = segment->start;
   position = segment->position;
+  src->reverse = segment->rate < 0;
 
   /* now move to the position indicated */
   if (src->info.fps_n) {
@@ -847,6 +989,8 @@ gst_video_test_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
   GstVideoTestSrc *src;
   GstClockTime next_time;
   GstVideoFrame frame;
+  gconstpointer pal;
+  gsize palsize;
 
   src = GST_VIDEO_TEST_SRC (psrc);
 
@@ -858,23 +1002,31 @@ gst_video_test_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
   if (G_UNLIKELY (src->info.fps_n == 0 && src->n_frames == 1))
     goto eos;
 
+  if (G_UNLIKELY (src->n_frames == -1)) {
+    /* EOS for reverse playback */
+    goto eos;
+  }
+
   GST_LOG_OBJECT (src,
       "creating buffer from pool for frame %d", (gint) src->n_frames);
 
   if (!gst_video_frame_map (&frame, &src->info, buffer, GST_MAP_WRITE))
     goto invalid_frame;
 
+  GST_BUFFER_PTS (buffer) =
+      src->accum_rtime + src->timestamp_offset + src->running_time;
+  GST_BUFFER_DTS (buffer) = GST_CLOCK_TIME_NONE;
+
+  gst_object_sync_values (GST_OBJECT (psrc), GST_BUFFER_PTS (buffer));
+
   src->make_image (src, &frame);
 
-  if (src->palette) {
-    memcpy (GST_VIDEO_FRAME_PLANE_DATA (&frame, 1), src->palette, 256 * 4);
+  if ((pal = gst_video_format_get_palette (GST_VIDEO_FRAME_FORMAT (&frame),
+              &palsize))) {
+    memcpy (GST_VIDEO_FRAME_PLANE_DATA (&frame, 1), pal, palsize);
   }
 
   gst_video_frame_unmap (&frame);
-
-  GST_BUFFER_DTS (buffer) =
-      src->accum_rtime + src->timestamp_offset + src->running_time;
-  GST_BUFFER_PTS (buffer) = GST_BUFFER_DTS (buffer);
 
   GST_DEBUG_OBJECT (src, "Timestamp: %" GST_TIME_FORMAT " = accumulated %"
       GST_TIME_FORMAT " + offset: %"
@@ -883,12 +1035,20 @@ gst_video_test_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
       GST_TIME_ARGS (src->timestamp_offset), GST_TIME_ARGS (src->running_time));
 
   GST_BUFFER_OFFSET (buffer) = src->accum_frames + src->n_frames;
-  src->n_frames++;
+  if (src->reverse) {
+    src->n_frames--;
+  } else {
+    src->n_frames++;
+  }
   GST_BUFFER_OFFSET_END (buffer) = GST_BUFFER_OFFSET (buffer) + 1;
   if (src->info.fps_n) {
     next_time = gst_util_uint64_scale_int (src->n_frames * GST_SECOND,
         src->info.fps_d, src->info.fps_n);
-    GST_BUFFER_DURATION (buffer) = next_time - src->running_time;
+    if (src->reverse) {
+      GST_BUFFER_DURATION (buffer) = src->running_time - next_time;
+    } else {
+      GST_BUFFER_DURATION (buffer) = next_time - src->running_time;
+    }
   } else {
     next_time = src->timestamp_offset;
     /* NONE means forever */
@@ -901,8 +1061,6 @@ gst_video_test_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
 
 not_negotiated:
   {
-    GST_ELEMENT_ERROR (src, CORE, NEGOTIATION, (NULL),
-        ("format wasn't negotiated before get function"));
     return GST_FLOW_NOT_NEGOTIATED;
   }
 eos:
@@ -927,6 +1085,8 @@ gst_video_test_src_start (GstBaseSrc * basesrc)
   src->accum_frames = 0;
   src->accum_rtime = 0;
 
+  gst_video_info_init (&src->info);
+
   return TRUE;
 }
 
@@ -934,6 +1094,7 @@ static gboolean
 gst_video_test_src_stop (GstBaseSrc * basesrc)
 {
   GstVideoTestSrc *src = GST_VIDEO_TEST_SRC (basesrc);
+  guint i;
 
   g_free (src->tmpline);
   src->tmpline = NULL;
@@ -943,8 +1104,15 @@ gst_video_test_src_stop (GstBaseSrc * basesrc)
   src->tmpline_u8 = NULL;
   g_free (src->tmpline_u16);
   src->tmpline_u16 = NULL;
-  g_free (src->palette);
-  src->palette = NULL;
+  if (src->subsample)
+    gst_video_chroma_resample_free (src->subsample);
+  src->subsample = NULL;
+
+  for (i = 0; i < src->n_lines; i++)
+    g_free (src->lines[i]);
+  g_free (src->lines);
+  src->n_lines = 0;
+  src->lines = NULL;
 
   return TRUE;
 }
