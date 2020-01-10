@@ -64,7 +64,9 @@
 #include <gst/gst.h>
 
 /* necessary for IP_TOS define */
+#if GLIB_CHECK_VERSION(2, 36, 0)
 #include <gio/gnetworking.h>
+#endif
 
 #include "gstrtspconnection.h"
 
@@ -157,7 +159,6 @@ struct _GstRTSPConnection
 
   /* TLS */
   GTlsDatabase *tls_database;
-  GTlsInteraction *tls_interaction;
 
   DecodeCtx ctx;
   DecodeCtx *ctxp;
@@ -195,10 +196,6 @@ typedef struct
   guint8 *body_data;
   glong body_len;
 } GstRTSPBuilder;
-
-/* function prototypes */
-static void add_auth_header (GstRTSPConnection * conn,
-    GstRTSPMessage * message);
 
 static void
 build_reset (GstRTSPBuilder * builder)
@@ -256,7 +253,7 @@ verify_error:
 
 static void
 socket_client_event (GSocketClient * client, GSocketClientEvent event,
-    GSocketConnectable * connectable, GTlsConnection * connection,
+    GSocketConnectable * connectable, GIOStream * connection,
     GstRTSPConnection * rtspconn)
 {
   if (event == G_SOCKET_CLIENT_TLS_HANDSHAKING) {
@@ -264,8 +261,6 @@ socket_client_event (GSocketClient * client, GSocketClientEvent event,
 
     g_signal_connect (connection, "accept-certificate",
         (GCallback) tls_accept_certificate, rtspconn);
-
-    g_tls_connection_set_interaction (connection, rtspconn->tls_interaction);
   }
 }
 
@@ -358,8 +353,6 @@ collect_addresses (GSocket * socket, gchar ** ip, guint16 * port,
  *
  * Returns: #GST_RTSP_OK when @conn contains a valid connection.
  */
-/* FIXME 2.0 We don't need the ip and port since they can be got from the
- * GSocket */
 GstRTSPResult
 gst_rtsp_connection_create_from_socket (GSocket * socket, const gchar * ip,
     guint16 port, const gchar * initial_buffer, GstRTSPConnection ** conn)
@@ -629,83 +622,26 @@ gst_rtsp_connection_get_tls_database (GstRTSPConnection * conn)
   return result;
 }
 
-/**
- * gst_rtsp_connection_set_tls_interaction:
- * @conn: a #GstRTSPConnection
- * @interaction: a #GTlsInteraction
- *
- * Sets a #GTlsInteraction object to be used when the connection or certificate
- * database need to interact with the user. This will be used to prompt the
- * user for passwords where necessary.
- *
- * Since: 1.6
- */
-void
-gst_rtsp_connection_set_tls_interaction (GstRTSPConnection * conn,
-    GTlsInteraction * interaction)
-{
-  GTlsInteraction *old_interaction;
-
-  g_return_if_fail (conn != NULL);
-
-  if (interaction)
-    g_object_ref (interaction);
-
-  old_interaction = conn->tls_interaction;
-  conn->tls_interaction = interaction;
-
-  if (old_interaction)
-    g_object_unref (old_interaction);
-}
-
-/**
- * gst_rtsp_connection_get_tls_interaction:
- * @conn: a #GstRTSPConnection
- *
- * Gets a #GTlsInteraction object to be used when the connection or certificate
- * database need to interact with the user. This will be used to prompt the
- * user for passwords where necessary.
- *
- * Returns: (transfer full): a reference on the #GTlsInteraction. Use
- * g_object_unref() to release.
- *
- * Since: 1.6
- */
-GTlsInteraction *
-gst_rtsp_connection_get_tls_interaction (GstRTSPConnection * conn)
-{
-  GTlsInteraction *result;
-
-  g_return_val_if_fail (conn != NULL, NULL);
-
-  if ((result = conn->tls_interaction))
-    g_object_ref (result);
-
-  return result;
-}
-
 static GstRTSPResult
-setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
-    GstRTSPMessage * response)
+setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri)
 {
   gint i;
   GstRTSPResult res;
   gchar *value;
   guint16 url_port;
   GstRTSPMessage *msg;
+  GstRTSPMessage response;
   gboolean old_http;
   GstRTSPUrl *url;
   GError *error = NULL;
   GSocketConnection *connection;
   GSocket *socket;
-  gchar *connection_uri = NULL;
-  gchar *request_uri = NULL;
-  gchar *host = NULL;
+  gchar *luri = NULL;
+
+  memset (&response, 0, sizeof (response));
+  gst_rtsp_message_init (&response);
 
   url = conn->url;
-
-  gst_rtsp_url_get_port (url, &url_port);
-  host = g_strdup_printf ("%s:%d", url->host, url_port);
 
   /* create a random sessionid */
   for (i = 0; i < TUNNELID_LEN; i++)
@@ -723,8 +659,6 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
       "application/x-rtsp-tunnelled");
   gst_rtsp_message_add_header (msg, GST_RTSP_HDR_CACHE_CONTROL, "no-cache");
   gst_rtsp_message_add_header (msg, GST_RTSP_HDR_PRAGMA, "no-cache");
-  gst_rtsp_message_add_header (msg, GST_RTSP_HDR_HOST, host);
-  add_auth_header (conn, msg);
 
   /* we need to temporarily set conn->tunneled to FALSE to prevent the HTTP
    * request from being base64 encoded */
@@ -739,15 +673,15 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
    * failure otherwise */
   old_http = conn->manual_http;
   conn->manual_http = TRUE;
-  GST_RTSP_CHECK (gst_rtsp_connection_receive (conn, response, timeout),
+  GST_RTSP_CHECK (gst_rtsp_connection_receive (conn, &response, timeout),
       read_failed);
   conn->manual_http = old_http;
 
-  if (response->type != GST_RTSP_MESSAGE_HTTP_RESPONSE ||
-      response->type_data.response.code != GST_RTSP_STS_OK)
+  if (response.type != GST_RTSP_MESSAGE_HTTP_RESPONSE ||
+      response.type_data.response.code != GST_RTSP_STS_OK)
     goto wrong_result;
 
-  if (gst_rtsp_message_get_header (response, GST_RTSP_HDR_X_SERVER_IP_ADDRESS,
+  if (gst_rtsp_message_get_header (&response, GST_RTSP_HDR_X_SERVER_IP_ADDRESS,
           &value, 0) == GST_RTSP_OK) {
     g_free (url->host);
     url->host = g_strdup (value);
@@ -755,20 +689,17 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
     conn->remote_ip = g_strdup (value);
   }
 
-  connection_uri = g_strdup_printf ("http://%s:%d%s%s%s", url->host, url_port,
+  gst_rtsp_url_get_port (url, &url_port);
+  luri = g_strdup_printf ("http://%s:%d%s%s%s", url->host, url_port,
       url->abspath, url->query ? "?" : "", url->query ? url->query : "");
 
   /* connect to the host/port */
   if (conn->proxy_host) {
     connection = g_socket_client_connect_to_host (conn->client,
         conn->proxy_host, conn->proxy_port, conn->cancellable, &error);
-    request_uri = g_strdup (connection_uri);
   } else {
     connection = g_socket_client_connect_to_uri (conn->client,
-        connection_uri, 0, conn->cancellable, &error);
-    request_uri =
-        g_strdup_printf ("%s%s%s", url->abspath,
-        url->query ? "?" : "", url->query ? url->query : "");
+        luri, 0, conn->cancellable, &error);
   }
   if (connection == NULL)
     goto connect_failed;
@@ -790,8 +721,8 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
   conn->control_stream = NULL;
 
   /* create the POST request for the write connection */
-  GST_RTSP_CHECK (gst_rtsp_message_new_request (&msg, GST_RTSP_POST,
-          request_uri), no_message);
+  GST_RTSP_CHECK (gst_rtsp_message_new_request (&msg, GST_RTSP_POST, luri),
+      no_message);
   msg->type = GST_RTSP_MESSAGE_HTTP_REQUEST;
 
   gst_rtsp_message_add_header (msg, GST_RTSP_HDR_X_SESSIONCOOKIE,
@@ -803,8 +734,6 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
   gst_rtsp_message_add_header (msg, GST_RTSP_HDR_EXPIRES,
       "Sun, 9 Jan 1972 00:00:00 GMT");
   gst_rtsp_message_add_header (msg, GST_RTSP_HDR_CONTENT_LENGTH, "32767");
-  gst_rtsp_message_add_header (msg, GST_RTSP_HDR_HOST, host);
-  add_auth_header (conn, msg);
 
   /* we need to temporarily set conn->tunneled to FALSE to prevent the HTTP
    * request from being base64 encoded */
@@ -814,9 +743,8 @@ setup_tunneling (GstRTSPConnection * conn, GTimeVal * timeout, gchar * uri,
   conn->tunneled = TRUE;
 
 exit:
-  g_free (connection_uri);
-  g_free (request_uri);
-  g_free (host);
+  gst_rtsp_message_unset (&response);
+  g_free (luri);
 
   return res;
 
@@ -841,8 +769,8 @@ read_failed:
   }
 wrong_result:
   {
-    GST_ERROR ("got failure response %d %s",
-        response->type_data.response.code, response->type_data.response.reason);
+    GST_ERROR ("got failure response %d %s", response.type_data.response.code,
+        response.type_data.response.reason);
     res = GST_RTSP_ERROR;
     goto exit;
   }
@@ -863,32 +791,27 @@ remote_address_failed:
 }
 
 /**
- * gst_rtsp_connection_connect_with_response:
+ * gst_rtsp_connection_connect:
  * @conn: a #GstRTSPConnection
  * @timeout: a #GTimeVal timeout
- * @response: a #GstRTSPMessage
  *
  * Attempt to connect to the url of @conn made with
  * gst_rtsp_connection_create(). If @timeout is #NULL this function can block
  * forever. If @timeout contains a valid timeout, this function will return
- * #GST_RTSP_ETIMEOUT after the timeout expired.  If @conn is set to tunneled,
- * @response will contain a response to the tunneling request messages.
+ * #GST_RTSP_ETIMEOUT after the timeout expired.
  *
  * This function can be cancelled with gst_rtsp_connection_flush().
  *
  * Returns: #GST_RTSP_OK when a connection could be made.
- *
- * Since 1.8
  */
 GstRTSPResult
-gst_rtsp_connection_connect_with_response (GstRTSPConnection * conn,
-    GTimeVal * timeout, GstRTSPMessage * response)
+gst_rtsp_connection_connect (GstRTSPConnection * conn, GTimeVal * timeout)
 {
   GstRTSPResult res;
   GSocketConnection *connection;
   GSocket *socket;
   GError *error = NULL;
-  gchar *connection_uri, *request_uri, *remote_ip;
+  gchar *uri, *remote_ip;
   GstClockTime to;
   guint16 url_port;
   GstRTSPUrl *url;
@@ -906,23 +829,18 @@ gst_rtsp_connection_connect_with_response (GstRTSPConnection * conn,
   gst_rtsp_url_get_port (url, &url_port);
 
   if (conn->tunneled) {
-    connection_uri = g_strdup_printf ("http://%s:%d%s%s%s", url->host, url_port,
+    uri = g_strdup_printf ("http://%s:%d%s%s%s", url->host, url_port,
         url->abspath, url->query ? "?" : "", url->query ? url->query : "");
   } else {
-    connection_uri = gst_rtsp_url_get_request_uri (url);
+    uri = gst_rtsp_url_get_request_uri (url);
   }
 
   if (conn->proxy_host) {
     connection = g_socket_client_connect_to_host (conn->client,
         conn->proxy_host, conn->proxy_port, conn->cancellable, &error);
-    request_uri = g_strdup (connection_uri);
   } else {
     connection = g_socket_client_connect_to_uri (conn->client,
-        connection_uri, url_port, conn->cancellable, &error);
-
-    /* use the relative component of the uri for non-proxy connections */
-    request_uri = g_strdup_printf ("%s%s%s", url->abspath,
-        url->query ? "?" : "", url->query ? url->query : "");
+        uri, url_port, conn->cancellable, &error);
   }
   if (connection == NULL)
     goto connect_failed;
@@ -945,12 +863,11 @@ gst_rtsp_connection_connect_with_response (GstRTSPConnection * conn,
   conn->control_stream = NULL;
 
   if (conn->tunneled) {
-    res = setup_tunneling (conn, timeout, request_uri, response);
+    res = setup_tunneling (conn, timeout, uri);
     if (res != GST_RTSP_OK)
       goto tunneling_failed;
   }
-  g_free (connection_uri);
-  g_free (request_uri);
+  g_free (uri);
 
   return GST_RTSP_OK;
 
@@ -959,8 +876,7 @@ connect_failed:
   {
     GST_ERROR ("failed to connect: %s", error->message);
     g_clear_error (&error);
-    g_free (connection_uri);
-    g_free (request_uri);
+    g_free (uri);
     return GST_RTSP_ERROR;
   }
 remote_address_failed:
@@ -968,15 +884,13 @@ remote_address_failed:
     GST_ERROR ("failed to connect: %s", error->message);
     g_object_unref (connection);
     g_clear_error (&error);
-    g_free (connection_uri);
-    g_free (request_uri);
+    g_free (uri);
     return GST_RTSP_ERROR;
   }
 tunneling_failed:
   {
     GST_ERROR ("failed to setup tunneling");
-    g_free (connection_uri);
-    g_free (request_uri);
+    g_free (uri);
     return res;
   }
 }
@@ -1103,36 +1017,6 @@ add_auth_header (GstRTSPConnection * conn, GstRTSPMessage * message)
       /* Nothing to do */
       break;
   }
-}
-
-/**
- * gst_rtsp_connection_connect:
- * @conn: a #GstRTSPConnection
- * @timeout: a #GTimeVal timeout
- *
- * Attempt to connect to the url of @conn made with
- * gst_rtsp_connection_create(). If @timeout is #NULL this function can block
- * forever. If @timeout contains a valid timeout, this function will return
- * #GST_RTSP_ETIMEOUT after the timeout expired.
- *
- * This function can be cancelled with gst_rtsp_connection_flush().
- *
- * Returns: #GST_RTSP_OK when a connection could be made.
- */
-GstRTSPResult
-gst_rtsp_connection_connect (GstRTSPConnection * conn, GTimeVal * timeout)
-{
-  GstRTSPResult result;
-  GstRTSPMessage response;
-
-  memset (&response, 0, sizeof (response));
-  gst_rtsp_message_init (&response);
-
-  result = gst_rtsp_connection_connect_with_response (conn, timeout, &response);
-
-  gst_rtsp_message_unset (&response);
-
-  return result;
 }
 
 static void
@@ -1816,7 +1700,6 @@ parse_line (guint8 * buffer, GstRTSPMessage * msg)
 {
   GstRTSPHeaderField field;
   gchar *line = (gchar *) buffer;
-  gchar *field_name = NULL;
   gchar *value;
 
   if ((value = strchr (line, ':')) == NULL || value == line)
@@ -1831,9 +1714,8 @@ parse_line (guint8 * buffer, GstRTSPMessage * msg)
 
   /* find the header */
   field = gst_rtsp_find_header_field (line);
-  /* custom header not present in the list of pre-defined headers */
   if (field == GST_RTSP_HDR_INVALID)
-    field_name = line;
+    goto done;
 
   /* split up the value in multiple key:value pairs if it contains comma(s) */
   while (*value != '\0') {
@@ -1900,19 +1782,6 @@ parse_line (guint8 * buffer, GstRTSPMessage * msg)
       next_value++;
     }
 
-    if (msg->type == GST_RTSP_MESSAGE_REQUEST && field == GST_RTSP_HDR_SESSION) {
-      /* The timeout parameter is only allowed in a session response header
-       * but some clients send it as part of the session request header.
-       * Ignore everything from the semicolon to the end of the line. */
-      next_value = value;
-      while (*next_value != '\0') {
-        if (*next_value == ';') {
-          break;
-        }
-        next_value++;
-      }
-    }
-
     /* trim space */
     if (value != next_value && next_value[-1] == ' ')
       next_value[-1] = '\0';
@@ -1921,16 +1790,13 @@ parse_line (guint8 * buffer, GstRTSPMessage * msg)
       *next_value++ = '\0';
 
     /* add the key:value pair */
-    if (*value != '\0') {
-      if (field != GST_RTSP_HDR_INVALID)
-        gst_rtsp_message_add_header (msg, field, value);
-      else
-        gst_rtsp_message_add_header_by_name (msg, field_name, value);
-    }
+    if (*value != '\0')
+      gst_rtsp_message_add_header (msg, field, value);
 
     value = next_value;
   }
 
+done:
   return GST_RTSP_OK;
 
   /* ERRORS */
@@ -2161,13 +2027,11 @@ build_next (GstRTSPBuilder * builder, GstRTSPMessage * message,
     }
   }
 done:
-  conn->may_cancel = TRUE;
   return res;
 
   /* ERRORS */
 invalid_body_len:
   {
-    conn->may_cancel = TRUE;
     GST_DEBUG ("could not allocate body");
     return GST_RTSP_ERROR;
   }
@@ -2421,8 +2285,6 @@ gst_rtsp_connection_free (GstRTSPConnection * conn)
     g_object_unref (conn->client);
   if (conn->tls_database)
     g_object_unref (conn->tls_database);
-  if (conn->tls_interaction)
-    g_object_unref (conn->tls_interaction);
 
   g_timer_destroy (conn->timer);
   gst_rtsp_url_free (conn->url);
@@ -2599,12 +2461,10 @@ gst_rtsp_connection_flush (GstRTSPConnection * conn, gboolean flush)
 {
   g_return_val_if_fail (conn != NULL, GST_RTSP_EINVAL);
 
-  if (flush) {
+  if (flush)
     g_cancellable_cancel (conn->cancellable);
-  } else {
-    g_object_unref (conn->cancellable);
-    conn->cancellable = g_cancellable_new ();
-  }
+  else
+    g_cancellable_reset (conn->cancellable);
 
   return GST_RTSP_OK;
 }
@@ -2900,7 +2760,7 @@ gst_rtsp_connection_set_ip (GstRTSPConnection * conn, const gchar * ip)
 }
 
 /**
- * gst_rtsp_connection_get_read_socket:
+ * gst_rtsp_connection_get_readfd:
  * @conn: a #GstRTSPConnection
  *
  * Get the file descriptor for reading.
@@ -3067,8 +2927,7 @@ gst_rtsp_connection_do_tunnel (GstRTSPConnection * conn,
     conn2->stream1 = NULL;
     conn2->input_stream = NULL;
     conn2->control_stream = NULL;
-    g_object_unref (conn2->cancellable);
-    conn2->cancellable = NULL;
+    g_cancellable_reset (conn2->cancellable);
 
     /* We make socket0 the write socket and socket1 the read socket. */
     conn->write_socket = conn->socket0;
@@ -3559,7 +3418,7 @@ static GSourceFuncs gst_rtsp_source_funcs = {
 };
 
 /**
- * gst_rtsp_watch_new: (skip)
+ * gst_rtsp_watch_new:
  * @conn: a #GstRTSPConnection
  * @funcs: watch functions
  * @user_data: user data to pass to @funcs
@@ -3998,7 +3857,7 @@ gst_rtsp_watch_set_flushing (GstRTSPWatch * watch, gboolean flushing)
   g_mutex_lock (&watch->mutex);
   watch->flushing = flushing;
   g_cond_signal (&watch->queue_not_full);
-  if (flushing) {
+  if (flushing == TRUE) {
     g_queue_foreach (watch->messages, (GFunc) gst_rtsp_rec_free, NULL);
     g_queue_clear (watch->messages);
   }

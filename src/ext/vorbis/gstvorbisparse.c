@@ -36,11 +36,11 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch-1.0 -v filesrc location=sine.ogg ! oggdemux ! vorbisparse ! fakesink
+ * gst-launch -v filesrc location=sine.ogg ! oggdemux ! vorbisparse ! fakesink
  * ]| This pipeline shows that the streamheader is set in the caps, and that each
  * buffer has the timestamp, duration, offset, and offset_end set.
  * |[
- * gst-launch-1.0 filesrc location=sine.ogg ! oggdemux ! vorbisparse \
+ * gst-launch filesrc location=sine.ogg ! oggdemux ! vorbisparse \
  *            ! oggmux ! filesink location=sine-remuxed.ogg
  * ]| This pipeline shows remuxing. sine-remuxed.ogg might not be exactly the same
  * as sine.ogg, but they should produce exactly the same decoded data.
@@ -93,12 +93,13 @@ gst_vorbis_parse_class_init (GstVorbisParseClass * klass)
 
   gstelement_class->change_state = vorbis_parse_change_state;
 
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &vorbis_parse_src_factory);
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &vorbis_parse_sink_factory);
-  gst_element_class_set_static_metadata (gstelement_class, "VorbisParse",
-      "Codec/Parser/Audio", "parse raw vorbis streams",
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vorbis_parse_src_factory));
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vorbis_parse_sink_factory));
+  gst_element_class_set_static_metadata (gstelement_class,
+      "VorbisParse", "Codec/Parser/Audio",
+      "parse raw vorbis streams",
       "Thomas Vander Stichele <thomas at apestaart dot org>");
 
   klass->parse_packet = GST_DEBUG_FUNCPTR (vorbis_parse_parse_packet);
@@ -226,7 +227,7 @@ vorbis_parse_push_headers (GstVorbisParse * parse)
   /* get the headers into the caps, passing them to vorbis as we go */
   caps = gst_caps_new_simple ("audio/x-vorbis",
       "rate", G_TYPE_INT, parse->sample_rate,
-      "channels", G_TYPE_INT, parse->channels, NULL);
+      "channels", G_TYPE_INT, parse->channels, NULL);;
   vorbis_parse_set_header_on_caps (parse, caps);
   GST_DEBUG_OBJECT (parse, "here are the caps: %" GST_PTR_FORMAT, caps);
   gst_pad_set_caps (parse->srcpad, caps);

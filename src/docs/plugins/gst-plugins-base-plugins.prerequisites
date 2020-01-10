@@ -1,4 +1,3 @@
-GDatagramBased GObject
 GFile GObject
 GInitable GObject
 GstChildProxy GObject

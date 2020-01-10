@@ -28,8 +28,8 @@
  * <refsect2>
  * <title>Example launch line</title>
  * |[
- * gst-launch-1.0 -v videotestsrc pattern=snow ! video/x-raw,width=1280,height=720 ! autovideosink
- * ]| Shows random noise in a video window.
+ * gst-launch -v videotestsrc pattern=snow ! ximagesink
+ * ]| Shows random noise in an X window.
  * </refsect2>
  */
 
@@ -74,7 +74,8 @@ enum
   PROP_YOFFSET,
   PROP_FOREGROUND_COLOR,
   PROP_BACKGROUND_COLOR,
-  PROP_HORIZONTAL_SPEED
+  PROP_HORIZONTAL_SPEED,
+  PROP_LAST
 };
 
 
@@ -150,8 +151,6 @@ gst_video_test_src_pattern_get_type (void)
     {GST_VIDEO_TEST_SRC_BAR, "Bar", "bar"},
     {GST_VIDEO_TEST_SRC_PINWHEEL, "Pinwheel", "pinwheel"},
     {GST_VIDEO_TEST_SRC_SPOKES, "Spokes", "spokes"},
-    {GST_VIDEO_TEST_SRC_GRADIENT, "Gradient", "gradient"},
-    {GST_VIDEO_TEST_SRC_COLORS, "Colors", "colors"},
     {0, NULL, NULL}
   };
 
@@ -184,9 +183,8 @@ gst_video_test_src_class_init (GstVideoTestSrcClass * klass)
           DEFAULT_PATTERN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_TIMESTAMP_OFFSET,
       g_param_spec_int64 ("timestamp-offset", "Timestamp offset",
-          "An offset added to timestamps set on buffers (in ns)", 0,
-          (G_MAXLONG == G_MAXINT64) ? G_MAXINT64 : (G_MAXLONG * GST_SECOND - 1),
-          0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          "An offset added to timestamps set on buffers (in ns)", G_MININT64,
+          G_MAXINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (gobject_class, PROP_IS_LIVE,
       g_param_spec_boolean ("is-live", "Is Live",
           "Whether to act as a live source", DEFAULT_IS_LIVE,
@@ -279,8 +277,8 @@ gst_video_test_src_class_init (GstVideoTestSrcClass * klass)
       "Video test source", "Source/Video",
       "Creates a test video stream", "David A. Schleef <ds@schleef.org>");
 
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &gst_video_test_src_template);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&gst_video_test_src_template));
 
   gstbasesrc_class->set_caps = gst_video_test_src_setcaps;
   gstbasesrc_class->fixate = gst_video_test_src_src_fixate;
@@ -313,82 +311,15 @@ gst_video_test_src_init (GstVideoTestSrc * src)
 static GstCaps *
 gst_video_test_src_src_fixate (GstBaseSrc * bsrc, GstCaps * caps)
 {
-  GstVideoTestSrc *src = GST_VIDEO_TEST_SRC (bsrc);
   GstStructure *structure;
 
-  /* Check if foreground color has alpha, if it is the case,
-   * force color format with an alpha channel downstream */
-  if (src->foreground_color >> 24 != 255) {
-    guint i;
-    GstCaps *alpha_only_caps = gst_caps_new_empty ();
-
-    for (i = 0; i < gst_caps_get_size (caps); i++) {
-      const GstVideoFormatInfo *info;
-      const GValue *formats =
-          gst_structure_get_value (gst_caps_get_structure (caps, i),
-          "format");
-
-      if (GST_VALUE_HOLDS_LIST (formats)) {
-        GValue possible_formats = { 0, };
-        guint list_size = gst_value_list_get_size (formats);
-        guint index;
-
-        g_value_init (&possible_formats, GST_TYPE_LIST);
-        for (index = 0; index < list_size; index++) {
-          const GValue *list_item = gst_value_list_get_value (formats, index);
-          info =
-              gst_video_format_get_info (gst_video_format_from_string
-              (g_value_get_string (list_item)));
-          if (GST_VIDEO_FORMAT_INFO_HAS_ALPHA (info)) {
-            GValue tmp = { 0, };
-
-            gst_value_init_and_copy (&tmp, list_item);
-            gst_value_list_append_value (&possible_formats, &tmp);
-          }
-        }
-
-        if (gst_value_list_get_size (&possible_formats)) {
-          GstStructure *astruct =
-              gst_structure_copy (gst_caps_get_structure (caps, i));
-
-          gst_structure_set_value (astruct, "format", &possible_formats);
-          gst_caps_append_structure (alpha_only_caps, astruct);
-        }
-
-      } else if (G_VALUE_HOLDS_STRING (formats)) {
-        info =
-            gst_video_format_get_info (gst_video_format_from_string
-            (g_value_get_string (formats)));
-
-        if (GST_VIDEO_FORMAT_INFO_HAS_ALPHA (info)) {
-          gst_caps_append_structure (alpha_only_caps,
-              gst_structure_copy (gst_caps_get_structure (caps, i)));
-        }
-      } else {
-        g_assert_not_reached ();
-        GST_WARNING ("Unexpected type for video 'format' field: %s",
-            G_VALUE_TYPE_NAME (formats));
-      }
-    }
-
-    if (gst_caps_is_empty (alpha_only_caps)) {
-      GST_WARNING_OBJECT (src,
-          "Foreground color contains alpha, but downstream can't support alpha.");
-    } else {
-      gst_caps_replace (&caps, alpha_only_caps);
-    }
-  }
-
   caps = gst_caps_make_writable (caps);
+
   structure = gst_caps_get_structure (caps, 0);
 
   gst_structure_fixate_field_nearest_int (structure, "width", 320);
   gst_structure_fixate_field_nearest_int (structure, "height", 240);
-
-  if (gst_structure_has_field (structure, "framerate"))
-    gst_structure_fixate_field_nearest_fraction (structure, "framerate", 30, 1);
-  else
-    gst_structure_set (structure, "framerate", GST_TYPE_FRACTION, 30, 1, NULL);
+  gst_structure_fixate_field_nearest_fraction (structure, "framerate", 30, 1);
 
   if (gst_structure_has_field (structure, "pixel-aspect-ratio"))
     gst_structure_fixate_field_nearest_fraction (structure,
@@ -492,12 +423,6 @@ gst_video_test_src_set_pattern (GstVideoTestSrc * videotestsrc,
     case GST_VIDEO_TEST_SRC_SPOKES:
       videotestsrc->make_image = gst_video_test_src_spokes;
       break;
-    case GST_VIDEO_TEST_SRC_GRADIENT:
-      videotestsrc->make_image = gst_video_test_src_gradient;
-      break;
-    case GST_VIDEO_TEST_SRC_COLORS:
-      videotestsrc->make_image = gst_video_test_src_colors;
-      break;
     default:
       g_assert_not_reached ();
   }
@@ -563,7 +488,6 @@ gst_video_test_src_set_property (GObject * object, guint prop_id,
       break;
     case PROP_HORIZONTAL_SPEED:
       src->horizontal_speed = g_value_get_int (value);
-      break;
     default:
       break;
   }
@@ -671,7 +595,7 @@ gst_video_test_src_parse_caps (const GstCaps * caps,
     } else if (g_str_equal (str, "grbg")) {
       *x_inv = 0;
       *y_inv = 1;
-    } else if (g_str_equal (str, "gbrg")) {
+    } else if (g_str_equal (str, "grbg")) {
       *x_inv = 1;
       *y_inv = 0;
     } else
@@ -852,7 +776,7 @@ unsupported_caps:
 static gboolean
 gst_video_test_src_query (GstBaseSrc * bsrc, GstQuery * query)
 {
-  gboolean res = FALSE;
+  gboolean res;
   GstVideoTestSrc *src;
 
   src = GST_VIDEO_TEST_SRC (bsrc);
@@ -868,23 +792,6 @@ gst_video_test_src_query (GstBaseSrc * bsrc, GstQuery * query)
           gst_video_info_convert (&src->info, src_fmt, src_val, dest_fmt,
           &dest_val);
       gst_query_set_convert (query, src_fmt, src_val, dest_fmt, dest_val);
-      break;
-    }
-    case GST_QUERY_LATENCY:
-    {
-      if (src->info.fps_n > 0) {
-        GstClockTime latency;
-
-        latency =
-            gst_util_uint64_scale (GST_SECOND, src->info.fps_d,
-            src->info.fps_n);
-        gst_query_set_latency (query,
-            gst_base_src_is_live (GST_BASE_SRC_CAST (src)), latency,
-            GST_CLOCK_TIME_NONE);
-        GST_DEBUG_OBJECT (src, "Reporting latency of %" GST_TIME_FORMAT,
-            GST_TIME_ARGS (latency));
-        res = TRUE;
-      }
       break;
     }
     case GST_QUERY_DURATION:{
@@ -925,7 +832,7 @@ gst_video_test_src_get_times (GstBaseSrc * basesrc, GstBuffer * buffer,
 {
   /* for live sources, sync on the timestamp of the buffer */
   if (gst_base_src_is_live (basesrc)) {
-    GstClockTime timestamp = GST_BUFFER_PTS (buffer);
+    GstClockTime timestamp = GST_BUFFER_DTS (buffer);
 
     if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
       /* get duration to calculate end time */
@@ -1013,11 +920,11 @@ gst_video_test_src_fill (GstPushSrc * psrc, GstBuffer * buffer)
   if (!gst_video_frame_map (&frame, &src->info, buffer, GST_MAP_WRITE))
     goto invalid_frame;
 
-  GST_BUFFER_PTS (buffer) =
+  GST_BUFFER_DTS (buffer) =
       src->accum_rtime + src->timestamp_offset + src->running_time;
-  GST_BUFFER_DTS (buffer) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_PTS (buffer) = GST_BUFFER_DTS (buffer);
 
-  gst_object_sync_values (GST_OBJECT (psrc), GST_BUFFER_PTS (buffer));
+  gst_object_sync_values (GST_OBJECT (psrc), GST_BUFFER_DTS (buffer));
 
   src->make_image (src, &frame);
 

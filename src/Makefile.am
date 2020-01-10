@@ -44,17 +44,13 @@ include $(top_srcdir)/common/release.mak
 include $(top_srcdir)/common/po.mak
 
 check-valgrind:
-	$(MAKE) -C tests/check check-valgrind
+	cd tests/check && make check-valgrind
 
 if HAVE_GST_CHECK
 check-torture:
-	$(MAKE) -C tests/check torture
-build-checks:
-	$(MAKE) -C tests/check build-checks
+	cd tests/check && make torture
 else
 check-torture:
-	true
-build-checks:
 	true
 endif
 
@@ -81,8 +77,6 @@ CRUFT_FILES = \
 	$(top_builddir)/common/shave \
 	$(top_builddir)/common/shave-libtool \
 	$(top_builddir)/gst-libs/gst/audio/testchannels \
-        $(top_builddir)/gst-libs/gst/app/gstapp-marshal.c \
-        $(top_builddir)/gst-libs/gst/app/gstapp-marshal.h \
 	$(top_builddir)/tests/check/elements/gdppay \
 	$(top_builddir)/tests/check/elements/gdpdepay \
 	$(top_builddir)/tests/check/pipelines/streamheader \
@@ -91,7 +85,6 @@ CRUFT_FILES = \
 	$(top_builddir)/tools/gst-discoverer
 
 CRUFT_DIRS = \
-	$(top_srcdir)/docs/plugins/tmpl \
 	$(top_srcdir)/ext/gio \
 	$(top_srcdir)/gst/gdp \
 	$(top_srcdir)/sys/v4l \

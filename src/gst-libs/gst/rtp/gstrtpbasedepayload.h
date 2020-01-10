@@ -36,10 +36,9 @@ G_BEGIN_DECLS
   (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_RTP_BASE_DEPAYLOAD))
 #define GST_IS_RTP_BASE_DEPAYLOAD_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_RTP_BASE_DEPAYLOAD))
-#define GST_RTP_BASE_DEPAYLOAD_CAST(obj) ((GstRTPBaseDepayload *)(obj))
 
-#define GST_RTP_BASE_DEPAYLOAD_SINKPAD(depayload) (GST_RTP_BASE_DEPAYLOAD_CAST (depayload)->sinkpad)
-#define GST_RTP_BASE_DEPAYLOAD_SRCPAD(depayload)  (GST_RTP_BASE_DEPAYLOAD_CAST (depayload)->srcpad)
+#define GST_RTP_BASE_DEPAYLOAD_SINKPAD(depayload) (GST_RTP_BASE_DEPAYLOAD (depayload)->sinkpad)
+#define GST_RTP_BASE_DEPAYLOAD_SRCPAD(depayload)  (GST_RTP_BASE_DEPAYLOAD (depayload)->srcpad)
 
 typedef struct _GstRTPBaseDepayload      GstRTPBaseDepayload;
 typedef struct _GstRTPBaseDepayloadClass GstRTPBaseDepayloadClass;
@@ -80,8 +79,7 @@ struct _GstRTPBaseDepayloadClass
   /* virtuals, inform the subclass of the caps. */
   gboolean (*set_caps) (GstRTPBaseDepayload *filter, GstCaps *caps);
 
-  /* pure virtual function, child must implement either this method
-   * or the process_rtp_packet virtual method to process incoming
+  /* pure virtual function, child must use this to process incoming
    * rtp packets. If the child returns a buffer without a valid timestamp,
    * the timestamp of @in will be applied to the result buffer and the
    * buffer will be pushed. If this function returns %NULL, nothing is
@@ -97,21 +95,8 @@ struct _GstRTPBaseDepayloadClass
    * implementation can override. */
   gboolean (*handle_event) (GstRTPBaseDepayload * filter, GstEvent * event);
 
-  /* Optional. Same as the process virtual function, but slightly more
-   * efficient, since it is passed the rtp buffer structure that has already
-   * been mapped (with GST_MAP_READ) by the base class and thus does not have
-   * to be mapped again by the subclass. Can be used by the subclass to process
-   * incoming rtp packets. If the subclass returns a buffer without a valid
-   * timestamp, the timestamp of the input buffer will be applied to the result
-   * buffer and the output buffer will be pushed out. If this function returns
-   * %NULL, nothing is pushed out.
-   *
-   * Since: 1.6
-   */
-  GstBuffer * (*process_rtp_packet) (GstRTPBaseDepayload *base, GstRTPBuffer * rtp_buffer);
-
   /*< private >*/
-  gpointer _gst_reserved[GST_PADDING - 1];
+  gpointer _gst_reserved[GST_PADDING];
 };
 
 GType gst_rtp_base_depayload_get_type (void);
@@ -119,10 +104,6 @@ GType gst_rtp_base_depayload_get_type (void);
 GstFlowReturn   gst_rtp_base_depayload_push       (GstRTPBaseDepayload *filter, GstBuffer *out_buf);
 GstFlowReturn   gst_rtp_base_depayload_push_list  (GstRTPBaseDepayload *filter, GstBufferList *out_list);
 
-
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstRTPBaseDepayload, gst_object_unref)
-#endif
 
 G_END_DECLS
 

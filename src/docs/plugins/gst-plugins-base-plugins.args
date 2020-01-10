@@ -45,7 +45,7 @@
 <FLAGS>rw</FLAGS>
 <NICK>method</NICK>
 <BLURB>method.</BLURB>
-<DEFAULT>Bilinear (2-tap)</DEFAULT>
+<DEFAULT>Bilinear</DEFAULT>
 </ARG>
 
 <ARG>
@@ -66,16 +66,6 @@
 <NICK>Sharpness</NICK>
 <BLURB>Sharpness of filter.</BLURB>
 <DEFAULT>1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoScale::gamma-decode</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rwx</FLAGS>
-<NICK>Gamma Decode</NICK>
-<BLURB>Decode gamma before scaling.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
 </ARG>
 
 <ARG>
@@ -689,26 +679,6 @@
 </ARG>
 
 <ARG>
-<NAME>GstPlayBin::video-multiview-flags</NAME>
-<TYPE>GstVideoMultiviewFlags</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Multiview Flags Override</NICK>
-<BLURB>Override details of the multiview frame layout.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin::video-multiview-mode</NAME>
-<TYPE>GstVideoMultiviewFramePacking</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Multiview Mode Override</NICK>
-<BLURB>Re-interpret a video stream as one of several frame-packed stereoscopic modes.</BLURB>
-<DEFAULT>GST_VIDEO_MULTIVIEW_FRAME_PACKING_NONE</DEFAULT>
-</ARG>
-
-<ARG>
 <NAME>GstDecodeBin::caps</NAME>
 <TYPE>GstCaps*</TYPE>
 <RANGE></RANGE>
@@ -870,122 +840,22 @@
 
 <ARG>
 <NAME>GstAudioResample::sinc-filter-mode</NAME>
-<TYPE>GstAudioResamplerFilterMode</TYPE>
+<TYPE>SpeexResamplerSincFilterMode</TYPE>
 <RANGE></RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Sinc filter table mode</NICK>
 <BLURB>What sinc filter table mode to use.</BLURB>
-<DEFAULT>GST_AUDIO_RESAMPLER_FILTER_MODE_AUTO</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstAudioResample::resample-method</NAME>
-<TYPE>GstAudioResamplerMethod</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Resample method to use</NICK>
-<BLURB>What resample method to use.</BLURB>
-<DEFAULT>GST_AUDIO_RESAMPLER_METHOD_KAISER</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstAudioResample::sinc-filter-interpolation</NAME>
-<TYPE>GstAudioResamplerFilterInterpolation</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Sinc filter interpolation</NICK>
-<BLURB>How to interpolate the sinc filter table.</BLURB>
-<DEFAULT>GST_AUDIO_RESAMPLER_FILTER_INTERPOLATION_CUBIC</DEFAULT>
+<DEFAULT>Use full table if table size below threshold</DEFAULT>
 </ARG>
 
 <ARG>
 <NAME>GstVideoConvert::dither</NAME>
-<TYPE>GstVideoDitherMethod</TYPE>
+<TYPE>GstVideoConvertDitherMethod</TYPE>
 <RANGE></RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Dither</NICK>
 <BLURB>Apply dithering while converting.</BLURB>
-<DEFAULT>GST_VIDEO_DITHER_BAYER</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::alpha-mode</NAME>
-<TYPE>GstVideoAlphaMode</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Alpha Mode</NICK>
-<BLURB>Alpha Mode to use.</BLURB>
-<DEFAULT>GST_VIDEO_ALPHA_MODE_COPY</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::alpha-value</NAME>
-<TYPE>gdouble</TYPE>
-<RANGE>[0,1]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Alpha Value</NICK>
-<BLURB>Alpha Value to use.</BLURB>
-<DEFAULT>1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::chroma-mode</NAME>
-<TYPE>GstVideoChromaMode</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Chroma Mode</NICK>
-<BLURB>Chroma Resampling Mode.</BLURB>
-<DEFAULT>GST_VIDEO_CHROMA_MODE_FULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::chroma-resampler</NAME>
-<TYPE>GstVideoResamplerMethod</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Chroma resampler</NICK>
-<BLURB>Chroma resampler method.</BLURB>
-<DEFAULT>GST_VIDEO_RESAMPLER_METHOD_LINEAR</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::dither-quantization</NAME>
-<TYPE>guint</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Dither Quantize</NICK>
-<BLURB>Quantizer to use.</BLURB>
-<DEFAULT>1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::gamma-mode</NAME>
-<TYPE>GstVideoGammaMode</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Gamma Mode</NICK>
-<BLURB>Gamma Conversion Mode.</BLURB>
-<DEFAULT>GST_VIDEO_GAMMA_MODE_NONE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::matrix-mode</NAME>
-<TYPE>GstVideoMatrixMode</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Matrix Mode</NICK>
-<BLURB>Matrix Conversion Mode.</BLURB>
-<DEFAULT>GST_VIDEO_MATRIX_MODE_FULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstVideoConvert::primaries-mode</NAME>
-<TYPE>GstVideoPrimariesMode</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Primaries Mode</NICK>
-<BLURB>Primaries Conversion Mode.</BLURB>
-<DEFAULT>GST_VIDEO_PRIMARIES_MODE_NONE</DEFAULT>
+<DEFAULT>No dithering (default)</DEFAULT>
 </ARG>
 
 <ARG>
@@ -1141,10 +1011,10 @@
 <ARG>
 <NAME>GstAudioTestSrc::freq</NAME>
 <TYPE>gdouble</TYPE>
-<RANGE>[0,5.36871e+08]</RANGE>
+<RANGE>[0,20000]</RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Frequency</NICK>
-<BLURB>Frequency of test signal. The sample rate needs to be at least 4 times higher.</BLURB>
+<BLURB>Frequency of test signal.</BLURB>
 <DEFAULT>440</DEFAULT>
 </ARG>
 
@@ -1319,16 +1189,6 @@
 </ARG>
 
 <ARG>
-<NAME>GstAppSrc::duration</NAME>
-<TYPE>guint64</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Duration</NICK>
-<BLURB>The duration of the data stream in nanoseconds (GST_CLOCK_TIME_NONE if unknown).</BLURB>
-<DEFAULT>18446744073709551615</DEFAULT>
-</ARG>
-
-<ARG>
 <NAME>GstAppSink::caps</NAME>
 <TYPE>GstCaps*</TYPE>
 <RANGE></RANGE>
@@ -1376,16 +1236,6 @@
 <NICK>Max Buffers</NICK>
 <BLURB>The maximum number of buffers to queue internally (0 = unlimited).</BLURB>
 <DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstAppSink::wait-on-eos</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Wait on EOS</NICK>
-<BLURB>Wait for all buffers to be processed after receiving an EOS.</BLURB>
-<DEFAULT>TRUE</DEFAULT>
 </ARG>
 
 <ARG>
@@ -1561,7 +1411,7 @@
 <ARG>
 <NAME>GstVideoTestSrc::timestamp-offset</NAME>
 <TYPE>gint64</TYPE>
-<RANGE>>= 0</RANGE>
+<RANGE></RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Timestamp offset</NICK>
 <BLURB>An offset added to timestamps set on buffers (in ns).</BLURB>
@@ -1690,22 +1540,22 @@
 
 <ARG>
 <NAME>GstAudioConvert::dithering</NAME>
-<TYPE>GstAudioDitherMethod</TYPE>
+<TYPE>GstAudioConvertDithering</TYPE>
 <RANGE></RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Dithering</NICK>
 <BLURB>Selects between different dithering methods.</BLURB>
-<DEFAULT>GST_AUDIO_DITHER_TPDF</DEFAULT>
+<DEFAULT>Triangular dithering (default)</DEFAULT>
 </ARG>
 
 <ARG>
 <NAME>GstAudioConvert::noise-shaping</NAME>
-<TYPE>GstAudioNoiseShapingMethod</TYPE>
+<TYPE>GstAudioConvertNoiseShaping</TYPE>
 <RANGE></RANGE>
 <FLAGS>rw</FLAGS>
 <NICK>Noise shaping</NICK>
 <BLURB>Selects between different noise shaping methods.</BLURB>
-<DEFAULT>GST_AUDIO_NOISE_SHAPING_NONE</DEFAULT>
+<DEFAULT>No noise shaping (default)</DEFAULT>
 </ARG>
 
 <ARG>
@@ -2556,745 +2406,5 @@
 <NICK>VP3 compatible</NICK>
 <BLURB>Disables non-VP3 compatible features.</BLURB>
 <DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstSocketSrc::socket</NAME>
-<TYPE>GSocket*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Socket</NICK>
-<BLURB>The socket to receive packets from.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstSocketSrc::caps</NAME>
-<TYPE>GstCaps*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Caps</NICK>
-<BLURB>The caps of the source pad.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstSocketSrc::send-messages</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Send Messages</NICK>
-<BLURB>If GstNetworkMessage events should be handled.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstTimeOverlay::time-mode</NAME>
-<TYPE>GstTimeOverlayTimeLine</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Time Mode</NICK>
-<BLURB>What time to show.</BLURB>
-<DEFAULT>buffer-time</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstAlsaMidiSrc::ports</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Ports</NICK>
-<BLURB>Comma separated list of sequencer ports (e.g. client:port,...).</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstMultiSocketSink::send-dispatched</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Send Dispatched</NICK>
-<BLURB>If GstNetworkMessageDispatched events should be pushed.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstMultiSocketSink::send-messages</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Send Messages</NICK>
-<BLURB>If GstNetworkMessage events should be pushed.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::audio</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Audio or voice</NICK>
-<BLURB>Audio or voice (DEPRECATED: use audio-type).</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::audio-type</NAME>
-<TYPE>GstOpusEncAudioType</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>What type of audio to optimize for</NICK>
-<BLURB>What type of audio to optimize for.</BLURB>
-<DEFAULT>Generic audio</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::bandwidth</NAME>
-<TYPE>GstOpusEncBandwidth</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Band Width</NICK>
-<BLURB>Audio Band Width.</BLURB>
-<DEFAULT>Full band</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::bitrate</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[4000,650000]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Encoding Bit-rate</NICK>
-<BLURB>Specify an encoding bit-rate (in bps).</BLURB>
-<DEFAULT>64000</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::bitrate-type</NAME>
-<TYPE>GstOpusEncBitrateType</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Bitrate type</NICK>
-<BLURB>Bitrate type.</BLURB>
-<DEFAULT>CBR</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::cbr</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Constant bit rate</NICK>
-<BLURB>Constant bit rate (DEPRECATED: use bitrate-type).</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::complexity</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,10]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Complexity</NICK>
-<BLURB>Complexity.</BLURB>
-<DEFAULT>10</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::constrained-vbr</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Constrained VBR</NICK>
-<BLURB>Constrained VBR (DEPRECATED: use bitrate-type).</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::dtx</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>DTX</NICK>
-<BLURB>DTX.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::frame-size</NAME>
-<TYPE>GstOpusEncFrameSize</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Frame Size</NICK>
-<BLURB>The duration of an audio frame, in ms.</BLURB>
-<DEFAULT>20</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::inband-fec</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>In-band FEC</NICK>
-<BLURB>Enable forward error correction.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::max-payload-size</NAME>
-<TYPE>guint</TYPE>
-<RANGE>[2,4000]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Max payload size</NICK>
-<BLURB>Maximum payload size in bytes.</BLURB>
-<DEFAULT>4000</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusEnc::packet-loss-percentage</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,100]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Loss percentage</NICK>
-<BLURB>Packet loss percentage.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusDec::apply-gain</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Apply gain</NICK>
-<BLURB>Apply gain if any is specified in the header.</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstOpusDec::use-inband-fec</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Use in-band FEC</NICK>
-<BLURB>Use forward error correction if available (needs PLC enabled).</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::buffer-duration</NAME>
-<TYPE>gint64</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Buffer duration (ns)</NICK>
-<BLURB>Buffer duration when buffering streams (-1 default value).</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::buffer-size</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Buffer size (bytes)</NICK>
-<BLURB>Buffer size when buffering streams (-1 default value).</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::connection-speed</NAME>
-<TYPE>guint64</TYPE>
-<RANGE><= 18446744073709551</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Connection Speed</NICK>
-<BLURB>Network connection speed in kbps (0 = unknown).</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::download</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Download</NICK>
-<BLURB>Attempt download buffering when buffering network streams.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::ring-buffer-max-size</NAME>
-<TYPE>guint64</TYPE>
-<RANGE><= G_MAXUINT</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Max. ring buffer size (bytes)</NICK>
-<BLURB>Max. amount of data in the ring buffer (bytes, 0 = ring buffer disabled).</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::source</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Source</NICK>
-<BLURB>Source object used.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::uri</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>URI</NICK>
-<BLURB>URI to decode.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstURISourceBin::use-buffering</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Use Buffering</NICK>
-<BLURB>Perform buffering on demuxed/parsed media.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::audio-filter</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Audio filter</NICK>
-<BLURB>the audio filter(s) to apply, if possible.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::audio-sink</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Audio Sink</NICK>
-<BLURB>the audio output element to use (NULL = default sink).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::audio-stream-combiner</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Audio stream combiner</NICK>
-<BLURB>Current audio stream combiner (NULL = input-selector).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::auto-select-streams</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Automatic Select-Streams</NICK>
-<BLURB>Whether playbin should respond to stream-collection messags with select-streams events.</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::av-offset</NAME>
-<TYPE>gint64</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>AV Offset</NICK>
-<BLURB>The synchronisation offset between audio and video in nanoseconds.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::buffer-duration</NAME>
-<TYPE>gint64</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Buffer duration (ns)</NICK>
-<BLURB>Buffer duration when buffering network streams.</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::buffer-size</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Buffer size (bytes)</NICK>
-<BLURB>Buffer size when buffering network streams.</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::connection-speed</NAME>
-<TYPE>guint64</TYPE>
-<RANGE><= 18446744073709551</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Connection Speed</NICK>
-<BLURB>Network connection speed in kbps (0 = unknown).</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::current-audio</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Current audio</NICK>
-<BLURB>Currently playing audio stream (-1 = auto).</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::current-suburi</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Current .sub-URI</NICK>
-<BLURB>The currently playing URI of a subtitle.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::current-text</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Current Text</NICK>
-<BLURB>Currently playing text stream (-1 = auto).</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::current-uri</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Current URI</NICK>
-<BLURB>The currently playing URI.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::current-video</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= G_MAXULONG</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Current Video</NICK>
-<BLURB>Currently playing video stream (-1 = auto).</BLURB>
-<DEFAULT>-1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::flags</NAME>
-<TYPE>GstPlayFlags</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Flags</NICK>
-<BLURB>Flags to control behaviour.</BLURB>
-<DEFAULT>Render the video stream|Render the audio stream|Render subtitles|Use software volume|Deinterlace video if necessary|Use software color balance</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::force-aspect-ratio</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Force Aspect Ratio</NICK>
-<BLURB>When enabled, scaling will respect original aspect ratio.</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::mute</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Mute</NICK>
-<BLURB>Mute the audio channel without changing the volume.</BLURB>
-<DEFAULT>FALSE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::n-audio</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= 0</RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Number Audio</NICK>
-<BLURB>Total number of audio streams.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::n-text</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= 0</RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Number Text</NICK>
-<BLURB>Total number of text streams.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::n-video</NAME>
-<TYPE>gint</TYPE>
-<RANGE>>= 0</RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Number Video</NICK>
-<BLURB>Total number of video streams.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::ring-buffer-max-size</NAME>
-<TYPE>guint64</TYPE>
-<RANGE><= G_MAXUINT</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Max. ring buffer size (bytes)</NICK>
-<BLURB>Max. amount of data in the ring buffer (bytes, 0 = ring buffer disabled).</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::sample</NAME>
-<TYPE>GstSample*</TYPE>
-<RANGE></RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Sample</NICK>
-<BLURB>The last sample (NULL = no video available).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::source</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>r</FLAGS>
-<NICK>Source</NICK>
-<BLURB>Source element.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::subtitle-encoding</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>subtitle encoding</NICK>
-<BLURB>Encoding to assume if input subtitles are not in UTF-8 encoding. If not set, the GST_SUBTITLE_ENCODING environment variable will be checked for an encoding to use. If that is not set either, ISO-8859-15 will be assumed.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::subtitle-font-desc</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>w</FLAGS>
-<NICK>Subtitle font description</NICK>
-<BLURB>Pango font description of font to be used for subtitle rendering.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::suburi</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>.sub-URI</NICK>
-<BLURB>Optional URI of a subtitle.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::text-sink</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Text plugin</NICK>
-<BLURB>the text output element to use (NULL = default subtitleoverlay).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::text-stream-combiner</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Text stream combiner</NICK>
-<BLURB>Current text stream combiner (NULL = input-selector).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::uri</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>URI</NICK>
-<BLURB>URI of the media to play.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::video-filter</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Video filter</NICK>
-<BLURB>the video filter(s) to apply, if possible.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::video-multiview-flags</NAME>
-<TYPE>GstVideoMultiviewFlags</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Multiview Flags Override</NICK>
-<BLURB>Override details of the multiview frame layout.</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::video-multiview-mode</NAME>
-<TYPE>GstVideoMultiviewFramePacking</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Multiview Mode Override</NICK>
-<BLURB>Re-interpret a video stream as one of several frame-packed stereoscopic modes.</BLURB>
-<DEFAULT>GST_VIDEO_MULTIVIEW_FRAME_PACKING_NONE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::video-sink</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Video Sink</NICK>
-<BLURB>the video output element to use (NULL = default sink).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::video-stream-combiner</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Video stream combiner</NICK>
-<BLURB>Current video stream combiner (NULL = input-selector).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::vis-plugin</NAME>
-<TYPE>GstElement*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Vis plugin</NICK>
-<BLURB>the visualization element to use (NULL = default).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstPlayBin3::volume</NAME>
-<TYPE>gdouble</TYPE>
-<RANGE>[0,10]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Volume</NICK>
-<BLURB>The audio volume, 1.0=100%.</BLURB>
-<DEFAULT>1</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstParseBin::connection-speed</NAME>
-<TYPE>guint64</TYPE>
-<RANGE><= 18446744073709551</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Connection Speed</NICK>
-<BLURB>Network connection speed in kbps (0 = unknown).</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstParseBin::expose-all-streams</NAME>
-<TYPE>gboolean</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Expose All Streams</NICK>
-<BLURB>Expose all streams, including those of unknown type or that don't match the 'caps' property.</BLURB>
-<DEFAULT>TRUE</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstParseBin::sink-caps</NAME>
-<TYPE>GstCaps*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Sink Caps</NICK>
-<BLURB>The caps of the input data. (NULL = use typefind element).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstParseBin::subtitle-encoding</NAME>
-<TYPE>gchar*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>subtitle encoding</NICK>
-<BLURB>Encoding to assume if input subtitles are not in UTF-8 encoding. If not set, the GST_SUBTITLE_ENCODING environment variable will be checked for an encoding to use. If that is not set either, ISO-8859-15 will be assumed.</BLURB>
-<DEFAULT>NULL</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstDecodebin3::caps</NAME>
-<TYPE>GstCaps*</TYPE>
-<RANGE></RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Caps</NICK>
-<BLURB>The caps on which to stop decoding. (NULL = default).</BLURB>
-<DEFAULT></DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstTheoraDec::visualize-bit-usage</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,255]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Visualize bitstream usage breakdown</NICK>
-<BLURB>Sets the bitstream breakdown visualization mode. Values influence the width of the bit usage bars to show.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstTheoraDec::visualize-macroblock-modes</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,65535]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Visualize macroblock modes</NICK>
-<BLURB>Show macroblock mode selection overlaid on image. Value gives a mask for macroblock (MB) modes to show.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstTheoraDec::visualize-motion-vectors</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,65535]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Visualize motion vectors</NICK>
-<BLURB>Show motion vector selection overlaid on image. Value gives a mask for motion vector (MV) modes to show.</BLURB>
-<DEFAULT>0</DEFAULT>
-</ARG>
-
-<ARG>
-<NAME>GstTheoraDec::visualize-quantization-modes</NAME>
-<TYPE>gint</TYPE>
-<RANGE>[0,65535]</RANGE>
-<FLAGS>rw</FLAGS>
-<NICK>Visualize adaptive quantization modes</NICK>
-<BLURB>Show adaptive quantization mode selection overlaid on image. Value gives a mask for quantization (QI) modes to show.</BLURB>
-<DEFAULT>0</DEFAULT>
 </ARG>
 

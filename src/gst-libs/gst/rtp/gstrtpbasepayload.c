@@ -44,8 +44,6 @@ struct _GstRTPBasePayloadPrivate
   gboolean perfect_rtptime;
   gint notified_first_timestamp;
 
-  gboolean pt_set;
-
   guint64 base_offset;
   gint64 base_rtime;
   guint64 base_rtime_hz;
@@ -60,7 +58,6 @@ struct _GstRTPBasePayloadPrivate
   GstEvent *pending_segment;
 
   GstCaps *subclass_srccaps;
-  GstCaps *sinkcaps;
 };
 
 /* RTPBasePayload signals and args */
@@ -373,7 +370,6 @@ gst_rtp_base_payload_init (GstRTPBasePayload * rtpbasepayload, gpointer g_class)
   priv->seqnum_offset_random = (rtpbasepayload->seqnum_offset == -1);
   priv->ts_offset_random = (rtpbasepayload->ts_offset == -1);
   priv->ssrc_random = (rtpbasepayload->ssrc == -1);
-  priv->pt_set = FALSE;
 
   rtpbasepayload->max_ptime = DEFAULT_MAX_PTIME;
   rtpbasepayload->min_ptime = DEFAULT_MIN_PTIME;
@@ -404,7 +400,6 @@ gst_rtp_base_payload_finalize (GObject * object)
   rtpbasepayload->encoding_name = NULL;
 
   gst_caps_replace (&rtpbasepayload->priv->subclass_srccaps, NULL);
-  gst_caps_replace (&rtpbasepayload->priv->sinkcaps, NULL);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -451,8 +446,6 @@ gst_rtp_base_payload_sink_event_default (GstRTPBasePayload * rtpbasepayload,
 
       gst_event_parse_caps (event, &caps);
       GST_DEBUG_OBJECT (rtpbasepayload, "setting caps %" GST_PTR_FORMAT, caps);
-
-      gst_caps_replace (&rtpbasepayload->priv->sinkcaps, caps);
 
       rtpbasepayload_class = GST_RTP_BASE_PAYLOAD_GET_CLASS (rtpbasepayload);
       if (rtpbasepayload_class->set_caps)
@@ -544,13 +537,11 @@ gst_rtp_base_payload_src_event_default (GstRTPBasePayload * rtpbasepayload,
             rtpbasepayload->current_ssrc = g_random_int ();
 
           caps = gst_pad_get_current_caps (rtpbasepayload->srcpad);
-          if (caps) {
-            caps = gst_caps_make_writable (caps);
-            gst_caps_set_simple (caps,
-                "ssrc", G_TYPE_UINT, rtpbasepayload->current_ssrc, NULL);
-            res = gst_pad_set_caps (rtpbasepayload->srcpad, caps);
-            gst_caps_unref (caps);
-          }
+          caps = gst_caps_make_writable (caps);
+          gst_caps_set_simple (caps,
+              "ssrc", G_TYPE_UINT, rtpbasepayload->current_ssrc, NULL);
+          res = gst_pad_set_caps (rtpbasepayload->srcpad, caps);
+          gst_caps_unref (caps);
 
           /* the event was for us */
           forward = FALSE;
@@ -780,8 +771,7 @@ gst_rtp_base_payload_set_outcaps (GstRTPBasePayload * payload,
 static gboolean
 gst_rtp_base_payload_negotiate (GstRTPBasePayload * payload)
 {
-  GstCaps *templ, *peercaps, *srccaps;
-  GstStructure *s, *d;
+  GstCaps *peercaps, *filter, *srccaps;
   gboolean res;
 
   payload->priv->caps_max_ptime = DEFAULT_MAX_PTIME;
@@ -789,21 +779,22 @@ gst_rtp_base_payload_negotiate (GstRTPBasePayload * payload)
 
   gst_pad_check_reconfigure (payload->srcpad);
 
-  templ = gst_pad_get_pad_template_caps (payload->srcpad);
+  filter = gst_pad_get_pad_template_caps (payload->srcpad);
 
   if (payload->priv->subclass_srccaps) {
     GstCaps *tmp = gst_caps_intersect (payload->priv->subclass_srccaps,
-        templ);
-    gst_caps_unref (templ);
-    templ = tmp;
+        filter);
+    gst_caps_unref (filter);
+    filter = tmp;
   }
 
-  peercaps = gst_pad_peer_query_caps (payload->srcpad, templ);
+  peercaps = gst_pad_peer_query_caps (payload->srcpad, filter);
+  gst_caps_unref (filter);
 
   if (peercaps == NULL) {
     /* no peer caps, just add the other properties */
 
-    srccaps = gst_caps_copy (templ);
+    srccaps = gst_caps_copy (payload->priv->subclass_srccaps);
     gst_caps_set_simple (srccaps,
         "payload", G_TYPE_INT, GST_RTP_BASE_PAYLOAD_PT (payload),
         "ssrc", G_TYPE_UINT, payload->current_ssrc,
@@ -813,202 +804,18 @@ gst_rtp_base_payload_negotiate (GstRTPBasePayload * payload)
     GST_DEBUG_OBJECT (payload, "no peer caps: %" GST_PTR_FORMAT, srccaps);
   } else {
     GstCaps *temp;
+    GstStructure *s, *d;
     const GValue *value;
-    gboolean have_pt = FALSE;
-    gboolean have_ts_offset = FALSE;
-    gboolean have_seqnum_offset = FALSE;
+    gint pt;
     guint max_ptime, ptime;
 
     /* peer provides caps we can use to fixate. They are already intersected
      * with our srccaps, just make them writable */
     temp = gst_caps_make_writable (peercaps);
-    peercaps = NULL;
 
     if (gst_caps_is_empty (temp)) {
       gst_caps_unref (temp);
-      gst_caps_unref (templ);
       return FALSE;
-    }
-
-    /* We prefer the pt, timestamp-offset, seqnum-offset from the
-     * property (if set), or any previously configured value over what
-     * downstream prefers. Only if downstream can't accept that, or the
-     * properties were not set, we fall back to choosing downstream's
-     * preferred value
-     *
-     * For ssrc we prefer any value downstream suggests, otherwise
-     * the property value or as a last resort a random value.
-     * This difference for ssrc is implemented for retaining backwards
-     * compatibility with changing rtpsession's internal-ssrc property.
-     *
-     * FIXME 2.0: All these properties should go away and be negotiated
-     * via caps only!
-     */
-
-    /* try to use the previously set pt, or the one from the property */
-    if (payload->priv->pt_set || gst_pad_has_current_caps (payload->srcpad)) {
-      GstCaps *probe_caps = gst_caps_copy (templ);
-      GstCaps *intersection;
-
-      gst_caps_set_simple (probe_caps, "payload", G_TYPE_INT,
-          GST_RTP_BASE_PAYLOAD_PT (payload), NULL);
-      intersection = gst_caps_intersect (probe_caps, temp);
-
-      if (!gst_caps_is_empty (intersection)) {
-        GST_LOG_OBJECT (payload, "Using selected pt %d",
-            GST_RTP_BASE_PAYLOAD_PT (payload));
-        have_pt = TRUE;
-        gst_caps_unref (temp);
-        temp = intersection;
-      } else {
-        GST_WARNING_OBJECT (payload, "Can't use selected pt %d",
-            GST_RTP_BASE_PAYLOAD_PT (payload));
-        gst_caps_unref (intersection);
-      }
-      gst_caps_unref (probe_caps);
-    }
-
-    /* If we got no pt above, select one now */
-    if (!have_pt) {
-      gint pt;
-
-      /* get first structure */
-      s = gst_caps_get_structure (temp, 0);
-
-      if (gst_structure_get_int (s, "payload", &pt)) {
-        /* use peer pt */
-        GST_RTP_BASE_PAYLOAD_PT (payload) = pt;
-        GST_LOG_OBJECT (payload, "using peer pt %d", pt);
-      } else {
-        if (gst_structure_has_field (s, "payload")) {
-          /* can only fixate if there is a field */
-          gst_structure_fixate_field_nearest_int (s, "payload",
-              GST_RTP_BASE_PAYLOAD_PT (payload));
-          gst_structure_get_int (s, "payload", &pt);
-          GST_RTP_BASE_PAYLOAD_PT (payload) = pt;
-          GST_LOG_OBJECT (payload, "using peer pt %d", pt);
-        } else {
-          /* no pt field, use the internal pt */
-          pt = GST_RTP_BASE_PAYLOAD_PT (payload);
-          gst_structure_set (s, "payload", G_TYPE_INT, pt, NULL);
-          GST_LOG_OBJECT (payload, "using internal pt %d", pt);
-        }
-      }
-      s = NULL;
-    }
-
-    /* If we got no ssrc above, select one now */
-    /* get first structure */
-    s = gst_caps_get_structure (temp, 0);
-
-    if (gst_structure_has_field_typed (s, "ssrc", G_TYPE_UINT)) {
-      value = gst_structure_get_value (s, "ssrc");
-      payload->current_ssrc = g_value_get_uint (value);
-      GST_LOG_OBJECT (payload, "using peer ssrc %08x", payload->current_ssrc);
-    } else {
-      /* FIXME, fixate_nearest_uint would be even better but we
-       * don't support uint ranges so how likely is it that anybody
-       * uses a list of possible ssrcs */
-      gst_structure_set (s, "ssrc", G_TYPE_UINT, payload->current_ssrc, NULL);
-      GST_LOG_OBJECT (payload, "using internal ssrc %08x",
-          payload->current_ssrc);
-    }
-    s = NULL;
-
-    /* try to select the previously used timestamp-offset, or the one from the property */
-    if (!payload->priv->ts_offset_random
-        || gst_pad_has_current_caps (payload->srcpad)) {
-      GstCaps *probe_caps = gst_caps_copy (templ);
-      GstCaps *intersection;
-
-      gst_caps_set_simple (probe_caps, "timestamp-offset", G_TYPE_UINT,
-          payload->ts_base, NULL);
-      intersection = gst_caps_intersect (probe_caps, temp);
-
-      if (!gst_caps_is_empty (intersection)) {
-        GST_LOG_OBJECT (payload, "Using selected timestamp-offset %u",
-            payload->ts_base);
-        gst_caps_unref (temp);
-        temp = intersection;
-        have_ts_offset = TRUE;
-      } else {
-        GST_WARNING_OBJECT (payload, "Can't use selected timestamp-offset %u",
-            payload->ts_base);
-        gst_caps_unref (intersection);
-      }
-      gst_caps_unref (probe_caps);
-    }
-
-    /* If we got no timestamp-offset above, select one now */
-    if (!have_ts_offset) {
-      /* get first structure */
-      s = gst_caps_get_structure (temp, 0);
-
-      if (gst_structure_has_field_typed (s, "timestamp-offset", G_TYPE_UINT)) {
-        value = gst_structure_get_value (s, "timestamp-offset");
-        payload->ts_base = g_value_get_uint (value);
-        GST_LOG_OBJECT (payload, "using peer timestamp-offset %u",
-            payload->ts_base);
-      } else {
-        /* FIXME, fixate_nearest_uint would be even better but we
-         * don't support uint ranges so how likely is it that anybody
-         * uses a list of possible timestamp-offsets */
-        gst_structure_set (s, "timestamp-offset", G_TYPE_UINT, payload->ts_base,
-            NULL);
-        GST_LOG_OBJECT (payload, "using internal timestamp-offset %u",
-            payload->ts_base);
-      }
-      s = NULL;
-    }
-
-    /* try to select the previously used seqnum-offset, or the one from the property */
-    if (!payload->priv->seqnum_offset_random
-        || gst_pad_has_current_caps (payload->srcpad)) {
-      GstCaps *probe_caps = gst_caps_copy (templ);
-      GstCaps *intersection;
-
-      gst_caps_set_simple (probe_caps, "seqnum-offset", G_TYPE_UINT,
-          payload->seqnum_base, NULL);
-      intersection = gst_caps_intersect (probe_caps, temp);
-
-      if (!gst_caps_is_empty (intersection)) {
-        GST_LOG_OBJECT (payload, "Using selected seqnum-offset %u",
-            payload->seqnum_base);
-        gst_caps_unref (temp);
-        temp = intersection;
-        have_seqnum_offset = TRUE;
-      } else {
-        GST_WARNING_OBJECT (payload, "Can't use selected seqnum-offset %u",
-            payload->seqnum_base);
-        gst_caps_unref (intersection);
-      }
-      gst_caps_unref (probe_caps);
-    }
-
-    /* If we got no seqnum-offset above, select one now */
-    if (!have_seqnum_offset) {
-      /* get first structure */
-      s = gst_caps_get_structure (temp, 0);
-
-      if (gst_structure_has_field_typed (s, "seqnum-offset", G_TYPE_UINT)) {
-        value = gst_structure_get_value (s, "seqnum-offset");
-        payload->seqnum_base = g_value_get_uint (value);
-        GST_LOG_OBJECT (payload, "using peer seqnum-offset %u",
-            payload->seqnum_base);
-        payload->priv->next_seqnum = payload->seqnum_base;
-        payload->seqnum = payload->seqnum_base;
-        payload->priv->seqnum_offset_random = FALSE;
-      } else {
-        /* FIXME, fixate_nearest_uint would be even better but we
-         * don't support uint ranges so how likely is it that anybody
-         * uses a list of possible seqnum-offsets */
-        gst_structure_set (s, "seqnum-offset", G_TYPE_UINT,
-            payload->seqnum_base, NULL);
-        GST_LOG_OBJECT (payload, "using internal seqnum-offset %u",
-            payload->seqnum_base);
-      }
-
-      s = NULL;
     }
 
     /* now fixate, start by taking the first caps */
@@ -1023,8 +830,67 @@ gst_rtp_base_payload_negotiate (GstRTPBasePayload * payload)
     if (gst_structure_get_uint (s, "ptime", &ptime))
       payload->ptime = ptime * GST_MSECOND;
 
-    /* make the target caps by copying over all the fixed fields, removing the
-     * unfixed fields. */
+    if (gst_structure_get_int (s, "payload", &pt)) {
+      /* use peer pt */
+      GST_RTP_BASE_PAYLOAD_PT (payload) = pt;
+      GST_LOG_OBJECT (payload, "using peer pt %d", pt);
+    } else {
+      if (gst_structure_has_field (s, "payload")) {
+        /* can only fixate if there is a field */
+        gst_structure_fixate_field_nearest_int (s, "payload",
+            GST_RTP_BASE_PAYLOAD_PT (payload));
+        gst_structure_get_int (s, "payload", &pt);
+        GST_LOG_OBJECT (payload, "using peer pt %d", pt);
+        GST_RTP_BASE_PAYLOAD_PT (payload) = pt;
+      } else {
+        /* no pt field, use the internal pt */
+        pt = GST_RTP_BASE_PAYLOAD_PT (payload);
+        gst_structure_set (s, "payload", G_TYPE_INT, pt, NULL);
+        GST_LOG_OBJECT (payload, "using internal pt %d", pt);
+      }
+    }
+
+    if (gst_structure_has_field_typed (s, "ssrc", G_TYPE_UINT)) {
+      value = gst_structure_get_value (s, "ssrc");
+      payload->current_ssrc = g_value_get_uint (value);
+      GST_LOG_OBJECT (payload, "using peer ssrc %08x", payload->current_ssrc);
+    } else {
+      /* FIXME, fixate_nearest_uint would be even better */
+      gst_structure_set (s, "ssrc", G_TYPE_UINT, payload->current_ssrc, NULL);
+      GST_LOG_OBJECT (payload, "using internal ssrc %08x",
+          payload->current_ssrc);
+    }
+
+    if (gst_structure_has_field_typed (s, "timestamp-offset", G_TYPE_UINT)) {
+      value = gst_structure_get_value (s, "timestamp-offset");
+      payload->ts_base = g_value_get_uint (value);
+      GST_LOG_OBJECT (payload, "using peer timestamp-offset %u",
+          payload->ts_base);
+    } else {
+      /* FIXME, fixate_nearest_uint would be even better */
+      gst_structure_set (s, "timestamp-offset", G_TYPE_UINT, payload->ts_base,
+          NULL);
+      GST_LOG_OBJECT (payload, "using internal timestamp-offset %u",
+          payload->ts_base);
+    }
+    if (gst_structure_has_field_typed (s, "seqnum-offset", G_TYPE_UINT)) {
+      value = gst_structure_get_value (s, "seqnum-offset");
+      payload->seqnum_base = g_value_get_uint (value);
+      GST_LOG_OBJECT (payload, "using peer seqnum-offset %u",
+          payload->seqnum_base);
+      payload->priv->next_seqnum = payload->seqnum_base;
+      payload->seqnum = payload->seqnum_base;
+      payload->priv->seqnum_offset_random = FALSE;
+    } else {
+      /* FIXME, fixate_nearest_uint would be even better */
+      gst_structure_set (s, "seqnum-offset", G_TYPE_UINT, payload->seqnum_base,
+          NULL);
+      GST_LOG_OBJECT (payload, "using internal seqnum-offset %u",
+          payload->seqnum_base);
+    }
+
+    /* make the target caps by copying over all the fixed caps, removing the
+     * unfixed caps. */
     srccaps = gst_caps_new_empty_simple (gst_structure_get_name (s));
     d = gst_caps_get_structure (srccaps, 0);
 
@@ -1035,40 +901,10 @@ gst_rtp_base_payload_negotiate (GstRTPBasePayload * payload)
     GST_DEBUG_OBJECT (payload, "with peer caps: %" GST_PTR_FORMAT, srccaps);
   }
 
-  if (payload->priv->sinkcaps != NULL) {
-    s = gst_caps_get_structure (payload->priv->sinkcaps, 0);
-    if (g_str_has_prefix (gst_structure_get_name (s), "video")) {
-      gboolean has_framerate;
-      gint num, denom;
-
-      GST_DEBUG_OBJECT (payload, "video caps: %" GST_PTR_FORMAT,
-          payload->priv->sinkcaps);
-
-      has_framerate = gst_structure_get_fraction (s, "framerate", &num, &denom);
-      if (has_framerate && num == 0 && denom == 1) {
-        has_framerate =
-            gst_structure_get_fraction (s, "max-framerate", &num, &denom);
-      }
-
-      if (has_framerate) {
-        gchar str[G_ASCII_DTOSTR_BUF_SIZE];
-        gdouble framerate;
-
-        gst_util_fraction_to_double (num, denom, &framerate);
-        g_ascii_dtostr (str, G_ASCII_DTOSTR_BUF_SIZE, framerate);
-        d = gst_caps_get_structure (srccaps, 0);
-        gst_structure_set (d, "a-framerate", G_TYPE_STRING, str, NULL);
-      }
-
-      GST_DEBUG_OBJECT (payload, "with video caps: %" GST_PTR_FORMAT, srccaps);
-    }
-  }
-
   update_max_ptime (payload);
 
   res = gst_pad_set_caps (GST_RTP_BASE_PAYLOAD_SRCPAD (payload), srccaps);
   gst_caps_unref (srccaps);
-  gst_caps_unref (templ);
 
   return res;
 }
@@ -1386,7 +1222,6 @@ gst_rtp_base_payload_set_property (GObject * object, guint prop_id,
       break;
     case PROP_PT:
       rtpbasepayload->pt = g_value_get_uint (value);
-      priv->pt_set = TRUE;
       break;
     case PROP_SSRC:
       val = g_value_get_uint (value);
@@ -1528,7 +1363,6 @@ gst_rtp_base_payload_change_state (GstElement * element,
       priv->base_offset = GST_BUFFER_OFFSET_NONE;
       priv->negotiated = FALSE;
       gst_caps_replace (&rtpbasepayload->priv->subclass_srccaps, NULL);
-      gst_caps_replace (&rtpbasepayload->priv->sinkcaps, NULL);
       break;
     default:
       break;

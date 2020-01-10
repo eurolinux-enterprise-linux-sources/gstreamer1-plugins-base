@@ -24,7 +24,6 @@
 #endif
 #include <gst/gst.h>
 #include <gst/check/gstcheck.h>
-#include <gst/check/gstharness.h>
 #include <gst/video/video.h>
 #include <gst/app/app.h>
 
@@ -46,8 +45,6 @@ typedef struct _GstVideoEncoderTesterClass GstVideoEncoderTesterClass;
 struct _GstVideoEncoderTester
 {
   GstVideoEncoder parent;
-
-  GstFlowReturn pre_push_result;
 };
 
 struct _GstVideoEncoderTesterClass
@@ -105,15 +102,6 @@ gst_video_encoder_tester_handle_frame (GstVideoEncoder * dec,
   return gst_video_encoder_finish_frame (dec, frame);
 }
 
-static GstFlowReturn
-gst_video_encoder_tester_pre_push (GstVideoEncoder * enc,
-    GstVideoCodecFrame * frame)
-{
-  GstVideoEncoderTester *tester = (GstVideoEncoderTester *) enc;
-
-  return tester->pre_push_result;
-}
-
 static void
 gst_video_encoder_tester_class_init (GstVideoEncoderTesterClass * klass)
 {
@@ -128,8 +116,10 @@ gst_video_encoder_tester_class_init (GstVideoEncoderTesterClass * klass)
       GST_PAD_SRC, GST_PAD_ALWAYS,
       GST_STATIC_CAPS ("video/x-test-custom"));
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
 
   gst_element_class_set_metadata (element_class,
       "VideoEncoderTester", "Encoder/Video", "yep", "me");
@@ -137,14 +127,12 @@ gst_video_encoder_tester_class_init (GstVideoEncoderTesterClass * klass)
   videoencoder_class->start = gst_video_encoder_tester_start;
   videoencoder_class->stop = gst_video_encoder_tester_stop;
   videoencoder_class->handle_frame = gst_video_encoder_tester_handle_frame;
-  videoencoder_class->pre_push = gst_video_encoder_tester_pre_push;
   videoencoder_class->set_format = gst_video_encoder_tester_set_format;
 }
 
 static void
 gst_video_encoder_tester_init (GstVideoEncoderTester * tester)
 {
-  tester->pre_push_result = GST_FLOW_OK;
 }
 
 static gboolean
@@ -211,15 +199,6 @@ create_test_buffer (guint64 num)
   return buffer;
 }
 
-static GstCaps *
-create_test_caps (void)
-{
-  return gst_caps_new_simple ("video/x-raw", "width", G_TYPE_INT,
-      TEST_VIDEO_WIDTH, "height", G_TYPE_INT, TEST_VIDEO_HEIGHT, "framerate",
-      GST_TYPE_FRACTION, TEST_VIDEO_FPS_N, TEST_VIDEO_FPS_D,
-      "format", G_TYPE_STRING, "GRAY8", NULL);
-}
-
 static void
 send_startup_events (void)
 {
@@ -229,7 +208,11 @@ send_startup_events (void)
           gst_event_new_stream_start ("randomvalue")));
 
   /* push caps */
-  caps = create_test_caps ();
+  caps =
+      gst_caps_new_simple ("video/x-raw", "width", G_TYPE_INT,
+      TEST_VIDEO_WIDTH, "height", G_TYPE_INT, TEST_VIDEO_HEIGHT, "framerate",
+      GST_TYPE_FRACTION, TEST_VIDEO_FPS_N, TEST_VIDEO_FPS_D,
+      "format", G_TYPE_STRING, "GRAY8", NULL);
   fail_unless (gst_pad_push_event (mysrcpad, gst_event_new_caps (caps)));
   gst_caps_unref (caps);
 }
@@ -413,7 +396,7 @@ GST_START_TEST (videoencoder_flush_events)
 {
   GstSegment segment;
   GstBuffer *buffer;
-  guint i;
+  guint64 i;
   GList *events_iter;
 
   setup_videoencodertester ();
@@ -512,28 +495,6 @@ GST_START_TEST (videoencoder_flush_events)
 
 GST_END_TEST;
 
-/* When pre_push fails the correct GstFlowReturn should be returned and there
- * should be no leaks */
-GST_START_TEST (videoencoder_pre_push_fails)
-{
-  GstVideoEncoderTester *tester;
-  GstHarness *h;
-
-  tester = g_object_new (GST_VIDEO_ENCODER_TESTER_TYPE, NULL);
-  tester->pre_push_result = GST_FLOW_ERROR;
-
-  h = gst_harness_new_with_element (GST_ELEMENT (tester), "sink", "src");
-  gst_harness_set_src_caps (h, create_test_caps ());
-
-  fail_unless_equals_int (gst_harness_push (h, create_test_buffer (0)),
-      GST_FLOW_ERROR);
-
-  gst_harness_teardown (h);
-  gst_object_unref (tester);
-}
-
-GST_END_TEST;
-
 static Suite *
 gst_videoencoder_suite (void)
 {
@@ -546,7 +507,6 @@ gst_videoencoder_suite (void)
   tcase_add_test (tc, videoencoder_tags_before_eos);
   tcase_add_test (tc, videoencoder_events_before_eos);
   tcase_add_test (tc, videoencoder_flush_events);
-  tcase_add_test (tc, videoencoder_pre_push_fails);
 
   return s;
 }

@@ -1,20 +1,19 @@
 # Polish translation for gst-plugins-base.
 # This file is distributed under the same license as the gst-plugins-base package.
-# Jakub Bogusz <qboosh@pld-linux.org>, 2007-2016.
+# Jakub Bogusz <qboosh@pld-linux.org>, 2007-2014.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.10.0\n"
+"Project-Id-Version: gst-plugins-base 1.4.0\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-11-01 20:50+0100\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-07-21 21:21+0200\n"
 "Last-Translator: Jakub Bogusz <qboosh@pld-linux.org>\n"
 "Language-Team: Polish <translation-team-pl@lists.sourceforge.net>\n"
 "Language: pl\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr ""
@@ -82,9 +81,18 @@ msgstr "Nie udało się ustawić położenia na CD."
 msgid "Could not read CD."
 msgstr "Nie udał się odczyt CD."
 
+msgid "Internal data stream error."
+msgstr "Błąd wewnętrzny strumienia danych."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr "Brak elementu '%s' - proszę sprawdzić instalację GStreamera."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"Wtyczka %s jest wymagana do otworzenia tego strumienia, ale nie jest "
+"zainstalowana."
 
 msgid "Could not determine type of stream"
 msgstr "Nie udało się określić typu strumienia"
@@ -94,12 +102,6 @@ msgstr "To wygląda na plik tekstowy"
 
 msgid "Could not create \"uridecodebin\" element."
 msgstr "Nie udało się utworzyć elementu \"uridecodebin\"."
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Nie udało się utworzyć elementu \"decodebin3\"."
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Nie udało się utworzyć elementu \"urisourcebin\"."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -233,9 +235,6 @@ msgstr "Format podpisów TMPlayer"
 
 msgid "Kate subtitle format"
 msgstr "Format podpisów Kate"
-
-msgid "WebVTT subtitle format"
-msgstr "Format podpisów WebVTT"
 
 msgid "Uncompressed video"
 msgstr "Nieskompresowany obraz"
@@ -403,15 +402,6 @@ msgstr "ogniskowa obiektywu"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Długość ogniskowej obiektywu użyta przy robieniu zdjęcia, w mm"
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr "ogniskowa obiektywu - odpowiednik 35 mm"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"Długość ogniskowej obiektywu użyta przy robieniu zdjęcia, w mm, będąca "
-"odpowiednikiem 35 mm"
-
 msgid "capturing digital zoom ratio"
 msgstr "współczynnik powiększenia cyfrowego"
 
@@ -537,111 +527,11 @@ msgstr ""
 "Bez kończenia po wyświetleniu początkowej listy urządzeń, oczekiwanie na "
 "dodanie/usunięcie urządzeń."
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Głośność: %.0f%%"
-
 msgid "Buffering..."
 msgstr "Buforowanie..."
 
 msgid "Clock lost, selecting a new one\n"
 msgstr "Utracono zegar, wybieranie nowego\n"
-
-msgid "Reached end of play list."
-msgstr "Osiągnięto koniec listy odtwarzania."
-
-msgid "Paused"
-msgstr "Pauza"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Trwa odtwarzanie %s\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Blisko końca, przygotowywanie następnego tytułu: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Tempo odtwarzania: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Nie udało się zmienić tempa odtwarzania na %.2f"
-
-msgid "space"
-msgstr "spacja"
-
-msgid "pause/unpause"
-msgstr "pauza/wznowienie"
-
-msgid "q or ESC"
-msgstr "q lub ESC"
-
-msgid "quit"
-msgstr "wyjście"
-
-msgid "> or n"
-msgstr "> lub n"
-
-msgid "play next"
-msgstr "odtworzenie następnego"
-
-msgid "< or b"
-msgstr "< lub b"
-
-msgid "play previous"
-msgstr "odtworzenie poprzedniego"
-
-msgid "seek forward"
-msgstr "przewinięcie w przód"
-
-msgid "seek backward"
-msgstr "przewinięcie w tył"
-
-msgid "volume up"
-msgstr "większa głośność"
-
-msgid "volume down"
-msgstr "mniejsza głośność"
-
-msgid "increase playback rate"
-msgstr "większe tempo odtwarzania"
-
-msgid "decrease playback rate"
-msgstr "mniejsze tempo odtwarzania"
-
-msgid "change playback direction"
-msgstr "zmiana kierunku odtwarzania"
-
-msgid "enable/disable trick modes"
-msgstr "włączenie/wyłączenie trybów trików"
-
-msgid "change audio track"
-msgstr "zmiana ścieżki dźwiękowej"
-
-msgid "change video track"
-msgstr "zmiana ścieżki filmowej"
-
-msgid "change subtitle track"
-msgstr "zmiana ścieżki podpisów"
-
-msgid "seek to beginning"
-msgstr "przewinięcie na początek"
-
-msgid "show keyboard shortcuts"
-msgstr "wyświetlenie skrótów klawiatury"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Tryb interaktywny - sterowanie z klawiatury:"
-
-msgid "Output status information and property notifications"
-msgstr "Informacje o stanie wyjścia i powiadomienia o własnościach"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
-msgstr ""
-"Sterowanie zachowaniem odtwarzania przez ustawianie własności 'flags' "
-"elementu playbin"
 
 msgid "Video sink to use (default is autovideosink)"
 msgstr "Element pochłaniający obraz (domyślny to autovideosink)"
@@ -655,8 +545,8 @@ msgstr "Włączenie odtwarzania bez przerw"
 msgid "Shuffle playlist"
 msgstr "Przetasowanie listy odtwarzania"
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Wyłączenie interaktywnego sterowania z klawiatury"
+msgid "Interactive control via keyboard"
+msgstr "Interaktywne sterowanie z klawiatury"
 
 msgid "Volume"
 msgstr "Głośność"
@@ -664,15 +554,9 @@ msgstr "Głośność"
 msgid "Playlist file containing input media files"
 msgstr "Plik listy odtwarzania zawierający wejściowe pliki multimedialne"
 
-msgid "Do not print any output (apart from errors)"
-msgstr "Bez wypisywania żadnego wyjścia (poza błędami)"
-
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 msgstr "Składnia: %s PLIK1|URI1 [PLIK2|URI2] [PLIK3|URI3] ..."
 
 msgid "You must provide at least one filename or URI to play."
 msgstr "Trzeba podać przynajmniej jedną nazwę pliku lub URI do odtworzenia."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Klawisz 'k' wyświetla listę skrótów klawiatury.\n"

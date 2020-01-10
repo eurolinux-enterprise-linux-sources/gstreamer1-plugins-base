@@ -104,13 +104,13 @@ run_capsfilter_renegotiation (const gchar * launch_line)
   current_caps = NULL;
 
   pipeline = gst_parse_launch (launch_line, NULL);
-  fail_unless (pipeline != NULL);
+  g_assert (pipeline);
 
   capsfilter = gst_bin_get_by_name (GST_BIN (pipeline), "cf");
-  fail_unless (capsfilter != NULL);
+  g_assert (capsfilter);
 
   sink = gst_bin_get_by_name (GST_BIN (pipeline), "sink");
-  fail_unless (sink != NULL);
+  g_assert (sink);
 
   pad = gst_element_get_static_pad (sink, "sink");
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, buffer_probe, capsfilter,
@@ -125,8 +125,8 @@ run_capsfilter_renegotiation (const gchar * launch_line)
   msg = gst_bus_timed_pop_filtered (bus, GST_CLOCK_TIME_NONE,
       GST_MESSAGE_EOS | GST_MESSAGE_ERROR);
 
-  fail_unless_equals_int (GST_MESSAGE_TYPE (msg), GST_MESSAGE_EOS);
-  fail_unless_equals_int (caps_change, 4);
+  g_assert (GST_MESSAGE_TYPE (msg) == GST_MESSAGE_EOS);
+  g_assert (caps_change == 4);
 
   gst_element_set_state (pipeline, GST_STATE_NULL);
 
@@ -168,4 +168,19 @@ capsfilter_renegotiation_suite (void)
   return s;
 }
 
-GST_CHECK_MAIN (capsfilter_renegotiation);
+int
+main (int argc, char **argv)
+{
+  int nf;
+
+  Suite *s = capsfilter_renegotiation_suite ();
+  SRunner *sr = srunner_create (s);
+
+  gst_check_init (&argc, &argv);
+
+  srunner_run_all (sr, CK_NORMAL);
+  nf = srunner_ntests_failed (sr);
+  srunner_free (sr);
+
+  return nf;
+}

@@ -202,14 +202,6 @@ gint  arg1
 </SIGNAL>
 
 <SIGNAL>
-<NAME>GstPlayBin::element-setup</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin *gstplaybin
-GstElement *arg1
-</SIGNAL>
-
-<SIGNAL>
 <NAME>GstDecodeBin::autoplug-continue</NAME>
 <RETURNS>gboolean</RETURNS>
 <FLAGS>l</FLAGS>
@@ -328,14 +320,6 @@ guint64  arg1
 </SIGNAL>
 
 <SIGNAL>
-<NAME>GstAppSrc::push-sample</NAME>
-<RETURNS>GstFlowReturn</RETURNS>
-<FLAGS>la</FLAGS>
-GstAppSrc *gstappsrc
-GstSample *arg1
-</SIGNAL>
-
-<SIGNAL>
 <NAME>GstAppSink::eos</NAME>
 <RETURNS>void</RETURNS>
 <FLAGS>l</FLAGS>
@@ -368,22 +352,6 @@ GstAppSink *gstappsink
 <RETURNS>GstSample*</RETURNS>
 <FLAGS>la</FLAGS>
 GstAppSink *gstappsink
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstAppSink::try-pull-preroll</NAME>
-<RETURNS>GstSample*</RETURNS>
-<FLAGS>la</FLAGS>
-GstAppSink *gstappsink
-guint64  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstAppSink::try-pull-sample</NAME>
-<RETURNS>GstSample*</RETURNS>
-<FLAGS>la</FLAGS>
-GstAppSink *gstappsink
-guint64  arg1
 </SIGNAL>
 
 <SIGNAL>
@@ -420,7 +388,7 @@ GObject *arg1
 <RETURNS>void</RETURNS>
 <FLAGS>l</FLAGS>
 GstMultiSocketSink *gstmultisocketsink
-GSocket *arg1
+gint  arg1
 GstMultiHandleSinkClientStatus  arg2
 </SIGNAL>
 
@@ -540,281 +508,5 @@ gint  arg1
 <FLAGS>l</FLAGS>
 GstCdParanoiaSrc *gstcdparanoiasrc
 gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstSocketSrc::connection-closed-by-peer</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>f</FLAGS>
-GstSocketSrc *gstsocketsrc
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::autoplug-continue</NAME>
-<RETURNS>gboolean</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::autoplug-factories</NAME>
-<RETURNS>GValueArray*</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::autoplug-query</NAME>
-<RETURNS>gboolean</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstElement *arg2
-GstQuery *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::autoplug-select</NAME>
-<RETURNS>GstAutoplugSelectResult</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstCaps *arg2
-GstElementFactory *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::autoplug-sort</NAME>
-<RETURNS>GValueArray*</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstCaps *arg2
-GValueArray *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::drained</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::source-setup</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstElement *arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstURISourceBin::unknown-type</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstURISourceBin *gsturisourcebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::about-to-finish</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::audio-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::audio-tags-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::convert-sample</NAME>
-<RETURNS>GstSample*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-GstCaps *arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-audio-pad</NAME>
-<RETURNS>GstPad*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-audio-tags</NAME>
-<RETURNS>GstTagList*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-text-pad</NAME>
-<RETURNS>GstPad*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-text-tags</NAME>
-<RETURNS>GstTagList*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-video-pad</NAME>
-<RETURNS>GstPad*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::get-video-tags</NAME>
-<RETURNS>GstTagList*</RETURNS>
-<FLAGS>la</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::source-setup</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-GstElement *arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::text-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::text-tags-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::video-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::video-tags-changed</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-gint  arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstPlayBin3::element-setup</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstPlayBin3 *gstplaybin3
-GstElement *arg1
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::autoplug-continue</NAME>
-<RETURNS>gboolean</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::autoplug-factories</NAME>
-<RETURNS>GValueArray*</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::autoplug-query</NAME>
-<RETURNS>gboolean</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstElement *arg2
-GstQuery *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::autoplug-select</NAME>
-<RETURNS>GstAutoplugSelectResult</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstCaps *arg2
-GstElementFactory *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::autoplug-sort</NAME>
-<RETURNS>GValueArray*</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstCaps *arg2
-GValueArray *arg3
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::drained</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstParseBin::unknown-type</NAME>
-<RETURNS>void</RETURNS>
-<FLAGS>l</FLAGS>
-GstParseBin *gstparsebin
-GstPad *arg1
-GstCaps *arg2
-</SIGNAL>
-
-<SIGNAL>
-<NAME>GstDecodebin3::select-stream</NAME>
-<RETURNS>gint</RETURNS>
-<FLAGS>l</FLAGS>
-GstDecodebin3 *gstdecodebin3
-GstStreamCollection *arg1
-GstStream *arg2
 </SIGNAL>
 

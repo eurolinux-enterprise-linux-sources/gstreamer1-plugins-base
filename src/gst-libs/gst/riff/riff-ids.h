@@ -34,7 +34,6 @@ G_BEGIN_DECLS
 /* tags */
 #define GST_RIFF_TAG_RIFF GST_MAKE_FOURCC ('R','I','F','F')
 #define GST_RIFF_TAG_AVF0 GST_MAKE_FOURCC ('A','V','F','0')
-#define GST_RIFF_TAG_RF64 GST_MAKE_FOURCC ('R','F','6','4')
 #define GST_RIFF_TAG_RIFX GST_MAKE_FOURCC ('R','I','F','X')
 #define GST_RIFF_TAG_LIST GST_MAKE_FOURCC ('L','I','S','T')
 #define GST_RIFF_TAG_avih GST_MAKE_FOURCC ('a','v','i','h')
@@ -63,7 +62,6 @@ G_BEGIN_DECLS
 #define GST_RIFF_TAG_note GST_MAKE_FOURCC ('n','o','t','e')
 #define GST_RIFF_TAG_smpl GST_MAKE_FOURCC ('s','m','p','l')
 #define GST_RIFF_TAG_inst GST_MAKE_FOURCC ('i','n','s','t')
-#define GST_RIFF_TAG_FLLR GST_MAKE_FOURCC ('F','L','L','R')
 
 /* LIST types */
 #define GST_RIFF_LIST_movi GST_MAKE_FOURCC ('m','o','v','i')
@@ -188,8 +186,8 @@ G_BEGIN_DECLS
 #define GST_RIFF_CVID GST_MAKE_FOURCC ('C', 'V', 'I', 'D')
 #define GST_RIFF_ULTI GST_MAKE_FOURCC ('U', 'L', 'T', 'I')
 #define GST_RIFF_ulti GST_MAKE_FOURCC ('u', 'l', 't', 'i')
-#define GST_RIFF_YUV9 GST_MAKE_FOURCC ('Y', 'U', 'V', '9')
-#define GST_RIFF_YVU9 GST_MAKE_FOURCC ('Y', 'V', 'U', '9')
+#define GST_RIFF_YUV9 GST_MAKE_FOURCC ('Y', 'V', 'U', '9')
+#define GST_RIFF_YVU9 GST_MAKE_FOURCC ('Y', 'U', 'V', '9')
 #define GST_RIFF_XMPG GST_MAKE_FOURCC ('X', 'M', 'P', 'G')
 #define GST_RIFF_xmpg GST_MAKE_FOURCC ('x', 'm', 'p', 'g')
 #define GST_RIFF_VDOW GST_MAKE_FOURCC ('V', 'D', 'O', 'W')
@@ -326,7 +324,7 @@ typedef struct _gst_riff_strf_auds {       /* == WaveHeader (?) */
 #define GST_RIFF_WAVE_FORMAT_DOLBY_AC2      (0x0030)
 #define GST_RIFF_WAVE_FORMAT_GSM610         (0x0031)
 #define GST_RIFF_WAVE_FORMAT_MSN            (0x0032)
-#define GST_RIFF_WAVE_FORMAT_ANTEX_ADPCME   (0x0033)
+#define GST_RIFF_WAVE_FORMAT_ANTEX_ADPCME   (0x0033 
 #define GST_RIFF_WAVE_FORMAT_CONTROL_RES_VQLPC (0x0034)
 #define GST_RIFF_WAVE_FORMAT_DIGIREAL       (0x0035)
 #define GST_RIFF_WAVE_FORMAT_DIGIADPCM      (0x0036)
@@ -468,7 +466,7 @@ typedef struct _gst_riff_strf_auds {       /* == WaveHeader (?) */
 #endif
 } gst_riff_strf_auds;
 
-typedef struct _gst_riff_strf_iavs {
+typedef struct _gst_riff_strf_iavs {    
   guint32 DVAAuxSrc;
   guint32 DVAAuxCtl;
   guint32 DVAAuxSrc1;
@@ -479,7 +477,7 @@ typedef struct _gst_riff_strf_iavs {
   guint32 DVReserved2;
 } gst_riff_strf_iavs;
 
-typedef struct _gst_riff_index_entry {
+typedef struct _gst_riff_index_entry {  
   guint32 id;
   guint32 flags;
 #define GST_RIFF_IF_LIST                (0x00000001L)

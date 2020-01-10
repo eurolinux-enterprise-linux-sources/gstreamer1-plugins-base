@@ -81,10 +81,8 @@ rm -rf $RPM_BUILD_ROOT
 # helper programs
 %{_bindir}/gst-discoverer-%{majorminor}
 %{_bindir}/gst-play-%{majorminor}
-%{_bindir}/gst-device-monitor-%{majorminor}
 %{_mandir}/man1/gst-discoverer-%{majorminor}*
 %{_mandir}/man1/gst-play-%{majorminor}*
-%{_mandir}/man1/gst-device-monitor-%{majorminor}*
 
 # libraries
 %{_libdir}/libgstaudio-%{majorminor}.so.*
@@ -221,7 +219,6 @@ GStreamer Plugins Base library development and header files.
 %{_includedir}/gstreamer-%{majorminor}/gst/audio/streamvolume.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalance.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/colorbalancechannel.h
-%{_includedir}/gstreamer-%{majorminor}/gst/video/videodirection.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videoorientation.h
 %{_includedir}/gstreamer-%{majorminor}/gst/video/videooverlay.h
 %{_includedir}/gstreamer-%{majorminor}/gst/app/app.h

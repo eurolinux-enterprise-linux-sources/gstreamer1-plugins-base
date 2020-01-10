@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gst-plugins-base 0.10.30.3\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
 "PO-Revision-Date: 2010-10-25 10:27+0900\n"
 "Last-Translator: Makoto Kato <makoto.kt@gmail.com>\n"
 "Language-Team: Japanese <translation-team-ja@lists.sourceforge.net>\n"
@@ -72,11 +72,20 @@ msgstr "CDをシークすることができませんでした"
 msgid "Could not read CD."
 msgstr "CD を読むことができませんでした"
 
+msgid "Internal data stream error."
+msgstr "内部データストリームエラー"
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr ""
 "エレメント '%s' が見つかりません - GStreamer のインストールが失敗している可能"
 "性があります"
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"%s プラグインはこのストリームを再生するのに必要ですが、インストールされていま"
+"せん"
 
 msgid "Could not determine type of stream"
 msgstr "ストリームの種類を判別できませんでした"
@@ -86,14 +95,6 @@ msgstr "これはテキストファイルのようです"
 
 #, fuzzy
 msgid "Could not create \"uridecodebin\" element."
-msgstr "\"decodebin\" エレメントを作成できません。"
-
-#, fuzzy
-msgid "Could not create \"decodebin3\" element."
-msgstr "\"decodebin2\" エレメントを作成できませんでした"
-
-#, fuzzy
-msgid "Could not create \"urisourcebin\" element."
 msgstr "\"decodebin\" エレメントを作成できません。"
 
 #, c-format
@@ -230,10 +231,6 @@ msgid "TMPlayer subtitle format"
 msgstr "TMPlayer 字幕形式"
 
 msgid "Kate subtitle format"
-msgstr "Kate 字幕形式"
-
-#, fuzzy
-msgid "WebVTT subtitle format"
 msgstr "Kate 字幕形式"
 
 #, fuzzy
@@ -405,13 +402,6 @@ msgstr ""
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr ""
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr ""
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-
 msgid "capturing digital zoom ratio"
 msgstr ""
 
@@ -537,110 +527,10 @@ msgid ""
 "added/removed."
 msgstr ""
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr ""
-
 msgid "Buffering..."
 msgstr ""
 
 msgid "Clock lost, selecting a new one\n"
-msgstr ""
-
-msgid "Reached end of play list."
-msgstr ""
-
-msgid "Paused"
-msgstr ""
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr ""
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr ""
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr ""
-
-#, fuzzy, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "ステレオモードで再生用にデバイスをオープンできませんでした"
-
-msgid "space"
-msgstr ""
-
-msgid "pause/unpause"
-msgstr ""
-
-msgid "q or ESC"
-msgstr ""
-
-msgid "quit"
-msgstr ""
-
-msgid "> or n"
-msgstr ""
-
-msgid "play next"
-msgstr ""
-
-msgid "< or b"
-msgstr ""
-
-msgid "play previous"
-msgstr ""
-
-msgid "seek forward"
-msgstr ""
-
-msgid "seek backward"
-msgstr ""
-
-msgid "volume up"
-msgstr ""
-
-msgid "volume down"
-msgstr ""
-
-msgid "increase playback rate"
-msgstr ""
-
-msgid "decrease playback rate"
-msgstr ""
-
-msgid "change playback direction"
-msgstr ""
-
-msgid "enable/disable trick modes"
-msgstr ""
-
-#, fuzzy
-msgid "change audio track"
-msgstr "この CD にはオーディオトラックがありません"
-
-msgid "change video track"
-msgstr ""
-
-#, fuzzy
-msgid "change subtitle track"
-msgstr "Kate 字幕形式"
-
-msgid "seek to beginning"
-msgstr ""
-
-msgid "show keyboard shortcuts"
-msgstr ""
-
-msgid "Interactive mode - keyboard controls:"
-msgstr ""
-
-msgid "Output status information and property notifications"
-msgstr ""
-
-msgid "Control playback behaviour setting playbin 'flags' property"
 msgstr ""
 
 msgid "Video sink to use (default is autovideosink)"
@@ -655,7 +545,7 @@ msgstr ""
 msgid "Shuffle playlist"
 msgstr ""
 
-msgid "Disable interactive control via the keyboard"
+msgid "Interactive control via keyboard"
 msgstr ""
 
 msgid "Volume"
@@ -664,26 +554,12 @@ msgstr ""
 msgid "Playlist file containing input media files"
 msgstr ""
 
-msgid "Do not print any output (apart from errors)"
-msgstr ""
-
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 msgstr ""
 
 msgid "You must provide at least one filename or URI to play."
 msgstr ""
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr ""
-
-#~ msgid "Internal data stream error."
-#~ msgstr "内部データストリームエラー"
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr ""
-#~ "%s プラグインはこのストリームを再生するのに必要ですが、インストールされて"
-#~ "いません"
 
 #, fuzzy
 #~ msgid "Uncompressed %s YUV %s"
@@ -827,6 +703,9 @@ msgstr ""
 
 #~ msgid "Could not open file \"%s\" for reading."
 #~ msgstr "読み込み用にファイル \"%s\" を開くことができませんでした"
+
+#~ msgid "Could not create \"decodebin2\" element."
+#~ msgstr "\"decodebin2\" エレメントを作成できませんでした"
 
 #~ msgid "Could not create \"queue2\" element."
 #~ msgstr "\"queue2\" エレメントを作成できませんでした"

@@ -1992,8 +1992,6 @@ extract_tags_kate (GstOggStream * pad, ogg_packet * packet)
 static gboolean
 setup_opus_mapper (GstOggStream * pad, ogg_packet * packet)
 {
-  GstBuffer *buffer;
-
   if (packet->bytes < 19)
     return FALSE;
 
@@ -2002,18 +2000,14 @@ setup_opus_mapper (GstOggStream * pad, ogg_packet * packet)
   pad->granuleshift = 0;
   pad->n_header_packets = 2;
   pad->first_granpos = -1;
-  pad->audio_clipping = TRUE;
+  pad->forbid_start_clamping = TRUE;
 
   /* pre-skip is in samples at 48000 Hz, which matches granule one for one */
   pad->granule_offset = -GST_READ_UINT16_LE (packet->packet + 10);
   GST_INFO ("Opus has a pre-skip of %" G_GINT64_FORMAT " samples",
       -pad->granule_offset);
 
-  buffer =
-      gst_buffer_new_wrapped (g_memdup (packet->packet, packet->bytes),
-      packet->bytes);
-  pad->caps = gst_codec_utils_opus_create_caps_from_header (buffer, NULL);
-  gst_buffer_unref (buffer);
+  pad->caps = gst_caps_new_empty_simple ("audio/x-opus");
 
   return TRUE;
 }

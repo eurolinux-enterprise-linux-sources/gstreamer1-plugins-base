@@ -25,7 +25,6 @@
 
 #include "gstalsasink.h"
 #include "gstalsasrc.h"
-#include "gstalsamidisrc.h"
 
 #include <gst/gst-i18n-plugin.h>
 
@@ -66,9 +65,6 @@ plugin_init (GstPlugin * plugin)
     return FALSE;
   if (!gst_element_register (plugin, "alsasink", GST_RANK_PRIMARY,
           GST_TYPE_ALSA_SINK))
-    return FALSE;
-  if (!gst_element_register (plugin, "alsamidisrc", GST_RANK_PRIMARY,
-          GST_TYPE_ALSA_MIDI_SRC))
     return FALSE;
 
   GST_DEBUG_CATEGORY_INIT (alsa_debug, "alsa", 0, "alsa plugins");

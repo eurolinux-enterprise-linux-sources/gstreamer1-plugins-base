@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>gstaudiosrc: GStreamer Base Plugins 1.0 Library Reference Manual</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<title>GStreamer Base Plugins 1.0 Library Reference Manual: gstaudiosrc</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="GStreamer Base Plugins 1.0 Library Reference Manual">
 <link rel="up" href="gstreamer-audio.html" title="Audio Library">
 <link rel="prev" href="gst-plugins-base-libs-gstaudiosink.html" title="gstaudiosink">
 <link rel="next" href="gst-plugins-base-libs-gstaudiobasesink.html" title="gstaudiobasesink">
-<meta name="generator" content="GTK-Doc V1.25 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -34,7 +34,7 @@
 </tr></table></div>
 <a name="GstAudioSrc"></a><div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiosrc.other"></a><h2>Types and Values</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="name">
 <col class="description">
@@ -53,12 +53,12 @@
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiosrc.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
-    <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-        <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstObject.html#GstObject-struct">GstObject</a>
-            <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstElement.html#GstElement-struct">GstElement</a>
-                <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-libs-1.0GstBaseSrc.html#GstBaseSrc-struct">GstBaseSrc</a>
-                    <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-libs-1.0GstPushSrc.html#GstPushSrc-struct">GstPushSrc</a>
+<pre class="screen">    <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
+        <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstObject.html">GstObject</a>
+            <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstElement.html">GstElement</a>
+                <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-libs/html/GstBaseSrc.html">GstBaseSrc</a>
+                    <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-libs/html/GstPushSrc.html">GstPushSrc</a>
                         <span class="lineart">╰──</span> <a class="link" href="gst-plugins-base-libs-gstaudiobasesrc.html#GstAudioBaseSrc">GstAudioBaseSrc</a>
                             <span class="lineart">╰──</span> GstAudioSrc
 </pre>
@@ -115,7 +115,6 @@ together with <a class="link" href="gst-plugins-base-libs-gstaudiobasesrc.html#G
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiosrc.functions_details"></a><h2>Functions</h2>
-<p></p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiosrc.other_details"></a><h2>Types and Values</h2>
@@ -143,7 +142,7 @@ together with <a class="link" href="gst-plugins-base-libs-gstaudiobasesrc.html#G
   /* read samples from the device */
   guint    (*read)      (GstAudioSrc *src, gpointer data, guint length,
       GstClockTime *timestamp);
-  /* get number of frames queued in the device */
+  /* get number of samples queued in the device */
   guint    (*delay)     (GstAudioSrc *src);
   /* reset the audio device, unblock from a write */
   void     (*reset)     (GstAudioSrc *src);
@@ -152,14 +151,19 @@ together with <a class="link" href="gst-plugins-base-libs-gstaudiobasesrc.html#G
 <p><a class="link" href="gst-plugins-base-libs-gstaudiosrc.html#GstAudioSrc"><span class="type">GstAudioSrc</span></a> class. Override the vmethod to implement
 functionality.</p>
 <div class="refsect3">
-<a name="GstAudioSrcClass.members"></a><h4>Members</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.6.11.9.3.5"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="300px" class="struct_members_name">
 <col class="struct_members_description">
 <col width="200px" class="struct_members_annotations">
 </colgroup>
 <tbody>
+<tr>
+<td class="struct_member_name"><p><a class="link" href="gst-plugins-base-libs-gstaudiobasesrc.html#GstAudioBaseSrcClass" title="struct GstAudioBaseSrcClass"><span class="type">GstAudioBaseSrcClass</span></a> <em class="structfield"><code><a name="GstAudioSrcClass.parent-class"></a>parent_class</code></em>;</p></td>
+<td class="struct_member_description"><p>the parent class.</p></td>
+<td class="struct_member_annotations"> </td>
+</tr>
 <tr>
 <td class="struct_member_name"><p><em class="structfield"><code><a name="GstAudioSrcClass.open"></a>open</code></em> ()</p></td>
 <td class="struct_member_description"><p>open the device with the specified caps</p></td>
@@ -187,7 +191,7 @@ functionality.</p>
 </tr>
 <tr>
 <td class="struct_member_name"><p><em class="structfield"><code><a name="GstAudioSrcClass.delay"></a>delay</code></em> ()</p></td>
-<td class="struct_member_description"><p>the number of frames queued in the device</p></td>
+<td class="struct_member_description"><p>the number of samples queued in the device</p></td>
 <td class="struct_member_annotations"> </td>
 </tr>
 <tr>
@@ -206,6 +210,7 @@ functionality.</p>
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.25</div>
+<hr>
+          Generated by GTK-Doc V1.21</div>
 </body>
 </html>

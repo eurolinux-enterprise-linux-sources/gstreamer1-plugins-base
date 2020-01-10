@@ -50,7 +50,6 @@ typedef enum {
  * @GST_VIDEO_COLOR_MATRIX_BT709: ITU-R BT.709 color matrix
  * @GST_VIDEO_COLOR_MATRIX_BT601: ITU-R BT.601 color matrix
  * @GST_VIDEO_COLOR_MATRIX_SMPTE240M: SMPTE 240M color matrix
- * @GST_VIDEO_COLOR_MATRIX_BT2020: ITU-R BT.2020 color matrix. Since: 1.6.
  *
  * The color matrix is used to convert between Y'PbPr and
  * non-linear RGB (R'G'B')
@@ -61,11 +60,8 @@ typedef enum {
   GST_VIDEO_COLOR_MATRIX_FCC,
   GST_VIDEO_COLOR_MATRIX_BT709,
   GST_VIDEO_COLOR_MATRIX_BT601,
-  GST_VIDEO_COLOR_MATRIX_SMPTE240M,
-  GST_VIDEO_COLOR_MATRIX_BT2020
+  GST_VIDEO_COLOR_MATRIX_SMPTE240M
 } GstVideoColorMatrix;
-
-gboolean gst_video_color_matrix_get_Kr_Kb (GstVideoColorMatrix matrix, gdouble * Kr, gdouble * Kb);
 
 /**
  * GstVideoTransferFunction:
@@ -85,10 +81,6 @@ gboolean gst_video_color_matrix_get_Kr_Kb (GstVideoColorMatrix matrix, gdouble *
  *                             100:1 range
  * @GST_VIDEO_TRANSFER_LOG316: Logarithmic transfer characteristic
  *                             316.22777:1 range
- * @GST_VIDEO_TRANSFER_BT2020_12: Gamma 2.2 curve with a linear segment in the lower
- *                                range. Used for BT.2020 with 12 bits per
- *                                component. Since: 1.6.
- * @GST_VIDEO_TRANSFER_ADOBERGB: Gamma 2.19921875. Since: 1.8
  *
  * The video transfer function defines the formula for converting between
  * non-linear RGB (R'G'B') and linear RGB
@@ -104,13 +96,8 @@ typedef enum {
   GST_VIDEO_TRANSFER_SRGB,
   GST_VIDEO_TRANSFER_GAMMA28,
   GST_VIDEO_TRANSFER_LOG100,
-  GST_VIDEO_TRANSFER_LOG316,
-  GST_VIDEO_TRANSFER_BT2020_12,
-  GST_VIDEO_TRANSFER_ADOBERGB
+  GST_VIDEO_TRANSFER_LOG316
 } GstVideoTransferFunction;
-
-gdouble      gst_video_color_transfer_encode (GstVideoTransferFunction func, gdouble val);
-gdouble      gst_video_color_transfer_decode (GstVideoTransferFunction func, gdouble val);
 
 /**
  * GstVideoColorPrimaries:
@@ -121,8 +108,6 @@ gdouble      gst_video_color_transfer_decode (GstVideoTransferFunction func, gdo
  * @GST_VIDEO_COLOR_PRIMARIES_SMPTE170M: SMPTE170M primaries
  * @GST_VIDEO_COLOR_PRIMARIES_SMPTE240M: SMPTE240M primaries
  * @GST_VIDEO_COLOR_PRIMARIES_FILM: Generic film
- * @GST_VIDEO_COLOR_PRIMARIES_BT2020: BT2020 primaries. Since: 1.6.
- * @GST_VIDEO_COLOR_PRIMARIES_ADOBERGB: Adobe RGB primaries. Since: 1.8
  *
  * The color primaries define the how to transform linear RGB values to and from
  * the CIE XYZ colorspace.
@@ -134,39 +119,8 @@ typedef enum {
   GST_VIDEO_COLOR_PRIMARIES_BT470BG,
   GST_VIDEO_COLOR_PRIMARIES_SMPTE170M,
   GST_VIDEO_COLOR_PRIMARIES_SMPTE240M,
-  GST_VIDEO_COLOR_PRIMARIES_FILM,
-  GST_VIDEO_COLOR_PRIMARIES_BT2020,
-  GST_VIDEO_COLOR_PRIMARIES_ADOBERGB
+  GST_VIDEO_COLOR_PRIMARIES_FILM
 } GstVideoColorPrimaries;
-
-/**
- * GstVideoColorPrimariesInfo:
- * @primaries: a #GstVideoColorPrimaries
- * @Wx: reference white x coordinate
- * @Wy: reference white y coordinate
- * @Rx: red x coordinate
- * @Ry: red y coordinate
- * @Gx: green x coordinate
- * @Gy: green y coordinate
- * @Bx: blue x coordinate
- * @By: blue y coordinate
- *
- * Structure describing the chromaticity coordinates of an RGB system. These
- * values can be used to construct a matrix to transform RGB to and from the
- * XYZ colorspace.
- *
- * Since: 1.6
- */
-typedef struct {
-  GstVideoColorPrimaries primaries;
-  gdouble Wx, Wy;
-  gdouble Rx, Ry;
-  gdouble Gx, Gy;
-  gdouble Bx, By;
-} GstVideoColorPrimariesInfo;
-
-const GstVideoColorPrimariesInfo *
-                gst_video_color_primaries_get_info     (GstVideoColorPrimaries primaries);
 
 /**
  * GstVideoColorimetry:
@@ -190,13 +144,10 @@ typedef struct {
 #define GST_VIDEO_COLORIMETRY_BT601       "bt601"
 #define GST_VIDEO_COLORIMETRY_BT709       "bt709"
 #define GST_VIDEO_COLORIMETRY_SMPTE240M   "smpte240m"
-#define GST_VIDEO_COLORIMETRY_SRGB        "sRGB"
-#define GST_VIDEO_COLORIMETRY_BT2020      "bt2020"
 
-gboolean     gst_video_colorimetry_matches     (const GstVideoColorimetry *cinfo, const gchar *color);
+gboolean     gst_video_colorimetry_matches     (GstVideoColorimetry *cinfo, const gchar *color);
 gboolean     gst_video_colorimetry_from_string (GstVideoColorimetry *cinfo, const gchar *color);
-gchar *      gst_video_colorimetry_to_string   (const GstVideoColorimetry *cinfo);
-gboolean     gst_video_colorimetry_is_equal    (const GstVideoColorimetry *cinfo, const GstVideoColorimetry *other);
+gchar *      gst_video_colorimetry_to_string   (GstVideoColorimetry *cinfo);
 
 /* compute offset and scale */
 void         gst_video_color_range_offsets     (GstVideoColorRange range,

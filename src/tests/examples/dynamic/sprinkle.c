@@ -164,12 +164,7 @@ do_sprinkle (SprinkleState * state)
     state->count++;
   } else {
     state->infos[0] = NULL;
-
-    /* if no more sources left, quit */
-    if (!state->infos[2])
-      g_main_loop_quit (loop);
   }
-
   return TRUE;
 }
 
@@ -207,7 +202,7 @@ main (int argc, char *argv[])
   GstBus *bus;
   GstElement *filter, *convert, *sink;
   GstCaps *caps;
-  gboolean linked;
+  gboolean res;
   SprinkleState *state;
 
   gst_init (&argc, &argv);
@@ -232,8 +227,8 @@ main (int argc, char *argv[])
 
   gst_bin_add_many (GST_BIN (pipeline), adder, filter, convert, sink, NULL);
 
-  linked = gst_element_link_many (adder, filter, convert, sink, NULL);
-  g_assert (linked);
+  res = gst_element_link_many (adder, filter, convert, sink, NULL);
+  g_assert (res);
 
   /* setup message handling */
   bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));

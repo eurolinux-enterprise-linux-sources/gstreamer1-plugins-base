@@ -1,21 +1,23 @@
 # Slovak translations for gst-plugins-base.
 # This file is put in the public domain.
 #
-# Peter Tuhársky <tuharsky@misbb.sk>, 2007, 2008, 2009, 2010, 2014, 2016.
+# Peter Tuhársky <tuharsky@misbb.sk>, 2007, 2008, 2009, 2010, 2014.
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.7.90\n"
+"Project-Id-Version: gst-plugins-base 1.2.1\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-05-20 12:24+0100\n"
-"Last-Translator: Peter Tuhársky <tuharsky@misbb.sk>\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-01-30 10:57+0100\n"
+"Last-Translator: Peter Tuharsky <tuharsky@misbb.sk>\n"
 "Language-Team: Slovak <sk-i18n@lists.linux.sk>\n"
 "Language: sk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\\n;\n"
-"X-Generator: Poedit 1.6.10\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\\n\n"
+"X-Generator: KBabel 1.11.4\n"
+"X-Poedit-Language: Slovak\n"
+"X-Poedit-Country: SLOVAKIA\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Nepodarilo sa otvoriť zariadenie pre prehrávanie v režime mono."
@@ -73,9 +75,18 @@ msgstr "Nepodarilo sa nastaviť pozíciu na CD."
 msgid "Could not read CD."
 msgstr "Nepodarilo sa čítať CD."
 
+msgid "Internal data stream error."
+msgstr "Vnútorná chyba prúdu údajov."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr "Chýa prvok '%s' - skontrolujte svoju inštaláciu GStreamer."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"Na prehratie tohto prúdu údajov je vyžadovaný zásuvný modul %s, ktorý nie je "
+"nainštalovaný."
 
 msgid "Could not determine type of stream"
 msgstr "Nepodarilo sa zistiť typ prúdu údajov"
@@ -84,14 +95,6 @@ msgid "This appears to be a text file"
 msgstr "Tento súbor je asi textový"
 
 msgid "Could not create \"uridecodebin\" element."
-msgstr "Nepodarilo sa vytvoriť prvok \"uridecodebin\"."
-
-#, fuzzy
-msgid "Could not create \"decodebin3\" element."
-msgstr "Nepodarilo sa vytvoriť prvok \"decodebin2\"."
-
-#, fuzzy
-msgid "Could not create \"urisourcebin\" element."
 msgstr "Nepodarilo sa vytvoriť prvok \"uridecodebin\"."
 
 #, c-format
@@ -225,10 +228,6 @@ msgid "TMPlayer subtitle format"
 msgstr "Formát titulkov TMPlayer"
 
 msgid "Kate subtitle format"
-msgstr "Formát titulkov Kate"
-
-#, fuzzy
-msgid "WebVTT subtitle format"
 msgstr "Formát titulkov Kate"
 
 msgid "Uncompressed video"
@@ -397,15 +396,6 @@ msgstr "ohnisková vzdialenosť"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Ohnisková vzdialenosť objektívu pri zachytávaní obrázku, v mm"
 
-#, fuzzy
-msgid "capturing 35 mm equivalent focal length"
-msgstr "ohnisková vzdialenosť"
-
-#, fuzzy
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr "Ohnisková vzdialenosť objektívu pri zachytávaní obrázku, v mm"
-
 msgid "capturing digital zoom ratio"
 msgstr "pomer digitálneho priblíženia"
 
@@ -528,136 +518,33 @@ msgid ""
 "Don't exit after showing the initial device list, but wait for devices to "
 "added/removed."
 msgstr ""
-"Neskončiť po zobrazení úvodného zoznamu zariadení, ale čakať na ich pridanie/"
-"odstránenie."
-
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Hlasitosť: %.0f%%"
 
 msgid "Buffering..."
 msgstr "Napĺňam vyrovnávaciu pamäť..."
 
 msgid "Clock lost, selecting a new one\n"
-msgstr "Čas sa stratil, vyberá sa nový\n"
-
-msgid "Reached end of play list."
-msgstr "Dosiahli sme koniec prehrávacieho zoznamu."
-
-msgid "Paused"
-msgstr "Pozastavené"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Hrá sa %s\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Pomaly končí, pripravuje sa ďalší titul: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Rýchlosť prehrávania: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Nepodarilo sa zmeniť rýchlosť prehrávania na %.2f"
-
-msgid "space"
-msgstr "medzerník"
-
-msgid "pause/unpause"
-msgstr "pozastaviť/pustiť"
-
-msgid "q or ESC"
-msgstr "q alebo ESC"
-
-msgid "quit"
-msgstr "ukončiť"
-
-msgid "> or n"
-msgstr "> alebo n"
-
-msgid "play next"
-msgstr "prehrať ďalší"
-
-msgid "< or b"
-msgstr "< alebo b"
-
-msgid "play previous"
-msgstr "prehrať predchádzajúce"
-
-msgid "seek forward"
-msgstr "posunúť späť"
-
-msgid "seek backward"
-msgstr "posunúť vpred"
-
-msgid "volume up"
-msgstr "zhlasniť"
-
-msgid "volume down"
-msgstr "stíšiť"
-
-msgid "increase playback rate"
-msgstr "zvýšiť rýchlosť prehrávania"
-
-msgid "decrease playback rate"
-msgstr "znížiť rýchlosť prehrávania"
-
-msgid "change playback direction"
-msgstr "zmeniť smer prehrávania"
-
-msgid "enable/disable trick modes"
-msgstr "zapnúť/vypnúť trikové režimy"
-
-msgid "change audio track"
-msgstr "zmeniť zvukovú stopu"
-
-msgid "change video track"
-msgstr "zmeniť video stopu"
-
-msgid "change subtitle track"
-msgstr "zmeniť stopu s titulkami"
-
-msgid "seek to beginning"
-msgstr "preskočiť na začiatok"
-
-msgid "show keyboard shortcuts"
-msgstr "zobraziť klávesové skratky"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Interaktívny režim - klávesové ovládanie:"
-
-msgid "Output status information and property notifications"
-msgstr "Zobraziť na výstupe informácie o stave a upozornenia o vlastníctve"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
 msgstr ""
 
 msgid "Video sink to use (default is autovideosink)"
-msgstr "Ktorý videosink použiť (predvolený je autovideosink)"
+msgstr ""
 
 msgid "Audio sink to use (default is autoaudiosink)"
-msgstr "Ktorý audiosink použiť (predvolený je autoaudiosink)"
+msgstr ""
 
 msgid "Enable gapless playback"
 msgstr "Povoliť plynulé prehrávanie"
 
 msgid "Shuffle playlist"
-msgstr "Premiešať prehrávací zoznam"
+msgstr ""
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Zakázať interaktívne ovládanie pomocou klávesnice"
+msgid "Interactive control via keyboard"
+msgstr ""
 
 msgid "Volume"
-msgstr "Hlasitosť"
+msgstr ""
 
 msgid "Playlist file containing input media files"
-msgstr "Súbor s prehrávacím zoznamom obsahujúcim vstupné mediálne súbory"
-
-msgid "Do not print any output (apart from errors)"
-msgstr "Nevypisovať žiadny výstup (okrem chýb)"
+msgstr ""
 
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
@@ -665,17 +552,6 @@ msgstr "Použitie: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 
 msgid "You must provide at least one filename or URI to play."
 msgstr "Ak chcete prehrávať, musíte zadať aspoň jeden názov súboru alebo URI."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Stlačením 'k' zobrazíte zoznam klávesových skratiek.\n"
-
-#~ msgid "Internal data stream error."
-#~ msgstr "Vnútorná chyba prúdu údajov."
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr ""
-#~ "Na prehratie tohto prúdu údajov je vyžadovaný zásuvný modul %s, ktorý nie "
-#~ "je nainštalovaný."
 
 #~ msgid "Master"
 #~ msgstr "Hlavný"
@@ -824,6 +700,9 @@ msgstr "Stlačením 'k' zobrazíte zoznam klávesových skratiek.\n"
 
 #~ msgid "Internal data flow error."
 #~ msgstr "Vnútorná chyba prúdu údajov."
+
+#~ msgid "Could not create \"decodebin2\" element."
+#~ msgstr "Nepodarilo sa vytvoriť prvok \"decodebin2\"."
 
 #~ msgid "Could not create \"queue2\" element."
 #~ msgstr "Nepodarilo sa vytvoriť prvok \"queue2\"."

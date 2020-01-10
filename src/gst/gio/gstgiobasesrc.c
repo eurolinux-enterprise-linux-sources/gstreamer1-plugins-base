@@ -64,7 +64,8 @@ gst_gio_base_src_class_init (GstGioBaseSrcClass * klass)
 
   gobject_class->finalize = gst_gio_base_src_finalize;
 
-  gst_element_class_add_static_pad_template (gstelement_class, &src_factory);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&src_factory));
 
   gstbasesrc_class->start = GST_DEBUG_FUNCPTR (gst_gio_base_src_start);
   gstbasesrc_class->stop = GST_DEBUG_FUNCPTR (gst_gio_base_src_stop);
@@ -285,8 +286,7 @@ gst_gio_base_src_unlock_stop (GstBaseSrc * base_src)
 
   GST_LOG_OBJECT (src, "resetting cancellable");
 
-  g_object_unref (src->cancel);
-  src->cancel = g_cancellable_new ();
+  g_cancellable_reset (src->cancel);
 
   return TRUE;
 }

@@ -311,7 +311,6 @@ EXIF_DESERIALIZATION_FUNC (add_to_pending_tags);
 #define EXIF_TAG_EXPOSURE_MODE 0xA402
 #define EXIF_TAG_WHITE_BALANCE 0xA403
 #define EXIF_TAG_DIGITAL_ZOOM_RATIO 0xA404
-#define EXIF_TAG_FOCAL_LENGTH_IN_35_MM_FILM 0xa405
 #define EXIF_TAG_SCENE_CAPTURE_TYPE 0xA406
 #define EXIF_TAG_GAIN_CONTROL 0xA407
 #define EXIF_TAG_CONTRAST 0xA408
@@ -412,8 +411,6 @@ static const GstExifTagMatch tag_map_exif[] = {
   {GST_TAG_CAPTURING_DIGITAL_ZOOM_RATIO, EXIF_TAG_DIGITAL_ZOOM_RATIO,
         EXIF_TYPE_RATIONAL, 0, NULL,
       NULL},
-  {GST_TAG_CAPTURING_FOCAL_LENGTH_35_MM, EXIF_TAG_FOCAL_LENGTH_IN_35_MM_FILM,
-      EXIF_TYPE_SHORT, 0, NULL, NULL},
   {GST_TAG_CAPTURING_SCENE_CAPTURE_TYPE, EXIF_TAG_SCENE_CAPTURE_TYPE,
         EXIF_TYPE_SHORT, 0, serialize_scene_capture_type,
       deserialize_scene_capture_type},
@@ -804,20 +801,6 @@ write_exif_undefined_tag (GstExifWriter * writer, guint16 tag,
   }
 }
 
-static inline gboolean
-gst_exif_tag_str_is_ascii (const gchar * str, gsize * length)
-{
-  gsize len = 0;
-
-  while (*str) {
-    if (*str++ & 0x80)
-      return FALSE;
-    ++len;
-  }
-  *length = len;
-  return TRUE;
-}
-
 static void
 write_exif_ascii_tag (GstExifWriter * writer, guint16 tag, const gchar * str)
 {
@@ -826,11 +809,7 @@ write_exif_ascii_tag (GstExifWriter * writer, guint16 tag, const gchar * str)
   gsize ascii_size;
   GError *error = NULL;
 
-  if (gst_exif_tag_str_is_ascii (str, &ascii_size))
-    ascii_str = g_strndup (str, ascii_size);
-  else
-    ascii_str =
-        g_convert (str, -1, "latin1", "utf8", NULL, &ascii_size, &error);
+  ascii_str = g_convert (str, -1, "latin1", "utf8", NULL, &ascii_size, &error);
 
   if (error) {
     GST_WARNING ("Failed to convert exif tag to ascii: 0x%x - %s. Error: %s",
@@ -1050,9 +1029,6 @@ write_exif_integer_tag_from_taglist (GstExifWriter * writer,
   switch (G_VALUE_TYPE (value)) {
     case G_TYPE_INT:
       num = g_value_get_int (value);
-      break;
-    case G_TYPE_DOUBLE:
-      num = (gint) g_value_get_double (value);
       break;
     default:
       GST_WARNING ("Conversion from %s to int not supported",
@@ -1317,37 +1293,6 @@ parse_exif_ascii_tag (GstExifReader * reader, const GstExifTagMatch * tag,
         tag->gst_tag);
   }
   g_free (utfstr);
-}
-
-static void
-parse_exif_short_tag (GstExifReader * reader, const GstExifTagMatch * tag,
-    guint32 count, guint32 offset, const guint8 * offset_as_data)
-{
-  GType tagtype;
-  guint16 value;
-
-  if (count > 1) {
-    GST_WARNING ("Short tags with more than one value are not supported");
-    return;
-  }
-
-  /* value is encoded into offset */
-  if (reader->byte_order == G_LITTLE_ENDIAN)
-    value = GST_READ_UINT16_LE (offset_as_data);
-  else
-    value = GST_READ_UINT16_BE (offset_as_data);
-
-  tagtype = gst_tag_get_type (tag->gst_tag);
-  if (tagtype == G_TYPE_INT) {
-    gst_tag_list_add (reader->taglist, GST_TAG_MERGE_REPLACE, tag->gst_tag,
-        value, NULL);
-  } else if (tagtype == G_TYPE_DOUBLE) {
-    gst_tag_list_add (reader->taglist, GST_TAG_MERGE_REPLACE, tag->gst_tag,
-        (gdouble) value, NULL);
-  } else {
-    GST_WARNING ("No parsing function associated to %x(%s)", tag->exif_tag,
-        tag->gst_tag);
-  }
 }
 
 static void
@@ -1800,10 +1745,6 @@ parse_exif_ifd (GstExifReader * exif_reader, gint buf_offset,
         parse_exif_long_tag (exif_reader, &tag_map[map_index],
             tagdata.count, tagdata.offset, tagdata.offset_as_data);
         break;
-      case EXIF_TYPE_SHORT:
-        parse_exif_short_tag (exif_reader, &tag_map[map_index],
-            tagdata.count, tagdata.offset, tagdata.offset_as_data);
-        break;
       default:
         GST_WARNING ("Unhandled tag type: %u", tagdata.tag_type);
         break;
@@ -2090,9 +2031,9 @@ serialize_geo_coordinate (GstExifWriter * writer, const GstTagList * taglist,
 {
   gboolean latitude;
   gdouble value;
-  guint32 degrees;
-  guint32 minutes;
-  guint32 seconds_numerator, seconds_denominator;
+  gint degrees;
+  gint minutes;
+  gint seconds;
   guint32 offset;
 
   latitude = exiftag->exif_tag == EXIF_TAG_GPS_LATITUDE;        /* exif tag for latitude */
@@ -2120,24 +2061,21 @@ serialize_geo_coordinate (GstExifWriter * writer, const GstTagList * taglist,
   }
 
   /* now write the degrees stuff */
-  GST_DEBUG ("Converting %lf degrees geo location to HMS", value);
-  degrees = (guint32) value;
+  GST_LOG ("Converting geo location %lf to degrees", value);
+  degrees = (gint) value;
   value -= degrees;
-  minutes = (guint32) (value * 60);
+  minutes = (gint) (value * 60);
   value = (value * 60) - minutes;
-  seconds_denominator = 10000000UL;
-  seconds_numerator = (guint32) (value * 60 * seconds_denominator);
-
-  GST_DEBUG ("Converted rational geo location to %u/%u %u/%u %u/%u degrees ",
-      degrees, 1U, minutes, 1U, seconds_numerator, seconds_denominator);
+  seconds = (gint) (value * 60);
+  GST_LOG ("Converted geo location to %d.%d'%d'' degrees", degrees,
+      minutes, seconds);
 
   offset = gst_byte_writer_get_size (&writer->datawriter);
   gst_exif_writer_write_tag_header (writer, exiftag->exif_tag,
       EXIF_TYPE_RATIONAL, 3, offset, NULL);
   gst_exif_writer_write_rational_data (writer, degrees, 1);
   gst_exif_writer_write_rational_data (writer, minutes, 1);
-  gst_exif_writer_write_rational_data (writer, seconds_numerator,
-      seconds_denominator);
+  gst_exif_writer_write_rational_data (writer, seconds, 1);
 }
 
 static gint
@@ -2254,11 +2192,12 @@ deserialize_geo_coordinate (GstExifReader * exif_reader,
   gst_util_fraction_to_double (degrees_n, degrees_d, &degrees);
   gst_util_fraction_to_double (minutes_n, minutes_d, &minutes);
   gst_util_fraction_to_double (seconds_n, seconds_d, &seconds);
+
   minutes += seconds / 60;
   degrees += minutes / 60;
   degrees *= multiplier;
 
-  GST_DEBUG ("Adding %s tag: %lf degrees", exiftag->gst_tag, degrees);
+  GST_DEBUG ("Adding %s tag: %lf", exiftag->gst_tag, degrees);
   gst_tag_list_add (exif_reader->taglist, GST_TAG_MERGE_REPLACE,
       exiftag->gst_tag, degrees, NULL);
 

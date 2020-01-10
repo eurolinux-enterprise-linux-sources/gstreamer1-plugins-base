@@ -26,9 +26,9 @@
  * <title>Example launch line</title>
  * |[
  * # server:
- * gst-launch-1.0 fdsrc fd=1 ! tcpserversink port=3000
+ * gst-launch fdsrc fd=1 ! tcpserversink port=3000
  * # client:
- * gst-launch-1.0 tcpclientsrc port=3000 ! fdsink fd=2
+ * gst-launch tcpclientsrc port=3000 ! fdsink fd=2
  * ]| 
  * </refsect2>
  */

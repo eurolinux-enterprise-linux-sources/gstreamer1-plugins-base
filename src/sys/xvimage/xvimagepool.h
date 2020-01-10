@@ -28,6 +28,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstXvImageBufferPool GstXvImageBufferPool;
 typedef struct _GstXvImageBufferPoolClass GstXvImageBufferPoolClass;
+typedef struct _GstXvImageBufferPoolPrivate GstXvImageBufferPoolPrivate;
 
 /* buffer pool functions */
 #define GST_TYPE_XVIMAGE_BUFFER_POOL      (gst_xvimage_buffer_pool_get_type())
@@ -39,17 +40,7 @@ struct _GstXvImageBufferPool
 {
   GstBufferPool bufferpool;
 
-  GstXvImageAllocator *allocator;
-
-  GstCaps *caps;
-  gint im_format;
-  GstVideoRectangle crop;
-  GstVideoInfo info;
-  GstVideoAlignment align;
-  guint padded_width;
-  guint padded_height;
-  gboolean add_metavideo;
-  gboolean need_alignment;
+  GstXvImageBufferPoolPrivate *priv;
 };
 
 struct _GstXvImageBufferPoolClass

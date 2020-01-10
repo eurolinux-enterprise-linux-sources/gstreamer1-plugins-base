@@ -30,7 +30,7 @@
  * # server:
  * nc -l -p 3000
  * # client:
- * gst-launch-1.0 tcpclientsrc port=3000 ! fdsink fd=2
+ * gst-launch tcpclientsrc port=3000 ! fdsink fd=2
  * ]| everything you type in the server is shown on the client
  * </refsect2>
  */
@@ -109,7 +109,8 @@ gst_tcp_client_src_class_init (GstTCPClientSrcClass * klass)
           TCP_HIGHEST_PORT, TCP_DEFAULT_PORT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&srctemplate));
 
   gst_element_class_set_static_metadata (gstelement_class,
       "TCP client source", "Source/Network",
@@ -484,8 +485,7 @@ gst_tcp_client_src_unlock_stop (GstBaseSrc * bsrc)
   GstTCPClientSrc *src = GST_TCP_CLIENT_SRC (bsrc);
 
   GST_DEBUG_OBJECT (src, "unset flushing");
-  g_object_unref (src->cancellable);
-  src->cancellable = g_cancellable_new ();
+  g_cancellable_reset (src->cancellable);
 
   return TRUE;
 }

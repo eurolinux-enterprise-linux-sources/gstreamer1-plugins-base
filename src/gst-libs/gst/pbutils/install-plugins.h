@@ -101,15 +101,6 @@ GstInstallPluginsContext * gst_install_plugins_context_new (void);
 
 void   gst_install_plugins_context_free    (GstInstallPluginsContext * ctx);
 
-void   gst_install_plugins_context_set_confirm_search (GstInstallPluginsContext * ctx,
-                                                       gboolean                   confirm_search);
-
-void   gst_install_plugins_context_set_desktop_id (GstInstallPluginsContext * ctx,
-                                                   const gchar              * desktop_id);
-
-void   gst_install_plugins_context_set_startup_notification_id (GstInstallPluginsContext * ctx,
-                                                                const gchar              * startup_id);
-
 void   gst_install_plugins_context_set_xid (GstInstallPluginsContext * ctx,
                                             guint                      xid);
 
@@ -140,10 +131,6 @@ const gchar * gst_install_plugins_return_get_name (GstInstallPluginsReturn ret);
 gboolean      gst_install_plugins_installation_in_progress (void);
 
 gboolean      gst_install_plugins_supported (void);
-
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstInstallPluginsContext, gst_install_plugins_context_free)
-#endif
 
 G_END_DECLS
 

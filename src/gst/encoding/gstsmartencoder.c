@@ -61,7 +61,7 @@ enum
 
 enum
 {
-  PROP_0
+  ARG_0
       /* FILL ME */
 };
 
@@ -100,8 +100,10 @@ gst_smart_encoder_class_init (GstSmartEncoderClass * klass)
 
   gst_smart_encoder_parent_class = g_type_class_peek_parent (klass);
 
-  gst_element_class_add_static_pad_template (element_class, &src_template);
-  gst_element_class_add_static_pad_template (element_class, &sink_template);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_template));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_template));
 
   gst_element_class_set_static_metadata (element_class, "Smart Video Encoder",
       "Codec/Recoder/Video",
@@ -356,12 +358,9 @@ smart_encoder_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
 
       GST_DEBUG_OBJECT (smart_encoder, "segment: %" GST_SEGMENT_FORMAT,
           smart_encoder->segment);
-      if (smart_encoder->segment->format != GST_FORMAT_TIME) {
+      if (smart_encoder->segment->format != GST_FORMAT_TIME)
         GST_ERROR
             ("smart_encoder can not handle streams not specified in GST_FORMAT_TIME");
-        gst_event_unref (event);
-        return FALSE;
-      }
 
       /* And keep a copy for further usage */
       if (smart_encoder->newsegment)
@@ -371,8 +370,7 @@ smart_encoder_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       break;
     case GST_EVENT_EOS:
       GST_DEBUG ("Eos, flushing remaining data");
-      if (smart_encoder->segment->format == GST_FORMAT_TIME)
-        gst_smart_encoder_push_pending_gop (smart_encoder);
+      gst_smart_encoder_push_pending_gop (smart_encoder);
       break;
     default:
       break;

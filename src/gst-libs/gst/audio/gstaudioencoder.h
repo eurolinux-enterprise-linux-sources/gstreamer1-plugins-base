@@ -174,21 +174,6 @@ struct _GstAudioEncoder {
  *                      Propose buffer allocation parameters for upstream elements.
  *                      Subclasses should chain up to the parent implementation to
  *                      invoke the default handler.
- * @transform_meta: Optional. Transform the metadata on the input buffer to the
- *                  output buffer. By default this method copies all meta without
- *                  tags and meta with only the "audio" tag. subclasses can
- *                  implement this method and return %TRUE if the metadata is to be
- *                  copied. Since 1.6
- * @sink_query:     Optional.
- *                  Query handler on the sink pad. This function should
- *                  return TRUE if the query could be performed. Subclasses
- *                  should chain up to the parent implementation to invoke the
- *                  default handler. Since 1.6
- * @src_query:      Optional.
- *                  Query handler on the source pad. This function should
- *                  return TRUE if the query could be performed. Subclasses
- *                  should chain up to the parent implementation to invoke the
- *                  default handler. Since 1.6
  *
  * Subclasses can override any of the available virtual methods or not, as
  * needed. At minimum @set_format and @handle_frame needs to be overridden.
@@ -233,18 +218,8 @@ struct _GstAudioEncoderClass {
   gboolean      (*propose_allocation) (GstAudioEncoder * enc,
                                        GstQuery * query);
 
-  gboolean      (*transform_meta)     (GstAudioEncoder *enc, GstBuffer *outbuf,
-                                       GstMeta *meta, GstBuffer *inbuf);
-
-  gboolean      (*sink_query)         (GstAudioEncoder *encoder,
-				       GstQuery *query);
-
-  gboolean      (*src_query)          (GstAudioEncoder *encoder,
-				       GstQuery *query);
-
-
   /*< private >*/
-  gpointer       _gst_reserved[GST_PADDING_LARGE-3];
+  gpointer       _gst_reserved[GST_PADDING_LARGE];
 };
 
 GType           gst_audio_encoder_get_type         (void);
@@ -295,9 +270,6 @@ void            gst_audio_encoder_set_latency (GstAudioEncoder * enc,
 void            gst_audio_encoder_set_headers (GstAudioEncoder * enc,
                                                GList           * headers);
 
-void            gst_audio_encoder_set_allocation_caps (GstAudioEncoder * enc,
-                                                       GstCaps         * allocation_caps);
-
 /* object properties */
 
 void            gst_audio_encoder_set_mark_granule (GstAudioEncoder * enc,
@@ -336,10 +308,6 @@ void            gst_audio_encoder_get_allocator (GstAudioEncoder * enc,
 
 void            gst_audio_encoder_merge_tags (GstAudioEncoder * enc,
                                               const GstTagList * tags, GstTagMergeMode mode);
-
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioEncoder, gst_object_unref)
-#endif
 
 G_END_DECLS
 

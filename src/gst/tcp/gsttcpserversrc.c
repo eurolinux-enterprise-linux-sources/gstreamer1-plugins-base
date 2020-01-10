@@ -28,9 +28,9 @@
  * <title>Example launch line</title>
  * |[
  * # server:
- * gst-launch-1.0 tcpserversrc port=3000 ! fdsink fd=2
+ * gst-launch tcpserversrc port=3000 ! fdsink fd=2
  * # client:
- * gst-launch-1.0 fdsrc fd=1 ! tcpclientsink port=3000
+ * gst-launch fdsrc fd=1 ! tcpclientsink port=3000
  * ]| 
  * </refsect2>
  */
@@ -122,7 +122,8 @@ gst_tcp_server_src_class_init (GstTCPServerSrcClass * klass)
           "The port number the socket is currently bound to", 0,
           TCP_HIGHEST_PORT, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&srctemplate));
 
   gst_element_class_set_static_metadata (gstelement_class,
       "TCP server source", "Source/Network",
@@ -558,8 +559,7 @@ gst_tcp_server_src_unlock_stop (GstBaseSrc * bsrc)
 {
   GstTCPServerSrc *src = GST_TCP_SERVER_SRC (bsrc);
 
-  g_object_unref (src->cancellable);
-  src->cancellable = g_cancellable_new ();
+  g_cancellable_reset (src->cancellable);
 
   return TRUE;
 }

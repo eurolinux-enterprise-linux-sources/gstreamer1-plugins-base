@@ -136,9 +136,9 @@ gst_rtsp_url_parse (const gchar * urlstr, GstRTSPUrl ** url)
     if (col == NULL || col > at)
       goto invalid;
 
-    res->user = g_uri_unescape_segment (p, col, NULL);
+    res->user = g_strndup (p, col - p);
     col++;
-    res->passwd = g_uri_unescape_segment (col, at, NULL);
+    res->passwd = g_strndup (col, at - col);
 
     /* move to host */
     p = at + 1;

@@ -26,13 +26,9 @@ typedef struct _GstVideoAlignment GstVideoAlignment;
 
 #include <gst/video/video-format.h>
 #include <gst/video/video-color.h>
-#include <gst/video/video-dither.h>
 #include <gst/video/video-info.h>
 #include <gst/video/video-frame.h>
 #include <gst/video/video-enumtypes.h>
-#include <gst/video/video-converter.h>
-#include <gst/video/video-scaler.h>
-#include <gst/video/video-multiview.h>
 
 G_BEGIN_DECLS
 
@@ -56,36 +52,6 @@ struct _GstVideoAlignment
   guint padding_right;
   guint stride_align[GST_VIDEO_MAX_PLANES];
 };
-
-/**
- * GstVideoOrientationMethod:
- * @GST_VIDEO_ORIENTATION_IDENTITY: Identity (no rotation)
- * @GST_VIDEO_ORIENTATION_90R: Rotate clockwise 90 degrees
- * @GST_VIDEO_ORIENTATION_180: Rotate 180 degrees
- * @GST_VIDEO_ORIENTATION_90L: Rotate counter-clockwise 90 degrees
- * @GST_VIDEO_ORIENTATION_HORIZ: Flip horizontally
- * @GST_VIDEO_ORIENTATION_VERT: Flip vertically
- * @GST_VIDEO_ORIENTATION_UL_LR: Flip across upper left/lower right diagonal
- * @GST_VIDEO_ORIENTATION_UR_LL: Flip across upper right/lower left diagonal
- * @GST_VIDEO_ORIENTATION_AUTO: Select flip method based on image-orientation tag
- * @GST_VIDEO_ORIENTATION_CUSTOM: Current status depends on plugin internal setup
- *
- * The different video orientation methods.
- *
- * Since: 1.10
- */
-typedef enum {
-  GST_VIDEO_ORIENTATION_IDENTITY,
-  GST_VIDEO_ORIENTATION_90R,
-  GST_VIDEO_ORIENTATION_180,
-  GST_VIDEO_ORIENTATION_90L,
-  GST_VIDEO_ORIENTATION_HORIZ,
-  GST_VIDEO_ORIENTATION_VERT,
-  GST_VIDEO_ORIENTATION_UL_LR,
-  GST_VIDEO_ORIENTATION_UR_LL,
-  GST_VIDEO_ORIENTATION_AUTO,
-  GST_VIDEO_ORIENTATION_CUSTOM,
-} GstVideoOrientationMethod;
 
 /* metadata macros */
 /**
@@ -134,9 +100,6 @@ gboolean       gst_video_calculate_display_ratio (guint * dar_n,
                                                   guint   display_par_n,
                                                   guint   display_par_d);
 
-gboolean       gst_video_guess_framerate (GstClockTime duration,
-                                          gint * dest_n, gint * dest_d);
-
 /* convert/encode video sample from one format to another */
 
 typedef void (*GstVideoConvertSampleCallback) (GstSample * sample, GError *error, gpointer user_data);
@@ -167,10 +130,8 @@ G_END_DECLS
 #include <gst/video/navigation.h>
 #include <gst/video/video-blend.h>
 #include <gst/video/video-event.h>
-#include <gst/video/videodirection.h>
 #include <gst/video/videoorientation.h>
 #include <gst/video/video-overlay-composition.h>
 #include <gst/video/videooverlay.h>
-#include <gst/video/gstvideotimecode.h>
 
 #endif /* __GST_VIDEO_H__ */

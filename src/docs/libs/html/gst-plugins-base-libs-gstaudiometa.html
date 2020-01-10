@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>gstaudiometa: GStreamer Base Plugins 1.0 Library Reference Manual</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<title>GStreamer Base Plugins 1.0 Library Reference Manual: gstaudiometa</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="GStreamer Base Plugins 1.0 Library Reference Manual">
 <link rel="up" href="gstreamer-audio.html" title="Audio Library">
 <link rel="prev" href="gst-plugins-base-libs-gstaudio.html" title="gstaudio">
 <link rel="next" href="gst-plugins-base-libs-gstaudiocdsrc.html" title="gstaudiocdsrc">
-<meta name="generator" content="GTK-Doc V1.25 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -33,7 +33,7 @@
 </tr></table></div>
 <div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiometa.functions"></a><h2>Functions</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="functions_return">
 <col class="functions_name">
@@ -61,40 +61,20 @@
 <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#gst-buffer-get-audio-downmix-meta-for-channels" title="gst_buffer_get_audio_downmix_meta_for_channels ()">gst_buffer_get_audio_downmix_meta_for_channels</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
-<tr>
-<td class="function_type">
-<a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioClippingMeta" title="struct GstAudioClippingMeta"><span class="returnvalue">GstAudioClippingMeta</span></a> *
-</td>
-<td class="function_name">
-<a class="link" href="gst-plugins-base-libs-gstaudiometa.html#gst-buffer-add-audio-clipping-meta" title="gst_buffer_add_audio_clipping_meta ()">gst_buffer_add_audio_clipping_meta</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="define_keyword">#define</td>
-<td class="function_name">
-<a class="link" href="gst-plugins-base-libs-gstaudiometa.html#gst-buffer-get-audio-clipping-meta" title="gst_buffer_get_audio_clipping_meta()">gst_buffer_get_audio_clipping_meta</a><span class="c_punctuation">()</span>
-</td>
-</tr>
 </tbody>
 </table></div>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-libs-gstaudiometa.other"></a><h2>Types and Values</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="name">
 <col class="description">
 </colgroup>
-<tbody>
-<tr>
+<tbody><tr>
 <td class="datatype_keyword">struct</td>
 <td class="function_name"><a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta">GstAudioDownmixMeta</a></td>
-</tr>
-<tr>
-<td class="datatype_keyword">struct</td>
-<td class="function_name"><a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioClippingMeta" title="struct GstAudioClippingMeta">GstAudioClippingMeta</a></td>
-</tr>
-</tbody>
+</tr></tbody>
 </table></div>
 </div>
 <div class="refsect1">
@@ -113,12 +93,12 @@ meta as well as extracting it.</p>
 <div class="refsect2">
 <a name="gst-buffer-add-audio-downmix-meta"></a><h3>gst_buffer_add_audio_downmix_meta ()</h3>
 <pre class="programlisting"><a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="returnvalue">GstAudioDownmixMeta</span></a> *
-gst_buffer_add_audio_downmix_meta (<em class="parameter"><code><a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a> *buffer</code></em>,
+gst_buffer_add_audio_downmix_meta (<em class="parameter"><code><a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstBuffer.html"><span class="type">GstBuffer</span></a> *buffer</code></em>,
                                    <em class="parameter"><code>const <a class="link" href="gst-plugins-base-libs-gstaudiochannels.html#GstAudioChannelPosition" title="enum GstAudioChannelPosition"><span class="type">GstAudioChannelPosition</span></a> *from_position</code></em>,
-                                   <em class="parameter"><code><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gint"><span class="type">gint</span></a> from_channels</code></em>,
+                                   <em class="parameter"><code><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a> from_channels</code></em>,
                                    <em class="parameter"><code>const <a class="link" href="gst-plugins-base-libs-gstaudiochannels.html#GstAudioChannelPosition" title="enum GstAudioChannelPosition"><span class="type">GstAudioChannelPosition</span></a> *to_position</code></em>,
-                                   <em class="parameter"><code><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gint"><span class="type">gint</span></a> to_channels</code></em>,
-                                   <em class="parameter"><code>const <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gfloat"><span class="type">gfloat</span></a> **matrix</code></em>);</pre>
+                                   <em class="parameter"><code><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a> to_channels</code></em>,
+                                   <em class="parameter"><code>const <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gfloat"><span class="type">gfloat</span></a> **matrix</code></em>);</pre>
 <p>Attaches <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="type">GstAudioDownmixMeta</span></a> metadata to <em class="parameter"><code>buffer</code></em>
  with the given parameters.</p>
 <p><em class="parameter"><code>matrix</code></em>
@@ -130,8 +110,8 @@ the input channels with the coefficients in <em class="parameter"><code>matrix</
 [i] and taking the sum
 of the results.</p>
 <div class="refsect3">
-<a name="gst-buffer-add-audio-downmix-meta.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.6.4.7.2.6"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -140,7 +120,7 @@ of the results.</p>
 <tbody>
 <tr>
 <td class="parameter_name"><p>buffer</p></td>
-<td class="parameter_description"><p>a <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a></p></td>
+<td class="parameter_description"><p>a <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstBuffer.html"><span class="type">GstBuffer</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -174,16 +154,16 @@ the destination. </p></td>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="gst-buffer-add-audio-downmix-meta.returns"></a><h4>Returns</h4>
+<a name="id-1.2.6.4.7.2.7"></a><h4>Returns</h4>
 <p> the <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="type">GstAudioDownmixMeta</span></a> on <em class="parameter"><code>buffer</code></em>
-. </p>
-<p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
+.</p>
+<p></p>
 </div>
 </div>
 <hr>
 <div class="refsect2">
 <a name="gst-buffer-get-audio-downmix-meta"></a><h3>gst_buffer_get_audio_downmix_meta()</h3>
-<pre class="programlisting">#define gst_buffer_get_audio_downmix_meta(b) ((GstAudioDownmixMeta*)gst_buffer_get_meta((b), GST_AUDIO_DOWNMIX_META_API_TYPE))
+<pre class="programlisting">#define gst_buffer_get_audio_downmix_meta(b) ((GstAudioDownmixMeta*)gst_buffer_get_meta((b),GST_AUDIO_DOWNMIX_META_INFO))
 </pre>
 </div>
 <hr>
@@ -191,15 +171,15 @@ the destination. </p></td>
 <a name="gst-buffer-get-audio-downmix-meta-for-channels"></a><h3>gst_buffer_get_audio_downmix_meta_for_channels ()</h3>
 <pre class="programlisting"><a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="returnvalue">GstAudioDownmixMeta</span></a> *
 gst_buffer_get_audio_downmix_meta_for_channels
-                               (<em class="parameter"><code><a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a> *buffer</code></em>,
+                               (<em class="parameter"><code><a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstBuffer.html"><span class="type">GstBuffer</span></a> *buffer</code></em>,
                                 <em class="parameter"><code>const <a class="link" href="gst-plugins-base-libs-gstaudiochannels.html#GstAudioChannelPosition" title="enum GstAudioChannelPosition"><span class="type">GstAudioChannelPosition</span></a> *to_position</code></em>,
-                                <em class="parameter"><code><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gint"><span class="type">gint</span></a> to_channels</code></em>);</pre>
+                                <em class="parameter"><code><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a> to_channels</code></em>);</pre>
 <p>Find the <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="type">GstAudioDownmixMeta</span></a> on <em class="parameter"><code>buffer</code></em>
  for the given destination
 channel positions.</p>
 <div class="refsect3">
-<a name="gst-buffer-get-audio-downmix-meta-for-channels.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.6.4.7.4.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -208,7 +188,7 @@ channel positions.</p>
 <tbody>
 <tr>
 <td class="parameter_name"><p>buffer</p></td>
-<td class="parameter_description"><p>a <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a></p></td>
+<td class="parameter_description"><p>a <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstBuffer.html"><span class="type">GstBuffer</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -226,69 +206,11 @@ the destination. </p></td>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="gst-buffer-get-audio-downmix-meta-for-channels.returns"></a><h4>Returns</h4>
+<a name="id-1.2.6.4.7.4.6"></a><h4>Returns</h4>
 <p> the <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioDownmixMeta" title="struct GstAudioDownmixMeta"><span class="type">GstAudioDownmixMeta</span></a> on <em class="parameter"><code>buffer</code></em>
-. </p>
-<p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
+.</p>
+<p></p>
 </div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="gst-buffer-add-audio-clipping-meta"></a><h3>gst_buffer_add_audio_clipping_meta ()</h3>
-<pre class="programlisting"><a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioClippingMeta" title="struct GstAudioClippingMeta"><span class="returnvalue">GstAudioClippingMeta</span></a> *
-gst_buffer_add_audio_clipping_meta (<em class="parameter"><code><a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a> *buffer</code></em>,
-                                    <em class="parameter"><code><a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a> format</code></em>,
-                                    <em class="parameter"><code><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a> start</code></em>,
-                                    <em class="parameter"><code><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a> end</code></em>);</pre>
-<p>Attaches <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioClippingMeta" title="struct GstAudioClippingMeta"><span class="type">GstAudioClippingMeta</span></a> metadata to <em class="parameter"><code>buffer</code></em>
- with the given parameters.</p>
-<div class="refsect3">
-<a name="gst-buffer-add-audio-clipping-meta.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="parameter_name"><p>buffer</p></td>
-<td class="parameter_description"><p>a <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstBuffer.html#GstBuffer-struct"><span class="type">GstBuffer</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>format</p></td>
-<td class="parameter_description"><p>GstFormat of <em class="parameter"><code>start</code></em>
-and <em class="parameter"><code>stop</code></em>
-, GST_FORMAT_DEFAULT is samples</p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>start</p></td>
-<td class="parameter_description"><p>Amount of audio to clip from start of buffer</p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>end</p></td>
-<td class="parameter_description"><p>Amount of  to clip from end of buffer</p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="gst-buffer-add-audio-clipping-meta.returns"></a><h4>Returns</h4>
-<p> the <a class="link" href="gst-plugins-base-libs-gstaudiometa.html#GstAudioClippingMeta" title="struct GstAudioClippingMeta"><span class="type">GstAudioClippingMeta</span></a> on <em class="parameter"><code>buffer</code></em>
-. </p>
-<p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
-</div>
-<p class="since">Since: 1.8</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="gst-buffer-get-audio-clipping-meta"></a><h3>gst_buffer_get_audio_clipping_meta()</h3>
-<pre class="programlisting">#define gst_buffer_get_audio_clipping_meta(b) ((GstAudioClippingMeta*)gst_buffer_get_meta((b), GST_AUDIO_CLIPPING_META_API_TYPE))
-</pre>
 </div>
 </div>
 <div class="refsect1">
@@ -317,8 +239,8 @@ the input channels with the coefficients in <em class="parameter"><code>matrix</
 [i] and taking the sum
 of the results.</p>
 <div class="refsect3">
-<a name="GstAudioDownmixMeta.members"></a><h4>Members</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.6.4.8.2.6"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="300px" class="struct_members_name">
 <col class="struct_members_description">
@@ -326,8 +248,8 @@ of the results.</p>
 </colgroup>
 <tbody>
 <tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.meta"></a>meta</code></em>;</p></td>
-<td class="struct_member_description"><p>parent <a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a></p></td>
+<td class="struct_member_name"><p><a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.meta"></a>meta</code></em>;</p></td>
+<td class="struct_member_description"><p>parent <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a></p></td>
 <td class="struct_member_annotations"> </td>
 </tr>
 <tr>
@@ -341,17 +263,17 @@ of the results.</p>
 <td class="struct_member_annotations"> </td>
 </tr>
 <tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gint"><span class="type">gint</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.from-channels"></a>from_channels</code></em>;</p></td>
+<td class="struct_member_name"><p><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.from-channels"></a>from_channels</code></em>;</p></td>
 <td class="struct_member_description"><p>the number of channels of the source</p></td>
 <td class="struct_member_annotations"> </td>
 </tr>
 <tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gint"><span class="type">gint</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.to-channels"></a>to_channels</code></em>;</p></td>
+<td class="struct_member_name"><p><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a> <em class="structfield"><code><a name="GstAudioDownmixMeta.to-channels"></a>to_channels</code></em>;</p></td>
 <td class="struct_member_description"><p>the number of channels of the destination</p></td>
 <td class="struct_member_annotations"> </td>
 </tr>
 <tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gfloat"><span class="type">gfloat</span></a> **<em class="structfield"><code><a name="GstAudioDownmixMeta.matrix"></a>matrix</code></em>;</p></td>
+<td class="struct_member_name"><p><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gfloat"><span class="type">gfloat</span></a> **<em class="structfield"><code><a name="GstAudioDownmixMeta.matrix"></a>matrix</code></em>;</p></td>
 <td class="struct_member_description"><p>the matrix coefficients.</p></td>
 <td class="struct_member_annotations"> </td>
 </tr>
@@ -359,65 +281,10 @@ of the results.</p>
 </table></div>
 </div>
 </div>
-<hr>
-<div class="refsect2">
-<a name="GstAudioClippingMeta"></a><h3>struct GstAudioClippingMeta</h3>
-<pre class="programlisting">struct GstAudioClippingMeta {
-  GstMeta   meta;
-
-  GstFormat format;
-  guint64   start;
-  guint64   end;
-};
-</pre>
-<p>Extra buffer metadata describing how much audio has to be clipped from
-the start or end of a buffer. This is used for compressed formats, where
-the first frame usually has some additional samples due to encoder and
-decoder delays, and the last frame usually has some additional samples to
-be able to fill the complete last frame.</p>
-<p>This is used to ensure that decoded data in the end has the same amount of
-samples, and multiply decoded streams can be gaplessly concatenated.</p>
-<p>Note: If clipping of the start is done by adjusting the segment, this meta
-has to be dropped from buffers as otherwise clipping could happen twice.</p>
-<div class="refsect3">
-<a name="GstAudioClippingMeta.members"></a><h4>Members</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="300px" class="struct_members_name">
-<col class="struct_members_description">
-<col width="200px" class="struct_members_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a> <em class="structfield"><code><a name="GstAudioClippingMeta.meta"></a>meta</code></em>;</p></td>
-<td class="struct_member_description"><p>parent <a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstMeta.html#GstMeta"><span class="type">GstMeta</span></a></p></td>
-<td class="struct_member_annotations"> </td>
-</tr>
-<tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a> <em class="structfield"><code><a name="GstAudioClippingMeta.format"></a>format</code></em>;</p></td>
-<td class="struct_member_description"><p>GstFormat of <em class="parameter"><code>start</code></em>
-and <em class="parameter"><code>stop</code></em>
-, GST_FORMAT_DEFAULT is samples</p></td>
-<td class="struct_member_annotations"> </td>
-</tr>
-<tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a> <em class="structfield"><code><a name="GstAudioClippingMeta.start"></a>start</code></em>;</p></td>
-<td class="struct_member_description"><p>Amount of audio to clip from start of buffer</p></td>
-<td class="struct_member_annotations"> </td>
-</tr>
-<tr>
-<td class="struct_member_name"><p><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a> <em class="structfield"><code><a name="GstAudioClippingMeta.end"></a>end</code></em>;</p></td>
-<td class="struct_member_description"><p>Amount of  to clip from end of buffer</p></td>
-<td class="struct_member_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<p class="since">Since: 1.8</p>
-</div>
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.25</div>
+<hr>
+          Generated by GTK-Doc V1.21</div>
 </body>
 </html>

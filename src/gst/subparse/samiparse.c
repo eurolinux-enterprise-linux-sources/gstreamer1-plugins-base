@@ -504,8 +504,7 @@ html_context_handle_element (HtmlContext * ctxt,
     }
 
     length = strlen (attr_value);
-    if (length > 0 && (attr_value[length - 1] == '"'
-            || attr_value[length - 1] == '\'')) {
+    if (attr_value[length - 1] == '"' || attr_value[length - 1] == '\'') {
       attr_value[length - 1] = '\0';
     }
 

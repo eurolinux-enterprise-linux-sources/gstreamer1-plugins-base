@@ -28,7 +28,7 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch-1.0 -v alsasrc ! queue ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
+ * gst-launch -v alsasrc ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
  * ]| Record from a sound card using ALSA and encode to Ogg/Vorbis.
  * </refsect2>
  */
@@ -142,8 +142,8 @@ gst_alsasrc_class_init (GstAlsaSrcClass * klass)
       "Audio source (ALSA)", "Source/Audio",
       "Read from a sound card via ALSA", "Wim Taymans <wim@fluendo.com>");
 
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &alsasrc_src_factory);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&alsasrc_src_factory));
 
   gstbasesrc_class->get_caps = GST_DEBUG_FUNCPTR (gst_alsasrc_getcaps);
 
@@ -725,7 +725,8 @@ gst_alsasrc_open (GstAudioSrc * asrc)
   alsa = GST_ALSA_SRC (asrc);
 
   CHECK (snd_pcm_open (&alsa->handle, alsa->device, SND_PCM_STREAM_CAPTURE,
-          (alsa->driver_timestamps) ? 0 : SND_PCM_NONBLOCK), open_error);
+          (alsa->driver_timestamps == TRUE) ? 0 : SND_PCM_NONBLOCK),
+      open_error);
 
   return TRUE;
 
@@ -785,8 +786,15 @@ gst_alsasrc_prepare (GstAudioSrc * asrc, GstAudioRingBufferSpec * spec)
   }
 
 #ifdef SND_CHMAP_API_VERSION
-  alsa_detect_channels_mapping (GST_OBJECT (alsa), alsa->handle, spec,
-      alsa->channels, GST_AUDIO_BASE_SRC (alsa)->ringbuffer);
+  if (spec->type == GST_AUDIO_RING_BUFFER_FORMAT_TYPE_RAW && alsa->channels < 9) {
+    snd_pcm_chmap_t *chmap = snd_pcm_get_chmap (alsa->handle);
+    if (chmap && chmap->channels == alsa->channels) {
+      GstAudioChannelPosition pos[8];
+      if (alsa_chmap_to_channel_positions (chmap, pos))
+	gst_audio_ring_buffer_set_channel_positions (GST_AUDIO_BASE_SRC (alsa)->ringbuffer, pos);
+    }
+    free (chmap);
+  }
 #endif /* SND_CHMAP_API_VERSION */
 
   return TRUE;
@@ -857,13 +865,13 @@ gst_alsasrc_close (GstAudioSrc * asrc)
 static gint
 xrun_recovery (GstAlsaSrc * alsa, snd_pcm_t * handle, gint err)
 {
-  GST_WARNING_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (-err));
+  GST_DEBUG_OBJECT (alsa, "xrun recovery %d: %s", err, g_strerror (err));
 
   if (err == -EPIPE) {          /* under-run */
     err = snd_pcm_prepare (handle);
     if (err < 0)
       GST_WARNING_OBJECT (alsa,
-          "Can't recover from underrun, prepare failed: %s",
+          "Can't recovery from underrun, prepare failed: %s",
           snd_strerror (err));
     return 0;
   } else if (err == -ESTRPIPE) {
@@ -874,7 +882,7 @@ xrun_recovery (GstAlsaSrc * alsa, snd_pcm_t * handle, gint err)
       err = snd_pcm_prepare (handle);
       if (err < 0)
         GST_WARNING_OBJECT (alsa,
-            "Can't recover from suspend, prepare failed: %s",
+            "Can't recovery from suspend, prepare failed: %s",
             snd_strerror (err));
     }
     return 0;
@@ -946,11 +954,12 @@ gst_alsasrc_read (GstAudioSrc * asrc, gpointer data, guint length,
   GstAlsaSrc *alsa;
   gint err;
   gint cptr;
-  guint8 *ptr = data;
+  gint16 *ptr;
 
   alsa = GST_ALSA_SRC (asrc);
 
   cptr = length / alsa->bpf;
+  ptr = data;
 
   GST_ALSA_SRC_LOCK (asrc);
   while (cptr > 0) {
@@ -966,7 +975,7 @@ gst_alsasrc_read (GstAudioSrc * asrc, gpointer data, guint length,
       continue;
     }
 
-    ptr += snd_pcm_frames_to_bytes (alsa->handle, err);
+    ptr += err * alsa->channels;
     cptr -= err;
   }
   GST_ALSA_SRC_UNLOCK (asrc);

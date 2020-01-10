@@ -1,8 +1,5 @@
 /* GStreamer
  *
- * giosrc-mounting: example application that shows how to handle the
- * "not-mounted" message
- *
  * Copyright (C) 2009 Sebastian Dröge <sebastian.droege@collabora.co.uk>
  * 
  * This library is free software; you can redistribute it and/or
@@ -51,7 +48,8 @@ mount_cb (GObject * obj, GAsyncResult * res, gpointer user_data)
 static gboolean
 message_handler (GstBus * bus, GstMessage * message, gpointer user_data)
 {
-  switch (GST_MESSAGE_TYPE (message)) {
+
+  switch (message->type) {
     case GST_MESSAGE_ELEMENT:{
       const GstStructure *s = gst_message_get_structure (message);
       const gchar *name = gst_structure_get_name (s);

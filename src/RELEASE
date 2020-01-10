@@ -1,15 +1,28 @@
 
-Release notes for GStreamer Base Plugins 1.10.4
+Release notes for GStreamer Base Plugins 1.4.5
 
-The GStreamer team is proud to announce the fourth bugfix release in the stable
-1.10 release series of your favourite cross-platform multimedia framework!
+The GStreamer team is pleased to announce a bugfix release of the stable
+1.4 release series. The 1.4 release series is adding new features on top
+of the 1.2 series and is part of the API and ABI-stable 1.x release
+series of the GStreamer multimedia framework that contains new features.
+The 1.4.x bugfix releases only contain important bugfixes compared to 1.4.0.
 
 
-This release only contains bugfixes and it is safe to update from 1.10.x. For a
-full list of bugfixes see Bugzilla.
+Binaries for Android, iOS, Mac OS X and Windows are provided by the
+GStreamer project for this release.
 
 
-See /releases/1.10/ for the full release notes.
+The 1.x series is a stable series targeted at end users. It is not API
+or ABI compatible with the 0.10.x series. It can, however, be installed
+in parallel with the 0.10.x series and will not affect an existing
+0.10.x installation.
+
+
+The stable 1.4.x release series is API and ABI compatible with 1.0.x and
+any other 1.x release series in the future. Compared to 1.0.x it contains
+some new features and more intrusive changes that were considered too
+risky as a bugfix.
+
 
 
 This module contains a set of reference plugins, base classes for other
@@ -58,19 +71,29 @@ contains a set of codecs plugins based on libav (formerly gst-ffmpeg)
 
 Bugs fixed in this release
      
-      * 778432 : Crash on state chang to NULL during mp3_type_find_at_offset
+      * 741420 : video pools: should update size in configuration after applying alignment
+      * 715050 : add typefinder for audio/x-audible
+      * 739544 : tcp: Add test and fix memory leak in tcp elements
+      * 739840 : typefind should recognize Apple Core Audio Format (CAF)
+      * 740556 : videodecoder: don't complain when DTS != PTS on keyframes
+      * 740675 : playsink: continues playback, reset mute property
+      * 740730 : rtspconnection: don't remove child source if parent source is already destroyed
+      * 740853 : audiodecoder: Push pending events before sending EOS.
+      * 740952 : alsa: NetBSD fixes
+      * 741045 : audiorate can can lose timestamp precision in some cases
+      * 741198 : playbin: leaks GstPads
 
 ==== Download ====
 
 You can find source releases of gst-plugins-base in the download
-directory: https://gstreamer.freedesktop.org/src/gst-plugins-base/
+directory: http://gstreamer.freedesktop.org/src/gst-plugins-base/
 
 The git repository and details how to clone it can be found at
 http://cgit.freedesktop.org/gstreamer/gst-plugins-base/
 
 ==== Homepage ====
 
-The project's website is https://gstreamer.freedesktop.org/
+The project's website is http://gstreamer.freedesktop.org/
 
 ==== Support and Bugs ====
 
@@ -95,8 +118,21 @@ subscribe to the gstreamer-devel list.
         
 Contributors to this release
     
-      * Heekyoung Seo
-      * Jochen Henneberg
+      * Andrei Sarakeev
+      * Chad
+      * Edward Hervey
+      * Göran Jönsson
+      * Jan Schmidt
+      * Jonathan Matthew
+      * Matej Knopp
+      * Mathieu Duponchelle
+      * Peter G. Baum
       * Sebastian Dröge
+      * Song Bing
+      * Thiago Santos
       * Thibault Saunier
+      * Thomas Klausner
+      * Tim-Philipp Müller
+      * William Manley
+      * Wim Taymans
  

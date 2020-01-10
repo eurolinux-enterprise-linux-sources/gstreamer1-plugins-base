@@ -23,7 +23,6 @@
 #include <gst/gst.h>
 
 #include <gst/video/video.h>
-#include <gst/video/gstvideotimecode.h>
 
 G_BEGIN_DECLS
 
@@ -79,7 +78,7 @@ struct _GstVideoMeta {
 GType gst_video_meta_api_get_type (void);
 const GstMetaInfo * gst_video_meta_get_info (void);
 
-GstVideoMeta * gst_buffer_get_video_meta (GstBuffer *buffer);
+#define gst_buffer_get_video_meta(b) ((GstVideoMeta*)gst_buffer_get_meta((b),GST_VIDEO_META_API_TYPE))
 GstVideoMeta * gst_buffer_get_video_meta_id    (GstBuffer *buffer, gint id);
 
 GstVideoMeta * gst_buffer_add_video_meta       (GstBuffer *buffer, GstVideoFrameFlags flags,
@@ -256,8 +255,8 @@ gboolean  gst_video_gl_texture_upload_meta_upload     (GstVideoGLTextureUploadMe
  * @parent_id: identifier of its parent ROI, used f.i. for ROI hierarchisation.
  * @x: x component of upper-left corner
  * @y: y component of upper-left corner
- * @w: bounding box width
- * @h: bounding box height
+ * @width: bounding box width
+ * @height: bounding box height
  *
  * Extra buffer metadata describing an image region of interest
  */
@@ -295,46 +294,6 @@ GstVideoRegionOfInterestMeta *gst_buffer_add_video_region_of_interest_meta_id (G
                                                                                guint         y,
                                                                                guint         w,
                                                                                guint         h);
-
-/**
- * GstVideoTimeCodeMeta:
- * @meta: parent #GstMeta
- * @tc: the GstVideoTimeCode to attach
- *
- * Extra buffer metadata describing the GstVideoTimeCode of the frame.
- *
- * Each frame is assumed to have its own timecode, i.e. they are not
- * automatically incremented/interpolated.
- *
- * Since: 1.10
- */
-typedef struct {
-  GstMeta meta;
-
-  GstVideoTimeCode tc;
-} GstVideoTimeCodeMeta;
-
-GType              gst_video_time_code_meta_api_get_type (void);
-#define GST_VIDEO_TIME_CODE_META_API_TYPE (gst_video_time_code_meta_api_get_type())
-const GstMetaInfo *gst_video_time_code_meta_get_info (void);
-#define GST_VIDEO_TIME_CODE_META_INFO (gst_video_time_code_meta_get_info())
-
-#define gst_buffer_get_video_time_code_meta(b) \
-        ((GstVideoTimeCodeMeta*)gst_buffer_get_meta((b),GST_VIDEO_TIME_CODE_META_API_TYPE))
-GstVideoTimeCodeMeta *gst_buffer_add_video_time_code_meta    (GstBuffer             * buffer,
-                                                              GstVideoTimeCode      * tc);
-
-GstVideoTimeCodeMeta *
-gst_buffer_add_video_time_code_meta_full                     (GstBuffer             * buffer,
-                                                              guint fps_n,
-                                                              guint fps_d,
-                                                              GDateTime             * latest_daily_jam,
-                                                              GstVideoTimeCodeFlags   flags,
-                                                              guint                   hours,
-                                                              guint                   minutes,
-                                                              guint                   seconds,
-                                                              guint                   frames,
-                                                              guint                   field_count);
 
 G_END_DECLS
 

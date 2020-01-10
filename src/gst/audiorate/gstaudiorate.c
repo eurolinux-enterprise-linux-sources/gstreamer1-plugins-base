@@ -51,15 +51,9 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch-1.0 -v autoaudiosrc ! audiorate ! audioconvert ! wavenc ! filesink location=alsa.wav
- * ]| Capture audio from the sound card and turn it into a perfect stream
+ * gst-launch -v alsasrc ! audiorate ! wavenc ! filesink location=alsa.wav
+ * ]| Capture audio from an ALSA device, and turn it into a perfect stream
  * for saving in a raw audio file.
- * |[
- * gst-launch-1.0 -v uridecodebin uri=file:///path/to/audio.file ! audiorate ! audioconvert ! wavenc ! filesink location=alsa.wav
- * ]| Decodes an audio file and transforms it into a perfect stream for saving
- * in a raw audio WAV file. Without the audio rate, the timing might not be
- * preserved correctly in the WAV file in case the decoded stream is jittery
- * or there are samples missing.
  * </refsect2>
  */
 
@@ -88,14 +82,14 @@ enum
 
 enum
 {
-  PROP_0,
-  PROP_IN,
-  PROP_OUT,
-  PROP_ADD,
-  PROP_DROP,
-  PROP_SILENT,
-  PROP_TOLERANCE,
-  PROP_SKIP_TO_FIRST
+  ARG_0,
+  ARG_IN,
+  ARG_OUT,
+  ARG_ADD,
+  ARG_DROP,
+  ARG_SILENT,
+  ARG_TOLERANCE,
+  ARG_SKIP_TO_FIRST
 };
 
 static GstStaticPadTemplate gst_audio_rate_src_template =
@@ -146,20 +140,20 @@ gst_audio_rate_class_init (GstAudioRateClass * klass)
   object_class->set_property = gst_audio_rate_set_property;
   object_class->get_property = gst_audio_rate_get_property;
 
-  g_object_class_install_property (object_class, PROP_IN,
+  g_object_class_install_property (object_class, ARG_IN,
       g_param_spec_uint64 ("in", "In",
           "Number of input samples", 0, G_MAXUINT64, 0,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-  g_object_class_install_property (object_class, PROP_OUT,
+  g_object_class_install_property (object_class, ARG_OUT,
       g_param_spec_uint64 ("out", "Out", "Number of output samples", 0,
           G_MAXUINT64, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
   pspec_add = g_param_spec_uint64 ("add", "Add", "Number of added samples",
       0, G_MAXUINT64, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
-  g_object_class_install_property (object_class, PROP_ADD, pspec_add);
+  g_object_class_install_property (object_class, ARG_ADD, pspec_add);
   pspec_drop = g_param_spec_uint64 ("drop", "Drop", "Number of dropped samples",
       0, G_MAXUINT64, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
-  g_object_class_install_property (object_class, PROP_DROP, pspec_drop);
-  g_object_class_install_property (object_class, PROP_SILENT,
+  g_object_class_install_property (object_class, ARG_DROP, pspec_drop);
+  g_object_class_install_property (object_class, ARG_SILENT,
       g_param_spec_boolean ("silent", "silent",
           "Don't emit notify for dropped and duplicated frames", DEFAULT_SILENT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
@@ -169,7 +163,7 @@ gst_audio_rate_class_init (GstAudioRateClass * klass)
    * The difference between incoming timestamp and next timestamp must exceed
    * the given value for audiorate to add or drop samples.
    */
-  g_object_class_install_property (object_class, PROP_TOLERANCE,
+  g_object_class_install_property (object_class, ARG_TOLERANCE,
       g_param_spec_uint64 ("tolerance", "tolerance",
           "Only act if timestamp jitter/imperfection exceeds indicated tolerance (ns)",
           0, G_MAXUINT64, DEFAULT_TOLERANCE,
@@ -180,7 +174,7 @@ gst_audio_rate_class_init (GstAudioRateClass * klass)
    *
    * Don't produce buffers before the first one we receive.
    */
-  g_object_class_install_property (object_class, PROP_SKIP_TO_FIRST,
+  g_object_class_install_property (object_class, ARG_SKIP_TO_FIRST,
       g_param_spec_boolean ("skip-to-first", "Skip to first buffer",
           "Don't produce buffers before the first one we receive",
           DEFAULT_SKIP_TO_FIRST, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
@@ -190,10 +184,10 @@ gst_audio_rate_class_init (GstAudioRateClass * klass)
       "Drops/duplicates/adjusts timestamps on audio samples to make a perfect stream",
       "Wim Taymans <wim@fluendo.com>");
 
-  gst_element_class_add_static_pad_template (element_class,
-      &gst_audio_rate_sink_template);
-  gst_element_class_add_static_pad_template (element_class,
-      &gst_audio_rate_src_template);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&gst_audio_rate_sink_template));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&gst_audio_rate_src_template));
 
   element_class->change_state = gst_audio_rate_change_state;
 }
@@ -343,19 +337,10 @@ gst_audio_rate_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
       res = gst_pad_push_event (audiorate->srcpad, event);
       break;
     case GST_EVENT_GAP:
-    {
-      /* Fill until end of gap */
-      GstClockTime timestamp, duration;
-      gst_event_parse_gap (event, &timestamp, &duration);
+      /* no gaps after audiorate, ignore the event */
       gst_event_unref (event);
-      if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
-        if (GST_CLOCK_TIME_IS_VALID (duration))
-          timestamp += duration;
-        gst_audio_rate_fill_to_time (audiorate, timestamp);
-      }
       res = TRUE;
       break;
-    }
     default:
       res = gst_pad_event_default (pad, parent, event);
       break;
@@ -535,17 +520,14 @@ gst_audio_rate_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
     while (fillsamples > 0) {
       guint64 cursamples = MIN (fillsamples, rate);
-      GstMapInfo fillmap;
 
       fillsamples -= cursamples;
       fillsize = cursamples * bpf;
 
       fill = gst_buffer_new_and_alloc (fillsize);
 
-      gst_buffer_map (fill, &fillmap, GST_MAP_WRITE);
-      gst_audio_format_fill_silence (audiorate->info.finfo, fillmap.data,
-          fillmap.size);
-      gst_buffer_unmap (fill, &fillmap);
+      /* FIXME, 0 might not be the silence byte for the negotiated format. */
+      gst_buffer_memset (fill, 0, 0, fillsize);
 
       GST_DEBUG_OBJECT (audiorate, "inserting %" G_GUINT64_FORMAT " samples",
           cursamples);
@@ -695,13 +677,13 @@ gst_audio_rate_set_property (GObject * object,
   GstAudioRate *audiorate = GST_AUDIO_RATE (object);
 
   switch (prop_id) {
-    case PROP_SILENT:
+    case ARG_SILENT:
       audiorate->silent = g_value_get_boolean (value);
       break;
-    case PROP_TOLERANCE:
+    case ARG_TOLERANCE:
       audiorate->tolerance = g_value_get_uint64 (value);
       break;
-    case PROP_SKIP_TO_FIRST:
+    case ARG_SKIP_TO_FIRST:
       audiorate->skip_to_first = g_value_get_boolean (value);
       break;
     default:
@@ -717,25 +699,25 @@ gst_audio_rate_get_property (GObject * object,
   GstAudioRate *audiorate = GST_AUDIO_RATE (object);
 
   switch (prop_id) {
-    case PROP_IN:
+    case ARG_IN:
       g_value_set_uint64 (value, audiorate->in);
       break;
-    case PROP_OUT:
+    case ARG_OUT:
       g_value_set_uint64 (value, audiorate->out);
       break;
-    case PROP_ADD:
+    case ARG_ADD:
       g_value_set_uint64 (value, audiorate->add);
       break;
-    case PROP_DROP:
+    case ARG_DROP:
       g_value_set_uint64 (value, audiorate->drop);
       break;
-    case PROP_SILENT:
+    case ARG_SILENT:
       g_value_set_boolean (value, audiorate->silent);
       break;
-    case PROP_TOLERANCE:
+    case ARG_TOLERANCE:
       g_value_set_uint64 (value, audiorate->tolerance);
       break;
-    case PROP_SKIP_TO_FIRST:
+    case ARG_SKIP_TO_FIRST:
       g_value_set_boolean (value, audiorate->skip_to_first);
       break;
     default:

@@ -43,18 +43,18 @@
  * <refsect2>
  * <title>Example launch lines</title>
  * |[
- * gst-launch-1.0 -v giosrc location=file:///home/joe/foo.xyz ! fakesink
+ * gst-launch -v giosrc location=file:///home/joe/foo.xyz ! fakesink
  * ]| The above pipeline will simply read a local file and do nothing with the
  * data read. Instead of giosrc, we could just as well have used the
  * filesrc element here.
  * |[
- * gst-launch-1.0 -v giosrc location=smb://othercomputer/foo.xyz ! filesink location=/home/joe/foo.xyz
+ * gst-launch -v giosrc location=smb://othercomputer/foo.xyz ! filesink location=/home/joe/foo.xyz
  * ]| The above pipeline will copy a file from a remote host to the local file
  * system using the Samba protocol.
  * |[
- * gst-launch-1.0 -v giosrc location=smb://othercomputer/demo.mp3 ! decodebin ! audioconvert ! audioresample ! autoaudiosink
+ * gst-launch -v giosrc location=http://music.foobar.com/demo.mp3 ! mad ! audioconvert ! audioresample ! alsasink
  * ]| The above pipeline will read and decode and play an mp3 file from a
- * SAMBA server.
+ * web server using the http protocol.
  * </refsect2>
  */
 

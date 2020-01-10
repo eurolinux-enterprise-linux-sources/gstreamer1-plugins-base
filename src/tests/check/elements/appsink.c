@@ -313,103 +313,6 @@ GST_START_TEST (test_buffer_list_fallback_signal)
 
 GST_END_TEST;
 
-GST_START_TEST (test_segment)
-{
-  GstElement *sink;
-  GstSegment segment;
-  GstBuffer *buffer;
-  GstSample *pulled_preroll;
-  GstSample *pulled_sample;
-
-  sink = setup_appsink ();
-
-  gst_segment_init (&segment, GST_FORMAT_TIME);
-  segment.start = 2 * GST_SECOND;
-  fail_unless (gst_pad_push_event (mysrcpad, gst_event_new_segment (&segment)));
-
-  ASSERT_SET_STATE (sink, GST_STATE_PLAYING, GST_STATE_CHANGE_ASYNC);
-
-  buffer = gst_buffer_new_and_alloc (4);
-  fail_unless (gst_pad_push (mysrcpad, buffer) == GST_FLOW_OK);
-
-  g_signal_emit_by_name (sink, "pull-preroll", &pulled_preroll);
-  fail_unless (gst_segment_is_equal (&segment,
-          gst_sample_get_segment (pulled_preroll)));
-  gst_sample_unref (pulled_preroll);
-
-  g_signal_emit_by_name (sink, "pull-sample", &pulled_sample);
-  fail_unless (gst_segment_is_equal (&segment,
-          gst_sample_get_segment (pulled_sample)));
-  gst_sample_unref (pulled_sample);
-
-  ASSERT_SET_STATE (sink, GST_STATE_NULL, GST_STATE_CHANGE_SUCCESS);
-  cleanup_appsink (sink);
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_pull_with_timeout)
-{
-  GstElement *sink;
-  GstBuffer *buffer;
-  GstSample *s;
-  guint64 t1, tdiff;
-
-  sink = setup_appsink ();
-
-  ASSERT_SET_STATE (sink, GST_STATE_PLAYING, GST_STATE_CHANGE_ASYNC);
-
-  /* Check that it actually waits for a bit */
-  t1 = gst_util_get_timestamp ();
-  s = gst_app_sink_try_pull_preroll (GST_APP_SINK (sink), GST_SECOND / 20);
-  tdiff = gst_util_get_timestamp () - t1;
-  GST_LOG ("tdiff: %" GST_TIME_FORMAT, GST_TIME_ARGS (tdiff));
-  fail_unless (s == NULL);
-  fail_unless (tdiff > (GST_SECOND / (20 * 2)));
-
-  buffer = gst_buffer_new_and_alloc (4);
-  fail_unless (gst_pad_push (mysrcpad, buffer) == GST_FLOW_OK);
-
-  s = gst_app_sink_try_pull_preroll (GST_APP_SINK (sink), GST_SECOND / 20);
-  fail_unless (s != NULL);
-  gst_sample_unref (s);
-
-  s = gst_app_sink_try_pull_sample (GST_APP_SINK (sink), 500 * GST_SECOND);
-  fail_unless (s != NULL);
-  gst_sample_unref (s);
-
-  /* No waiting */
-  s = gst_app_sink_try_pull_sample (GST_APP_SINK (sink), 0);
-  fail_unless (s == NULL);
-
-  /* Check that it actually waits for a bit */
-  t1 = gst_util_get_timestamp ();
-  s = gst_app_sink_try_pull_sample (GST_APP_SINK (sink), GST_SECOND / 20);
-  tdiff = gst_util_get_timestamp () - t1;
-  GST_LOG ("tdiff: %" GST_TIME_FORMAT, GST_TIME_ARGS (tdiff));
-  fail_unless (s == NULL);
-  fail_unless (tdiff > (GST_SECOND / (20 * 2)));
-
-  /* No waiting, with buffer pending */
-  buffer = gst_buffer_new_and_alloc (5);
-  fail_unless (gst_pad_push (mysrcpad, buffer) == GST_FLOW_OK);
-  s = gst_app_sink_try_pull_sample (GST_APP_SINK (sink), 0);
-  fail_unless (s != NULL);
-  gst_sample_unref (s);
-
-  /* With timeout, with buffer pending */
-  buffer = gst_buffer_new_and_alloc (6);
-  fail_unless (gst_pad_push (mysrcpad, buffer) == GST_FLOW_OK);
-  s = gst_app_sink_try_pull_sample (GST_APP_SINK (sink), GST_SECOND / 20);
-  fail_unless (s != NULL);
-  gst_sample_unref (s);
-
-  ASSERT_SET_STATE (sink, GST_STATE_NULL, GST_STATE_CHANGE_SUCCESS);
-  cleanup_appsink (sink);
-}
-
-GST_END_TEST;
-
 static Suite *
 appsink_suite (void)
 {
@@ -423,8 +326,6 @@ appsink_suite (void)
   tcase_add_test (tc_chain, test_notify1);
   tcase_add_test (tc_chain, test_buffer_list_fallback);
   tcase_add_test (tc_chain, test_buffer_list_fallback_signal);
-  tcase_add_test (tc_chain, test_segment);
-  tcase_add_test (tc_chain, test_pull_with_timeout);
 
   return s;
 }

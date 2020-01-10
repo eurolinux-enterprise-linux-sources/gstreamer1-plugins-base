@@ -77,7 +77,6 @@ struct _GstTheoraDec
   gint telemetry_bits;
 
   gboolean can_crop;
-  GstVideoInfo uncropped_info;
 };
 
 struct _GstTheoraDecClass
@@ -86,6 +85,7 @@ struct _GstTheoraDecClass
 };
 
 GType gst_theora_dec_get_type (void);
+gboolean gst_theora_dec_register (GstPlugin * plugin);
 
 G_END_DECLS
 

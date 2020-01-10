@@ -202,6 +202,9 @@ struct _GstMultiHandleSink {
   GMainContext *main_context;
   GCancellable *cancellable;
 
+  GSList *streamheader; /* GSList of GstBuffers to use as streamheader */
+  gboolean previous_buffer_in_caps;
+
   gint qos_dscp;
 
   GArray *bufqueue;     /* global queue of buffers */

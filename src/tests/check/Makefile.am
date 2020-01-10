@@ -6,7 +6,8 @@ TEST_FILES_DIRECTORY = $(top_srcdir)/tests/files
 REGISTRY_ENVIRONMENT = \
 	GST_REGISTRY_1_0=$(CHECK_REGISTRY)
 
-AM_TESTS_ENVIRONMENT += \
+TESTS_ENVIRONMENT = \
+	CK_DEFAULT_TIMEOUT=120                                  \
 	GST_STATE_IGNORE_ELEMENTS="$(STATE_IGNORE_ELEMENTS)"	\
 	$(REGISTRY_ENVIRONMENT)					\
 	GST_PLUGIN_SYSTEM_PATH_1_0=				\
@@ -19,11 +20,11 @@ AM_TESTS_ENVIRONMENT += \
 CLEANFILES = core.* test-registry.*
 
 clean-local: clean-local-check
-
+	
 distclean-local: distclean-local-orc
 
 $(CHECK_REGISTRY):
-	$(AM_TESTS_ENVIRONMENT)
+	$(TESTS_ENVIRONMENT)
 
 # elements to ignore for the state tests
 STATE_IGNORE_ELEMENTS = cdio cdparanoiasrc libvisual_ alsasrc alsasink
@@ -40,12 +41,6 @@ if USE_OGG
 check_ogg = pipelines/oggmux
 else
 check_ogg =
-endif
-
-if USE_OPUS
-check_opus = elements/opus
-else
-check_opus =
 endif
 
 if USE_PANGO
@@ -75,8 +70,7 @@ endif
 
 if USE_PLUGIN_PLAYBACK
 check_playback = elements/decodebin elements/playbin \
-    elements/playbin-complex elements/streamsynchronizer \
-    elements/playsink
+    elements/playbin-complex elements/streamsynchronizer
 else
 check_playback =
 endif
@@ -122,9 +116,7 @@ check_videorate =
 endif
 
 if USE_PLUGIN_VIDEOSCALE
-check_videoscale = elements/videoscale elements/videoscale-1 \
-        elements/videoscale-2 elements/videoscale-3 elements/videoscale-4 \
-        elements/videoscale-5 elements/videoscale-6
+check_videoscale = elements/videoscale
 else
 check_videoscale =
 endif
@@ -148,7 +140,7 @@ check_adder =
 endif
 
 if HAVE_ORC
-check_orc = orc/video orc/audio orc/adder orc/volume orc/videotestsrc
+check_orc = orc/video orc/audio orc/adder orc/audioconvert orc/volume orc/videoscale orc/videotestsrc
 else
 check_orc =
 endif
@@ -172,11 +164,7 @@ check_audiorate =
 endif
 
 if USE_PLUGIN_TCP
-if USE_PLUGIN_APP
-check_tcp = elements/multifdsink elements/multisocketsink pipelines/tcp
-else
 check_tcp = elements/multifdsink elements/multisocketsink
-endif
 else
 check_tcp =
 endif
@@ -197,12 +185,10 @@ check_PROGRAMS = \
 	generic/clock-selection \
 	generic/states \
 	libs/libsabi \
-	libs/allocators \
 	libs/audio \
 	libs/audiocdsrc \
 	libs/audiodecoder \
 	libs/audioencoder \
-	libs/baseaudiovisualizer \
 	libs/discoverer \
 	libs/fft \
 	libs/navigation \
@@ -219,12 +205,10 @@ check_PROGRAMS = \
 	libs/video \
 	libs/videodecoder \
 	libs/videoencoder \
-	libs/videotimecode \
 	libs/xmpwriter \
 	pipelines/simple-launch-lines \
 	pipelines/basetime \
 	pipelines/capsfilter-renegotiation \
-	pipelines/streamsynchronizer \
 	$(check_adder) \
 	$(check_app) \
 	$(check_audioconvert) \
@@ -234,7 +218,6 @@ check_PROGRAMS = \
 	$(check_encodebin) \
 	$(check_gio) \
 	$(check_ogg) \
-	$(check_opus) \
 	$(check_pango) \
 	$(check_playback) \
 	$(check_subparse) \
@@ -255,6 +238,8 @@ check_PROGRAMS = \
 
 # videoconvert takes too long, so disabled for now
 VALGRIND_TO_FIX = \
+	elements/videoconvert \
+	libs/video \
 	$(check_orc)
 
 # these tests don't even pass
@@ -265,19 +250,16 @@ noinst_HEADERS = \
 	libs/struct_i386.h     \
 	libs/struct_i386_osx.h \
 	libs/struct_ppc32.h \
-	libs/struct_ppc64.h \
 	libs/struct_x86_64.h
 
 AM_CFLAGS = -I$(top_srcdir)/gst-libs -I$(top_builddir)/gst-libs \
 	$(GST_CFLAGS) $(GST_CHECK_CFLAGS) \
 	-DGST_TEST_FILES_PATH="\"$(TEST_FILES_DIRECTORY)\"" \
-	-DGST_CHECK_TEST_ENVIRONMENT_BEACON="\"GST_PLUGIN_LOADING_WHITELIST\"" \
-	-UG_DISABLE_ASSERT -UG_DISABLE_CAST_CHECKS $(PTHREAD_CFLAGS)
+	-UG_DISABLE_ASSERT -UG_DISABLE_CAST_CHECKS
 AM_CXXFLAGS = -I$(top_srcdir)/gst-libs -I$(top_builddir)/gst-libs \
 	$(GST_CXXFLAGS) $(GST_CHECK_CFLAGS) \
 	-DGST_TEST_FILES_PATH="\"$(TEST_FILES_DIRECTORY)\"" \
-	-DGST_CHECK_TEST_ENVIRONMENT_BEACON="\"GST_PLUGIN_LOADING_WHITELIST\"" \
-	-UG_DISABLE_ASSERT -UG_DISABLE_CAST_CHECKS $(PTHREAD_CFLAGS)
+	-UG_DISABLE_ASSERT -UG_DISABLE_CAST_CHECKS
 LDADD = $(GST_LIBS) $(GST_CHECK_LIBS)
 
 # valgrind testing
@@ -299,16 +281,6 @@ libs_libsabi_LDADD = \
 	$(top_builddir)/gst-libs/gst/rtsp/libgstrtsp-@GST_API_VERSION@.la \
 	$(top_builddir)/gst-libs/gst/tag/libgsttag-@GST_API_VERSION@.la \
 	$(top_builddir)/gst-libs/gst/video/libgstvideo-@GST_API_VERSION@.la \
-	$(GST_BASE_LIBS) \
-	$(LDADD)
-
-libs_allocators_CFLAGS = \
-	$(GST_PLUGINS_BASE_CFLAGS) \
-	$(GST_BASE_CFLAGS) \
-	$(AM_CFLAGS)
-
-libs_allocators_LDADD = \
-	$(top_builddir)/gst-libs/gst/allocators/libgstallocators-@GST_API_VERSION@.la \
 	$(GST_BASE_LIBS) \
 	$(LDADD)
 
@@ -352,14 +324,6 @@ libs_audiocdsrc_LDADD = \
 	$(top_builddir)/gst-libs/gst/tag/libgsttag-@GST_API_VERSION@.la \
 	$(GST_BASE_LIBS) \
 	$(LDADD)
-
-libs_baseaudiovisualizer_SOURCES = libs/baseaudiovisualizer.c
-libs_baseaudiovisualizer_CFLAGS = \
-        $(GST_PLUGINS_BASE_CFLAGS) \
-        $(GST_CFLAGS) $(AM_CFLAGS)
-libs_baseaudiovisualizer_LDADD = \
-        $(top_builddir)/gst-libs/gst/pbutils/libgstpbutils-@GST_API_VERSION@.la \
-        $(GST_LIBS) $(LDADD)
 
 libs_discoverer_CFLAGS = \
 	$(GST_PLUGINS_BASE_CFLAGS) \
@@ -591,25 +555,6 @@ elements_videoscale_LDADD = \
 	$(top_builddir)/gst-libs/gst/video/libgstvideo-@GST_API_VERSION@.la \
 	$(GST_BASE_LIBS) $(LDADD)
 
-elements_videoscale_1_SOURCES = elements/videoscale.c
-elements_videoscale_1_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=1
-elements_videoscale_1_LDADD = $(elements_videoscale_LDADD)
-elements_videoscale_2_SOURCES = elements/videoscale.c
-elements_videoscale_2_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=2
-elements_videoscale_2_LDADD = $(elements_videoscale_LDADD)
-elements_videoscale_3_SOURCES = elements/videoscale.c
-elements_videoscale_3_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=3
-elements_videoscale_3_LDADD = $(elements_videoscale_LDADD)
-elements_videoscale_4_SOURCES = elements/videoscale.c
-elements_videoscale_4_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=4
-elements_videoscale_4_LDADD = $(elements_videoscale_LDADD)
-elements_videoscale_5_SOURCES = elements/videoscale.c
-elements_videoscale_5_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=5
-elements_videoscale_5_LDADD = $(elements_videoscale_LDADD)
-elements_videoscale_6_SOURCES = elements/videoscale.c
-elements_videoscale_6_CFLAGS = $(elements_videoscale_CFLAGS) -DVSCALE_TEST_GROUP=6
-elements_videoscale_6_LDADD = $(elements_videoscale_LDADD)
-
 gst_typefindfunctions_CFLAGS = $(GST_BASE_CFLAGS) $(AM_CFLAGS)
 gst_typefindfunctions_LDADD = $(GST_BASE_LIBS) $(LDADD)
 
@@ -643,26 +588,8 @@ libs_videoencoder_LDADD = \
 	$(GST_BASE_LIBS) \
 	$(LDADD)
 
-libs_videotimecode_CFLAGS = \
-	$(GST_PLUGINS_BASE_CFLAGS) \
-	$(GST_BASE_CFLAGS) \
-	$(AM_CFLAGS)
-
-libs_videotimecode_LDADD = \
-	$(top_builddir)/gst-libs/gst/video/libgstvideo-@GST_API_VERSION@.la \
-	$(GST_BASE_LIBS) \
-	$(LDADD)
-
 elements_multisocketsink_CFLAGS = $(GIO_CFLAGS) $(AM_CFLAGS)
 elements_multisocketsink_LDADD = $(GIO_LIBS) $(LDADD)
-
-if USE_GIO_UNIX_2_0
-GIO_UNIX_2_0_DEFINED=-DHAVE_GIO_UNIX_2_0=1
-endif
-
-pipelines_tcp_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_NET_CFLAGS) $(GIO_CFLAGS) $(GIO_UNIX_2_0_CFLAGS) $(GIO_UNIX_2_0_DEFINED) $(AM_CFLAGS)
-pipelines_tcp_LDADD = $(GST_PLUGINS_BASE_LIBS) $(GST_NET_LIBS) $(GIO_LIBS) $(LDADD) \
-    $(GIO_UNIX_2_0_LIBS) $(top_builddir)/gst-libs/gst/app/libgstapp-@GST_API_VERSION@.la
 
 pipelines_gio_CFLAGS = $(GIO_CFLAGS) $(AM_CFLAGS)
 pipelines_gio_LDADD = $(GIO_LIBS) $(LDADD)
@@ -700,9 +627,15 @@ nodist_orc_audio_SOURCES = orc/audio.c
 orc_adder_CFLAGS = $(ORC_CFLAGS)
 orc_adder_LDADD = $(ORC_LIBS) -lorc-test-0.4
 nodist_orc_adder_SOURCES = orc/adder.c
+orc_audioconvert_CFLAGS = $(ORC_CFLAGS)
+orc_audioconvert_LDADD = $(ORC_LIBS) -lorc-test-0.4
+nodist_orc_audioconvert_SOURCES = orc/audioconvert.c
 orc_volume_CFLAGS = $(ORC_CFLAGS)
 orc_volume_LDADD = $(ORC_LIBS) -lorc-test-0.4
 nodist_orc_volume_SOURCES = orc/volume.c
+orc_videoscale_CFLAGS = $(ORC_CFLAGS)
+orc_videoscale_LDADD = $(ORC_LIBS) -lorc-test-0.4
+nodist_orc_videoscale_SOURCES = orc/videoscale.c
 orc_videotestsrc_CFLAGS = $(ORC_CFLAGS)
 orc_videotestsrc_LDADD = $(ORC_LIBS) -lorc-test-0.4
 nodist_orc_videotestsrc_SOURCES = orc/videotestsrc.c
@@ -719,7 +652,15 @@ orc/adder.c: $(top_srcdir)/gst/adder/gstadderorc.orc
 	$(MKDIR_P) orc/
 	$(ORCC) --test -o $@ $<
 
+orc/audioconvert.c: $(top_srcdir)/gst/audioconvert/gstaudioconvertorc.orc
+	$(MKDIR_P) orc/
+	$(ORCC) --test -o $@ $<
+
 orc/volume.c: $(top_srcdir)/gst/volume/gstvolumeorc.orc
+	$(MKDIR_P) orc/
+	$(ORCC) --test -o $@ $<
+
+orc/videoscale.c: $(top_srcdir)/gst/videoscale/gstvideoscaleorc.orc
 	$(MKDIR_P) orc/
 	$(ORCC) --test -o $@ $<
 

@@ -1,0 +1,43 @@
+From 94ab7b84994fdf4a76bcfcefc91fda8fb36dd8d1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tim-Philipp=20M=C3=BCller?= <tim@centricular.com>
+Date: Fri, 24 Oct 2014 13:09:42 +0100
+Subject: [PATCH 2/2] tests: fix playbin-complex test on big endian
+
+---
+ tests/check/elements/playbin-complex.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tests/check/elements/playbin-complex.c b/tests/check/elements/playbin-complex.c
+index 706cb47..f59a103 100644
+--- a/tests/check/elements/playbin-complex.c
++++ b/tests/check/elements/playbin-complex.c
+@@ -26,7 +26,7 @@
+ #include <gst/check/gstcheck.h>
+ #include <gst/base/gstpushsrc.h>
+ #include <gst/base/gstbasesink.h>
+-#include <gst/audio/streamvolume.h>
++#include <gst/audio/audio.h>
+ #include <gst/video/gstvideodecoder.h>
+ 
+ #ifndef GST_DISABLE_REGISTRY
+@@ -521,7 +521,7 @@ gst_codec_demuxer_setup_pad (GstCodecDemuxer * demux, GstPad ** pad,
+       caps = gst_caps_new_empty_simple ("video/x-compressed");
+     } else if (g_str_equal (streaminfo, "raw-audio")) {
+       caps = gst_caps_new_simple ("audio/x-raw",
+-          "format", G_TYPE_STRING, "S16LE",
++          "format", G_TYPE_STRING, GST_AUDIO_NE (S16),
+           "layout", G_TYPE_STRING, "interleaved",
+           "rate", G_TYPE_INT, 48000, "channels", G_TYPE_INT, 2, NULL);
+     } else {
+@@ -1222,7 +1222,7 @@ GST_START_TEST (test_raw_single_audio_stream_manual_sink)
+   playbin =
+       create_playbin
+       ("caps:audio/x-raw,"
+-      " format=(string)S16LE, " "layout=(string)interleaved, "
++      " format=(string)" GST_AUDIO_NE (S16) ", " "layout=(string)interleaved, "
+       " rate=(int)48000, " " channels=(int)2", TRUE);
+ 
+   fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_READY),
+-- 
+2.4.3
+

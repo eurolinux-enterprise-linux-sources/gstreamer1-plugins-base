@@ -24,10 +24,6 @@
 #include "config.h"
 #endif
 
-#ifdef HAVE_VALGRIND
-#include <valgrind/valgrind.h>
-#endif
-
 #include <gst/check/gstcheck.h>
 
 #ifndef GST_DISABLE_PARSE
@@ -59,7 +55,7 @@ buffer_probe_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   }
   old_ts = new_ts;
 
-  return GST_PAD_PROBE_OK;
+  return TRUE;
 }
 
 GST_START_TEST (test_basetime_calculation)
@@ -72,7 +68,7 @@ GST_START_TEST (test_basetime_calculation)
   loop = g_main_loop_new (NULL, FALSE);
 
   /* The "main" pipeline */
-  p1 = gst_parse_launch ("fakesrc ! identity sleep-time=1 ! fakesink", NULL);
+  p1 = gst_parse_launch ("fakesrc ! fakesink", NULL);
   fail_if (p1 == NULL);
 
   /* Create a sub-bin that is activated only in "certain situations" */
@@ -134,19 +130,9 @@ baseaudiosrc_suite (void)
 {
   Suite *s = suite_create ("baseaudiosrc");
   TCase *tc_chain = tcase_create ("general");
-  guint timeout;
 
   /* timeout 6 sec */
-  timeout = 6;
-
-#ifdef HAVE_VALGRIND
-  {
-    if (RUNNING_ON_VALGRIND)
-      timeout *= 4;
-  }
-#endif
-
-  tcase_set_timeout (tc_chain, timeout);
+  tcase_set_timeout (tc_chain, 6);
   suite_add_tcase (s, tc_chain);
 
 #ifndef GST_DISABLE_PARSE
@@ -156,4 +142,19 @@ baseaudiosrc_suite (void)
   return s;
 }
 
-GST_CHECK_MAIN (baseaudiosrc);
+int
+main (int argc, char **argv)
+{
+  int nf;
+
+  Suite *s = baseaudiosrc_suite ();
+  SRunner *sr = srunner_create (s);
+
+  gst_check_init (&argc, &argv);
+
+  srunner_run_all (sr, CK_NORMAL);
+  nf = srunner_ntests_failed (sr);
+  srunner_free (sr);
+
+  return nf;
+}

@@ -32,36 +32,14 @@
 #include "audio.h"
 #include "audio-enumtypes.h"
 
-#ifndef GST_DISABLE_GST_DEBUG
-#define GST_CAT_DEFAULT ensure_debug_category()
-static GstDebugCategory *
-ensure_debug_category (void)
-{
-  static gsize cat_gonce = 0;
-
-  if (g_once_init_enter (&cat_gonce)) {
-    gsize cat_done;
-
-    cat_done = (gsize) _gst_debug_category_new ("audio", 0, "audio library");
-
-    g_once_init_leave (&cat_gonce, cat_done);
-  }
-
-  return (GstDebugCategory *) cat_gonce;
-}
-#else
-#define ensure_debug_category() /* NOOP */
-#endif /* GST_DISABLE_GST_DEBUG */
-
-
 /**
  * gst_audio_buffer_clip:
  * @buffer: (transfer full): The buffer to clip.
  * @segment: Segment in %GST_FORMAT_TIME or %GST_FORMAT_DEFAULT to which
  *           the buffer should be clipped.
  * @rate: sample rate.
- * @bpf: size of one audio frame in bytes. This is the size of one sample * 
- * number of channels.
+ * @bpf: size of one audio frame in bytes. This is the size of one sample
+ * * channels.
  *
  * Clip the buffer to the given %GstSegment.
  *
@@ -75,8 +53,8 @@ ensure_debug_category (void)
  * is not clipped
  */
 GstBuffer *
-gst_audio_buffer_clip (GstBuffer * buffer, const GstSegment * segment,
-    gint rate, gint bpf)
+gst_audio_buffer_clip (GstBuffer * buffer, GstSegment * segment, gint rate,
+    gint bpf)
 {
   GstBuffer *ret;
   GstClockTime timestamp = GST_CLOCK_TIME_NONE, duration = GST_CLOCK_TIME_NONE;
@@ -224,18 +202,14 @@ gst_audio_buffer_clip (GstBuffer * buffer, const GstSegment * segment,
     gst_buffer_unref (buffer);
 
     GST_DEBUG ("timestamp %" GST_TIME_FORMAT, GST_TIME_ARGS (timestamp));
-    if (ret) {
-      GST_BUFFER_TIMESTAMP (ret) = timestamp;
+    GST_BUFFER_TIMESTAMP (ret) = timestamp;
 
-      if (change_duration)
-        GST_BUFFER_DURATION (ret) = duration;
-      if (change_offset)
-        GST_BUFFER_OFFSET (ret) = offset;
-      if (change_offset_end)
-        GST_BUFFER_OFFSET_END (ret) = offset_end;
-    } else {
-      GST_ERROR ("copy_region failed");
-    }
+    if (change_duration)
+      GST_BUFFER_DURATION (ret) = duration;
+    if (change_offset)
+      GST_BUFFER_OFFSET (ret) = offset;
+    if (change_offset_end)
+      GST_BUFFER_OFFSET_END (ret) = offset_end;
   }
   return ret;
 }

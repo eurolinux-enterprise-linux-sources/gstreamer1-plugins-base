@@ -36,201 +36,51 @@ A wide range of video and audio decoders, encoders, and filters are included.
 
  <release>
   <Version>
-   <revision>1.10.4</revision>
-   <branch>1.10</branch>
+   <revision>1.4.5</revision>
+   <branch>1.4</branch>
    <name></name>
-   <created>2017-02-23</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.10.4.tar.xz" />
+   <created>2014-12-18</created>
+   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.5.tar.xz" />
   </Version>
  </release>
 
  <release>
   <Version>
-   <revision>1.10.3</revision>
-   <branch>1.10</branch>
+   <revision>1.4.4</revision>
+   <branch>1.4</branch>
    <name></name>
-   <created>2017-01-30</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.10.3.tar.xz" />
+   <created>2014-11-06</created>
+   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.4.tar.xz" />
   </Version>
  </release>
 
  <release>
   <Version>
-   <revision>1.10.2</revision>
-   <branch>1.10</branch>
+   <revision>1.4.3</revision>
+   <branch>1.4</branch>
    <name></name>
-   <created>2016-11-29</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.10.2.tar.xz" />
+   <created>2014-09-24</created>
+   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.3.tar.xz" />
   </Version>
  </release>
 
  <release>
   <Version>
-   <revision>1.10.1</revision>
-   <branch>1.10</branch>
+   <revision>1.4.2</revision>
+   <branch>1.4</branch>
    <name></name>
-   <created>2016-11-17</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.10.1.tar.xz" />
+   <created>2014-09-19</created>
+   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.2.tar.xz" />
   </Version>
  </release>
 
  <release>
   <Version>
-   <revision>1.10.0</revision>
-   <branch>master</branch>
+   <revision>1.4.1</revision>
+   <branch>1.4</branch>
    <name></name>
-   <created>2016-11-01</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.10.0.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.9.90</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-09-30</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.9.90.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.9.2</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-09-01</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.9.2.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.9.1</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-06-06</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.9.1.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.8.0</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-03-24</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.8.0.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.7.91</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-03-15</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.7.91.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.7.90</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-03-01</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.7.90.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.7.2</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2016-02-19</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.7.2.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.7.1</revision>
-   <branch>master</branch>
-   <name></name>
-   <created>2015-12-24</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.7.1.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.6.2</revision>
-   <branch>1.6</branch>
-   <name></name>
-   <created>2015-12-14</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.6.2.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.6.1</revision>
-   <branch>1.6</branch>
-   <name></name>
-   <created>2015-10-30</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.6.1.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.6.0</revision>
-   <branch>1.6</branch>
-   <name></name>
-   <created>2015-09-25</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.6.0.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.5.91</revision>
-   <branch>1.5</branch>
-   <name></name>
-   <created>2015-09-18</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.5.91.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.5.90</revision>
-   <branch>1.5</branch>
-   <name></name>
-   <created>2015-08-19</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.5.90.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.5.2</revision>
-   <branch>1.5</branch>
-   <name></name>
-   <created>2015-06-24</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.5.2.tar.xz" />
-  </Version>
- </release>
-
- <release>
-  <Version>
-   <revision>1.5.1</revision>
-   <branch>1.5</branch>
-   <name></name>
-   <created>2015-06-07</created>
-   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.5.1.tar.xz" />
+   <created>2014-08-27</created>
+   <file-release rdf:resource="http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.1.tar.xz" />
   </Version>
  </release>
 

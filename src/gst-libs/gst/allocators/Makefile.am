@@ -4,13 +4,11 @@ libgstallocators_@GST_API_VERSION@_includedir = $(includedir)/gstreamer-@GST_API
 
 libgstallocators_@GST_API_VERSION@_include_HEADERS = \
 	allocators.h \
-	gstfdmemory.h \
 	gstdmabuf.h
 
 noinst_HEADERS =
 
 libgstallocators_@GST_API_VERSION@_la_SOURCES = \
-	gstfdmemory.c \
 	gstdmabuf.c 
 
 libgstallocators_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(LIBM)
@@ -25,13 +23,11 @@ gir_sources=$(patsubst %,$(srcdir)/%, $(libgstallocators_@GST_API_VERSION@_la_SO
 gir_cincludes=$(patsubst %,--c-include='gst/allocators/%',$(libgstallocators_@GST_API_VERSION@_include_HEADERS))
 
 GstAllocators-@GST_API_VERSION@.gir: $(INTROSPECTION_SCANNER) libgstallocators-@GST_API_VERSION@.la
-	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" GI_SCANNER_DISABLE_CACHE=yes\
+	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" \
 		GST_PLUGIN_SYSTEM_PATH="" GST_PLUGIN_PATH="" GST_REGISTRY_UPDATE=no \
-		CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CC="$(CC)" PKG_CONFIG="$(PKG_CONFIG)" DLLTOOL="$(DLLTOOL)" \
 		$(INTROSPECTION_SCANNER) -v --namespace GstAllocators \
 		--nsversion=@GST_API_VERSION@ \
-		--identifier-prefix=Gst \
-		--symbol-prefix=gst \
+		--strip-prefix=Gst \
 		--warn-all \
 		--c-include "gst/allocators/allocators.h" \
 		-I$(top_srcdir)/gst-libs \
@@ -65,3 +61,17 @@ typelibs_DATA = $(BUILT_GIRSOURCES:.gir=.typelib)
 
 CLEANFILES = $(BUILT_GIRSOURCES) $(typelibs_DATA)
 endif
+
+Android.mk: Makefile.am
+	androgenizer -:PROJECT libgstallocators -:SHARED libgstallocators-@GST_API_VERSION@ \
+	 -:TAGS eng debug \
+         -:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
+	 -:SOURCES $(libgstallocators_@GST_API_VERSION@_la_SOURCES) \
+	 -:CFLAGS $(DEFS) $(libgstallocators_@GST_API_VERSION@_la_CFLAGS) \
+	 -:LDFLAGS $(libgstallocators_@GST_API_VERSION@_la_LDFLAGS) \
+	           $(libgstallocators_@GST_API_VERSION@_la_LIBADD) \
+	           -ldl \
+	 -:HEADER_TARGET gstreamer-@GST_API_VERSION@/gst/allocators \
+	 -:HEADERS $(libgstallocatorsinclude_HEADERS) \
+	 -:PASSTHROUGH LOCAL_ARM_MODE:=arm \
+	> $@

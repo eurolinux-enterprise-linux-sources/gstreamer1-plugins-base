@@ -12,38 +12,41 @@ check-valgrind:
 endif
 
 LOOPS ?= 10
-AM_TESTS_ENVIRONMENT = CK_DEFAULT_TIMEOUT=20
 
 # run any given test by running make test.check
 # if the test fails, run it again at at least debug level 2
 %.check: %
-	@$(AM_TESTS_ENVIRONMENT)					\
+	@$(TESTS_ENVIRONMENT)					\
+	CK_DEFAULT_TIMEOUT=20					\
 	$* ||							\
-	$(AM_TESTS_ENVIRONMENT)					\
+	$(TESTS_ENVIRONMENT)					\
 	GST_DEBUG=$$GST_DEBUG,*:2				\
+	CK_DEFAULT_TIMEOUT=20					\
 	$*
 
 # just like 'check', but don't run it again if it fails (useful for debugging)
 %.check-norepeat: %
-	@$(AM_TESTS_ENVIRONMENT)					\
+	@$(TESTS_ENVIRONMENT)					\
+	CK_DEFAULT_TIMEOUT=20					\
 	$*
 
 # run any given test in a loop
 %.torture: %
 	@for i in `seq 1 $(LOOPS)`; do				\
-	$(AM_TESTS_ENVIRONMENT)					\
+	$(TESTS_ENVIRONMENT)					\
+	CK_DEFAULT_TIMEOUT=20					\
 	$*; done
 
 # run any given test in an infinite loop
 %.forever: %
 	@while true; do						\
-	$(AM_TESTS_ENVIRONMENT)					\
+	$(TESTS_ENVIRONMENT)					\
+	CK_DEFAULT_TIMEOUT=20					\
 	$* || break; done
 
 # valgrind any given test by running make test.valgrind
 %.valgrind: %
-	@valgrind_log=$(subst /,-,$*-valgrind.log);		\
-	$(AM_TESTS_ENVIRONMENT)					\
+	@$(TESTS_ENVIRONMENT)					\
 	CK_DEFAULT_TIMEOUT=360					\
 	G_SLICE=always-malloc					\
 	$(LIBTOOL) --mode=execute				\
@@ -52,16 +55,16 @@ AM_TESTS_ENVIRONMENT = CK_DEFAULT_TIMEOUT=20
 	--tool=memcheck --leak-check=full --trace-children=yes	\
 	--show-possibly-lost=no                                 \
 	--leak-resolution=high --num-callers=20			\
-	./$* 2>&1 | tee $$valgrind_log ;			\
-	if grep "^==" $$valgrind_log > /dev/null 2>&1; then	\
-	    rm $$valgrind_log;					\
+	./$* 2>&1 | tee valgrind.log
+	@if grep "==" valgrind.log > /dev/null 2>&1; then	\
+	    rm valgrind.log;					\
 	    exit 1;						\
-	fi ;							\
-	rm $$valgrind_log
+	fi
+	@rm valgrind.log
 
 # valgrind any given test and generate suppressions for it
 %.valgrind.gen-suppressions: %
-	@$(AM_TESTS_ENVIRONMENT)					\
+	@$(TESTS_ENVIRONMENT)					\
 	CK_DEFAULT_TIMEOUT=360					\
 	G_SLICE=always-malloc					\
 	$(LIBTOOL) --mode=execute				\
@@ -91,7 +94,7 @@ AM_TESTS_ENVIRONMENT = CK_DEFAULT_TIMEOUT=20
 
 # gdb any given test by running make test.gdb
 %.gdb: %
-	@$(AM_TESTS_ENVIRONMENT)					\
+	@$(TESTS_ENVIRONMENT)					\
 	CK_FORK=no						\
 	$(LIBTOOL) --mode=execute				\
 	gdb $*
@@ -147,13 +150,19 @@ forever: $(TESTS)
 # valgrind all tests
 valgrind: $(TESTS)
 	@echo "Valgrinding tests ..."
-	@failed=0; valgrind_targets="";					\
+	@failed=0;							\
 	for t in $(filter-out $(VALGRIND_TESTS_DISABLE),$(TESTS)); do	\
-	  valgrind_targets="$$valgrind_targets $$t.valgrind";		\
+		$(MAKE) $$t.valgrind;					\
+		if test "$$?" -ne 0; then                               \
+			echo "Valgrind error for test $$t";		\
+			failed=`expr $$failed + 1`;			\
+			whicht="$$whicht $$t";				\
+		fi;							\
 	done;								\
-	if ! $(MAKE) $$valgrind_targets ; then				\
-	  echo "Some tests had leaks or errors under valgrind";		\
-	  false;							\
+	if test "$$failed" -ne 0; then					\
+		echo "$$failed tests had leaks or errors under valgrind:";	\
+		echo "$$whicht";					\
+		false;							\
 	fi
 
 # valgrind all tests until failure
@@ -201,13 +210,10 @@ valgrind.gen-suppressions: $(TESTS)
 GST_INSPECT = $(GST_TOOLS_DIR)/gst-inspect-$(GST_API_VERSION)
 inspect:
 	@echo "Inspecting features ..."
-	@for e in `$(AM_TESTS_ENVIRONMENT) $(GST_INSPECT) | head -n -2 	\
+	@for e in `$(TESTS_ENVIRONMENT) $(GST_INSPECT) | head -n -2 	\
 	  | cut -d: -f2`;						\
 	  do echo Inspecting $$e;					\
 	     $(GST_INSPECT) $$e > /dev/null 2>&1; done
-
-# build all tests
-build-checks: $(TESTS)
 
 help:
 	@echo
@@ -231,7 +237,6 @@ help:
 	@echo "make (dir)/(test).valgrind.gen-suppressions -- generate suppressions"
 	@echo "                                               and save to suppressions.log"
 	@echo "make inspect                       -- inspect all plugin features"
-	@echo "make build-checks                  -- build all checks (but don't run them)"
 	@echo
 	@echo
 	@echo "Additionally, you can use the GST_CHECKS environment variable to"

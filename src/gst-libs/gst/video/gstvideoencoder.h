@@ -39,7 +39,7 @@ G_BEGIN_DECLS
   (G_TYPE_INSTANCE_GET_CLASS((obj),GST_TYPE_VIDEO_ENCODER,GstVideoEncoderClass))
 #define GST_IS_VIDEO_ENCODER(obj) \
   (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_VIDEO_ENCODER))
-#define GST_IS_VIDEO_ENCODER_CLASS(klass) \
+#define GST_IS_VIDEO_ENCODER_CLASS(obj) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_VIDEO_ENCODER))
 #define GST_VIDEO_ENCODER_CAST(enc) ((GstVideoEncoder*)enc)
 
@@ -83,13 +83,8 @@ G_BEGIN_DECLS
  * GST_VIDEO_ENCODER_FLOW_DROPPED:
  *
  * Returned when the event/buffer should be dropped.
- *
- * Deprecated: since 1.8. use gst_video_encoder_finish_frame with
- * a %NULL frame->output_buffer to drop the frame instead.
  */
-#ifndef GST_DISABLE_DEPRECATED
 #define GST_VIDEO_ENCODER_FLOW_DROPPED GST_FLOW_CUSTOM_SUCCESS_1
-#endif
 
 /**
  * GST_VIDEO_ENCODER_INPUT_SEGMENT:
@@ -229,11 +224,6 @@ struct _GstVideoEncoder
  *                  return TRUE if the query could be performed. Subclasses
  *                  should chain up to the parent implementation to invoke the
  *                  default handler. Since 1.4
- * @transform_meta: Optional. Transform the metadata on the input buffer to the
- *                  output buffer. By default this method is copies all meta without
- *                  tags and meta with only the "video" tag. subclasses can
- *                  implement this method and return %TRUE if the metadata is to be
- *                  copied. Since 1.6
  *
  * Subclasses can override any of the available virtual methods or not, as
  * needed. At minimum @handle_frame needs to be overridden, and @set_format
@@ -291,12 +281,8 @@ struct _GstVideoEncoderClass
   gboolean      (*src_query)      (GstVideoEncoder *encoder,
 				   GstQuery *query);
 
-  gboolean      (*transform_meta) (GstVideoEncoder *encoder,
-                                   GstVideoCodecFrame *frame,
-                                   GstMeta * meta);
-
   /*< private >*/
-  gpointer       _gst_reserved[GST_PADDING_LARGE-4];
+  gpointer       _gst_reserved[GST_PADDING_LARGE-3];
 };
 
 GType                gst_video_encoder_get_type (void);
@@ -346,12 +332,6 @@ void                 gst_video_encoder_merge_tags  (GstVideoEncoder *encoder,
 void                 gst_video_encoder_get_allocator (GstVideoEncoder *encoder,
                                                       GstAllocator **allocator,
                                                       GstAllocationParams *params);
-
-void                 gst_video_encoder_set_min_pts(GstVideoEncoder *encoder, GstClockTime min_pts);
-
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstVideoEncoder, gst_object_unref)
-#endif
 
 G_END_DECLS
 

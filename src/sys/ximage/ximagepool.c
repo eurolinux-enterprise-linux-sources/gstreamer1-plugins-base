@@ -32,8 +32,19 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideopool.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_debug_x_image_pool);
-#define GST_CAT_DEFAULT gst_debug_x_image_pool
+GST_DEBUG_CATEGORY_EXTERN (gst_debug_ximagepool);
+#define GST_CAT_DEFAULT gst_debug_ximagepool
+
+struct _GstXImageBufferPoolPrivate
+{
+  GstCaps *caps;
+  GstVideoInfo info;
+  GstVideoAlignment align;
+  guint padded_width;
+  guint padded_height;
+  gboolean add_metavideo;
+  gboolean need_alignment;
+};
 
 /* X11 stuff */
 static gboolean error_caught = FALSE;
@@ -213,14 +224,16 @@ ximage_memory_alloc (GstXImageBufferPool * xpool)
   int (*handler) (Display *, XErrorEvent *);
   gboolean success = FALSE;
   GstXContext *xcontext;
-  gint width, height, align, offset;
+  gint width, height, align = 15, offset;
+  GstXImageBufferPoolPrivate *priv;
   GstXImageMemory *mem;
 
+  priv = xpool->priv;
   ximagesink = xpool->sink;
   xcontext = ximagesink->xcontext;
 
-  width = xpool->padded_width;
-  height = xpool->padded_height;
+  width = priv->padded_width;
+  height = priv->padded_height;
 
   mem = g_slice_new (GstXImageMemory);
 
@@ -228,10 +241,10 @@ ximage_memory_alloc (GstXImageBufferPool * xpool)
   mem->SHMInfo.shmaddr = ((void *) -1);
   mem->SHMInfo.shmid = -1;
 #endif
-  mem->x = xpool->align.padding_left;
-  mem->y = xpool->align.padding_top;
-  mem->width = GST_VIDEO_INFO_WIDTH (&xpool->info);
-  mem->height = GST_VIDEO_INFO_HEIGHT (&xpool->info);
+  mem->x = priv->align.padding_left;
+  mem->y = priv->align.padding_top;
+  mem->width = GST_VIDEO_INFO_WIDTH (&priv->info);
+  mem->height = GST_VIDEO_INFO_HEIGHT (&priv->info);
   mem->sink = gst_object_ref (ximagesink);
 
   GST_DEBUG_OBJECT (ximagesink, "creating image %p (%dx%d)", mem,
@@ -276,7 +289,6 @@ ximage_memory_alloc (GstXImageBufferPool * xpool)
         mem->size, width, mem->ximage->bytes_per_line);
 
     /* get shared memory */
-    align = 0;
     mem->SHMInfo.shmid =
         shmget (IPC_PRIVATE, mem->size + align, IPC_CREAT | 0777);
     if (mem->SHMInfo.shmid == -1)
@@ -331,8 +343,6 @@ ximage_memory_alloc (GstXImageBufferPool * xpool)
     allocsize =
         GST_ROUND_UP_4 (mem->ximage->bytes_per_line) * mem->ximage->height;
 
-    /* we want 16 byte aligned memory, g_malloc may only give 8 */
-    align = 15;
     mem->ximage->data = g_malloc (allocsize + align);
     GST_LOG_OBJECT (ximagesink,
         "non-XShm image size is %" G_GSIZE_FORMAT " (alloced: %u), width %d, "
@@ -419,7 +429,7 @@ xattach_failed:
 /* This function checks that it is actually really possible to create an image
    using XShm */
 gboolean
-gst_x_image_sink_check_xshm_calls (GstXImageSink * ximagesink,
+gst_ximagesink_check_xshm_calls (GstXImageSink * ximagesink,
     GstXContext * xcontext)
 {
   XImage *ximage;
@@ -525,6 +535,9 @@ beach:
 /* bufferpool */
 static void gst_ximage_buffer_pool_finalize (GObject * object);
 
+#define GST_XIMAGE_BUFFER_POOL_GET_PRIVATE(obj)  \
+   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_XIMAGE_BUFFER_POOL, GstXImageBufferPoolPrivate))
+
 #define gst_ximage_buffer_pool_parent_class parent_class
 G_DEFINE_TYPE (GstXImageBufferPool, gst_ximage_buffer_pool,
     GST_TYPE_BUFFER_POOL);
@@ -543,6 +556,7 @@ static gboolean
 ximage_buffer_pool_set_config (GstBufferPool * pool, GstStructure * config)
 {
   GstXImageBufferPool *xpool = GST_XIMAGE_BUFFER_POOL_CAST (pool);
+  GstXImageBufferPoolPrivate *priv = xpool->priv;
   GstVideoInfo info;
   GstCaps *caps;
   guint size, min_buffers, max_buffers;
@@ -562,46 +576,44 @@ ximage_buffer_pool_set_config (GstBufferPool * pool, GstStructure * config)
       caps);
 
   /* keep track of the width and height and caps */
-  if (xpool->caps)
-    gst_caps_unref (xpool->caps);
-  xpool->caps = gst_caps_ref (caps);
+  if (priv->caps)
+    gst_caps_unref (priv->caps);
+  priv->caps = gst_caps_ref (caps);
 
   /* check for the configured metadata */
-  xpool->add_metavideo =
+  priv->add_metavideo =
       gst_buffer_pool_config_has_option (config,
       GST_BUFFER_POOL_OPTION_VIDEO_META);
 
   /* parse extra alignment info */
-  xpool->need_alignment = gst_buffer_pool_config_has_option (config,
+  priv->need_alignment = gst_buffer_pool_config_has_option (config,
       GST_BUFFER_POOL_OPTION_VIDEO_ALIGNMENT);
 
-  if (xpool->need_alignment) {
-    gst_buffer_pool_config_get_video_alignment (config, &xpool->align);
+  if (priv->need_alignment) {
+    gst_buffer_pool_config_get_video_alignment (config, &priv->align);
 
-    GST_LOG_OBJECT (pool, "padding %u-%ux%u-%u", xpool->align.padding_top,
-        xpool->align.padding_left, xpool->align.padding_left,
-        xpool->align.padding_bottom);
+    GST_LOG_OBJECT (pool, "padding %u-%ux%u-%u", priv->align.padding_top,
+        priv->align.padding_left, priv->align.padding_left,
+        priv->align.padding_bottom);
 
     /* do padding and alignment */
-    gst_video_info_align (&info, &xpool->align);
-
-    gst_buffer_pool_config_set_video_alignment (config, &xpool->align);
+    gst_video_info_align (&info, &priv->align);
 
     /* we need the video metadata too now */
-    xpool->add_metavideo = TRUE;
+    priv->add_metavideo = TRUE;
   } else {
-    gst_video_alignment_reset (&xpool->align);
+    gst_video_alignment_reset (&priv->align);
   }
 
   /* add the padding */
-  xpool->padded_width =
-      GST_VIDEO_INFO_WIDTH (&info) + xpool->align.padding_left +
-      xpool->align.padding_right;
-  xpool->padded_height =
-      GST_VIDEO_INFO_HEIGHT (&info) + xpool->align.padding_top +
-      xpool->align.padding_bottom;
+  priv->padded_width =
+      GST_VIDEO_INFO_WIDTH (&info) + priv->align.padding_left +
+      priv->align.padding_right;
+  priv->padded_height =
+      GST_VIDEO_INFO_HEIGHT (&info) + priv->align.padding_top +
+      priv->align.padding_bottom;
 
-  xpool->info = info;
+  priv->info = info;
 
   gst_buffer_pool_config_set_params (config, caps, info.size, min_buffers,
       max_buffers);
@@ -633,11 +645,12 @@ ximage_buffer_pool_alloc (GstBufferPool * pool, GstBuffer ** buffer,
     GstBufferPoolAcquireParams * params)
 {
   GstXImageBufferPool *xpool = GST_XIMAGE_BUFFER_POOL_CAST (pool);
+  GstXImageBufferPoolPrivate *priv = xpool->priv;
   GstVideoInfo *info;
   GstBuffer *ximage;
   GstMemory *mem;
 
-  info = &xpool->info;
+  info = &priv->info;
 
   ximage = gst_buffer_new ();
   mem = ximage_memory_alloc (xpool);
@@ -647,7 +660,7 @@ ximage_buffer_pool_alloc (GstBufferPool * pool, GstBuffer ** buffer,
   }
   gst_buffer_append_memory (ximage, mem);
 
-  if (xpool->add_metavideo) {
+  if (priv->add_metavideo) {
     GST_DEBUG_OBJECT (pool, "adding GstVideoMeta");
     /* these are just the defaults for now */
     gst_buffer_add_video_meta_full (ximage, GST_VIDEO_FRAME_FLAG_NONE,
@@ -672,7 +685,7 @@ gst_ximage_buffer_pool_new (GstXImageSink * ximagesink)
 {
   GstXImageBufferPool *pool;
 
-  g_return_val_if_fail (GST_IS_X_IMAGE_SINK (ximagesink), NULL);
+  g_return_val_if_fail (GST_IS_XIMAGESINK (ximagesink), NULL);
 
   pool = g_object_new (GST_TYPE_XIMAGE_BUFFER_POOL, NULL);
   pool->sink = gst_object_ref (ximagesink);
@@ -689,6 +702,8 @@ gst_ximage_buffer_pool_class_init (GstXImageBufferPoolClass * klass)
   GObjectClass *gobject_class = (GObjectClass *) klass;
   GstBufferPoolClass *gstbufferpool_class = (GstBufferPoolClass *) klass;
 
+  g_type_class_add_private (klass, sizeof (GstXImageBufferPoolPrivate));
+
   gobject_class->finalize = gst_ximage_buffer_pool_finalize;
 
   gstbufferpool_class->get_options = ximage_buffer_pool_get_options;
@@ -699,18 +714,19 @@ gst_ximage_buffer_pool_class_init (GstXImageBufferPoolClass * klass)
 static void
 gst_ximage_buffer_pool_init (GstXImageBufferPool * pool)
 {
-  /* nothing to do here */
+  pool->priv = GST_XIMAGE_BUFFER_POOL_GET_PRIVATE (pool);
 }
 
 static void
 gst_ximage_buffer_pool_finalize (GObject * object)
 {
   GstXImageBufferPool *pool = GST_XIMAGE_BUFFER_POOL_CAST (object);
+  GstXImageBufferPoolPrivate *priv = pool->priv;
 
   GST_LOG_OBJECT (pool, "finalize XImage buffer pool %p", pool);
 
-  if (pool->caps)
-    gst_caps_unref (pool->caps);
+  if (priv->caps)
+    gst_caps_unref (priv->caps);
   gst_object_unref (pool->sink);
   gst_object_unref (pool->allocator);
 

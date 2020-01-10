@@ -1237,6 +1237,7 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
   if (len < max_ft_len)
     goto missing_footer;
 
+  GST_DEBUG ("checking footer: [%s]", &xps[len - max_ft_len]);
   xp2 = g_strstr_len (&xps[len - max_ft_len], max_ft_len, "<?xpacket ");
   if (!xp2)
     goto missing_footer;
@@ -1313,7 +1314,6 @@ gst_tag_list_from_xmp_buffer (GstBuffer * buffer)
                 }
                 if (ns_match[i].ns_prefix) {
                   if (strcmp (ns_map[i].original_ns, &as[6])) {
-                    g_free (ns_map[i].gstreamer_ns);
                     ns_map[i].gstreamer_ns = g_strdup (&as[6]);
                   }
                 }

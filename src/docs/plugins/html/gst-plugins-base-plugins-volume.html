@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>volume: GStreamer Base Plugins 1.0 Plugins Reference Manual</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<title>GStreamer Base Plugins 1.0 Plugins Reference Manual: volume</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="GStreamer Base Plugins 1.0 Plugins Reference Manual">
 <link rel="up" href="ch01.html" title="gst-plugins-base Elements">
 <link rel="prev" href="gst-plugins-base-plugins-videotestsrc.html" title="videotestsrc">
 <link rel="next" href="gst-plugins-base-plugins-vorbisdec.html" title="vorbisdec">
-<meta name="generator" content="GTK-Doc V1.25 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -30,13 +30,13 @@
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="gst-plugins-base-plugins-volume.top_of_page"></a>volume</span></h2>
-<p>volume</p>
+<p>volume — Set volume on audio/raw streams</p>
 </td>
 <td class="gallery_image" valign="top" align="right"></td>
 </tr></table></div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.properties"></a><h2>Properties</h2>
-<div class="informaltable"><table class="informaltable" border="0">
+<div class="informaltable"><table border="0">
 <colgroup>
 <col width="150px" class="properties_type">
 <col width="300px" class="properties_name">
@@ -44,12 +44,12 @@
 </colgroup>
 <tbody>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_type"><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-volume.html#GstVolume--mute" title="The “mute” property">mute</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a></td>
+<td class="property_type"><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-volume.html#GstVolume--volume" title="The “volume” property">volume</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
@@ -58,7 +58,7 @@
 </div>
 <a name="GstVolume"></a><div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.other"></a><h2>Types and Values</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="name">
 <col class="description">
@@ -71,12 +71,12 @@
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
-    <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-        <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstObject.html#GstObject-struct">GstObject</a>
-            <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstElement.html#GstElement-struct">GstElement</a>
-                <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-libs-1.0GstBaseTransform.html#GstBaseTransform-struct">GstBaseTransform</a>
-                    <span class="lineart">╰──</span> <a href="../html/gst-plugins-base-libs-gstaudiofilter.html#GstAudioFilter-struct">GstAudioFilter</a>
+<pre class="screen">    <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
+        <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstObject.html">GstObject</a>
+            <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstElement.html">GstElement</a>
+                <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-libs/html/GstBaseTransform.html">GstBaseTransform</a>
+                    <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-base-libs/html/gst-plugins-base-libs-gstaudiofilter.html#GstAudioFilter">GstAudioFilter</a>
                         <span class="lineart">╰──</span> GstVolume
 </pre>
 </div>
@@ -84,19 +84,19 @@
 <a name="gst-plugins-base-plugins-volume.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 GstVolume implements
- <a href="../html/gst-plugins-base-libs-gststreamvolume.html#GstStreamVolume-struct">GstStreamVolume</a>.</p>
+ <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-base-libs/html/gst-plugins-base-libs-gststreamvolume.html#GstStreamVolume">GstStreamVolume</a>.</p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.description"></a><h2>Description</h2>
 <p>The volume element changes the volume of the audio data.</p>
 <div class="refsect2">
-<a name="id-1.2.57.8.3"></a><h3>Example launch line</h3>
+<a name="id-1.2.42.8.3"></a><h3>Example launch line</h3>
 <div class="informalexample">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
       <tr>
         <td class="listing_lines" align="right"><pre>1</pre></td>
-        <td class="listing_code"><pre class="programlisting">gst<span class="gtkdoc opt">-</span>launch<span class="gtkdoc opt">-</span><span class="number">1.0</span> <span class="gtkdoc opt">-</span>v <span class="gtkdoc opt">-</span>m audiotestsrc <span class="gtkdoc opt">!</span> volume volume<span class="gtkdoc opt">=</span><span class="number">0.5</span> <span class="gtkdoc opt">!</span> level <span class="gtkdoc opt">!</span> fakesink silent<span class="gtkdoc opt">=</span>TRUE</pre></td>
+        <td class="listing_code"><pre class="programlisting">gst<span class="gtkdoc opt">-</span>launch <span class="gtkdoc opt">-</span>v <span class="gtkdoc opt">-</span>m audiotestsrc <span class="gtkdoc opt">!</span> volume volume<span class="gtkdoc opt">=</span><span class="number">0.5</span> <span class="gtkdoc opt">!</span> level <span class="gtkdoc opt">!</span> fakesink silent<span class="gtkdoc opt">=</span>TRUE</pre></td>
       </tr>
     </tbody>
   </table>
@@ -108,7 +108,7 @@ the same pipeline without the volume element.
 <div class="refsynopsisdiv">
 <h2>Synopsis</h2>
 <div class="refsect2">
-<a name="id-1.2.57.8.4.1"></a><h3>Element Information</h3>
+<a name="id-1.2.42.8.4.1"></a><h3>Element Information</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -134,7 +134,7 @@ the same pipeline without the volume element.
 </div>
 <hr>
 <div class="refsect2">
-<a name="id-1.2.57.8.4.2"></a><h3>Element Pads</h3>
+<a name="id-1.2.42.8.4.2"></a><h3>Element Pads</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -185,10 +185,11 @@ the same pipeline without the volume element.
 </table></div>
 </div>
 </div>
+<p>
+</p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.functions_details"></a><h2>Functions</h2>
-<p></p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-volume.other_details"></a><h2>Types and Values</h2>
@@ -202,7 +203,7 @@ the same pipeline without the volume element.
 <a name="gst-plugins-base-plugins-volume.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="GstVolume--mute"></a><h3>The <code class="literal">“mute”</code> property</h3>
-<pre class="programlisting">  “mute”                     <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<pre class="programlisting">  “mute”                     <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
 <p>mute channel.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: FALSE</p>
@@ -210,7 +211,7 @@ the same pipeline without the volume element.
 <hr>
 <div class="refsect2">
 <a name="GstVolume--volume"></a><h3>The <code class="literal">“volume”</code> property</h3>
-<pre class="programlisting">  “volume”                   <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a></pre>
+<pre class="programlisting">  “volume”                   <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a></pre>
 <p>volume factor, 1.0=100%.</p>
 <p>Flags: Read / Write</p>
 <p>Allowed values: [0,10]</p>
@@ -219,6 +220,7 @@ the same pipeline without the volume element.
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.25</div>
+<hr>
+          Generated by GTK-Doc V1.21</div>
 </body>
 </html>

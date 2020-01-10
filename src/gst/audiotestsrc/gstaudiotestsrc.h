@@ -104,10 +104,6 @@ struct _GstAudioTestSrc {
   GstBaseSrc parent;
 
   ProcessFunc process;
-  GstAudioFormatPack pack_func;
-  gint pack_size;
-  gpointer tmp;
-  gsize tmpsize;
 
   /* parameters */
   GstAudioTestSrcWave wave;

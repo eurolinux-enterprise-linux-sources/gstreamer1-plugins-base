@@ -26,6 +26,10 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+/* FIXME 0.11: suppress warnings for deprecated API such as GStaticRecMutex
+ * with newer GTK versions (>= 3.3.0) */
+#define GDK_DISABLE_DEPRECATION_WARNINGS
+#define GLIB_DISABLE_DEPRECATION_WARNINGS
 
 #include <stdlib.h>
 #include <math.h>
@@ -73,7 +77,6 @@ typedef enum
 //#define UPDATE_INTERVAL 500
 //#define UPDATE_INTERVAL 100
 #define UPDATE_INTERVAL 40
-#define SLOW_UPDATE_INTERVAL 500
 
 /* number of milliseconds to play for after a seek */
 #define SCRUB_TIME 100
@@ -115,7 +118,6 @@ typedef struct
   GtkWidget *subtitle_fontdesc_button;
 
   GtkWidget *seek_format_combo, *seek_position_label, *seek_duration_label;
-  GtkWidget *seek_start_label, *seek_stop_label;
   GtkWidget *seek_entry;
 
   GtkWidget *seek_scale, *statusbar;
@@ -149,8 +151,6 @@ typedef struct
   gboolean scrub;
   gboolean play_scrub;
   gboolean skip_seek;
-  gboolean skip_seek_key_only;
-  gboolean skip_seek_no_audio;
   gdouble rate;
   gboolean snap_before;
   gboolean snap_after;
@@ -163,6 +163,8 @@ typedef struct
   GList *paths, *current_path;
   GList *sub_paths, *current_sub_path;
 
+  gchar *audiosink_str, *videosink_str;
+
   /* Internal state */
   gint64 position, duration;
 
@@ -172,7 +174,6 @@ typedef struct
   gint64 buffering_left;
   GstState state;
   guint update_id;
-  guint slow_update_id;
   guint seek_timeout_id;        /* Used for scrubbing in paused */
   gulong changed_id;
   guint fill_id;
@@ -292,14 +293,13 @@ typedef struct
 {
   const gchar *name;
   void (*func) (PlaybackApp * app, const gchar * location);
-  const gchar *help;
 }
 Pipeline;
 
 static const Pipeline pipelines[] = {
-  {"playbin", make_playbin_pipeline, "[URLS|FILENAMES]"},
+  {"playbin", make_playbin_pipeline},
 #ifndef GST_DISABLE_PARSE
-  {"parse-launch", make_parselaunch_pipeline, "[PARSE-LAUNCH-LINE]"},
+  {"parse-launch", make_parselaunch_pipeline},
 #endif
 };
 
@@ -427,37 +427,6 @@ update_fill (PlaybackApp * app)
 }
 
 static gboolean
-update_seek_range (PlaybackApp * app)
-{
-  GstFormat format = GST_FORMAT_TIME;
-  gint64 seek_start, seek_stop;
-  gboolean seekable;
-  GstQuery *query;
-
-  query = gst_query_new_seeking (format);
-  if (gst_element_query (app->pipeline, query)) {
-    gchar *str;
-
-    gst_query_parse_seeking (query, &format, &seekable, &seek_start,
-        &seek_stop);
-    if (!seekable) {
-      seek_start = seek_stop = -1;
-    }
-
-    str = g_strdup_printf ("%" G_GINT64_FORMAT, seek_start);
-    gtk_label_set_text (GTK_LABEL (app->seek_start_label), str);
-    g_free (str);
-
-    str = g_strdup_printf ("%" G_GINT64_FORMAT, seek_stop);
-    gtk_label_set_text (GTK_LABEL (app->seek_stop_label), str);
-    g_free (str);
-  }
-  gst_query_unref (query);
-
-  return TRUE;
-}
-
-static gboolean
 update_scale (PlaybackApp * app)
 {
   GstFormat format = GST_FORMAT_TIME;
@@ -539,11 +508,7 @@ do_seek (PlaybackApp * app, GstFormat format, gint64 position)
   if (app->loop_seek)
     flags |= GST_SEEK_FLAG_SEGMENT;
   if (app->skip_seek)
-    flags |= GST_SEEK_FLAG_TRICKMODE;
-  if (app->skip_seek_key_only)
-    flags |= GST_SEEK_FLAG_TRICKMODE_KEY_UNITS;
-  if (app->skip_seek_no_audio)
-    flags |= GST_SEEK_FLAG_TRICKMODE_NO_AUDIO;
+    flags |= GST_SEEK_FLAG_SKIP;
   if (app->snap_before)
     flags |= GST_SEEK_FLAG_SNAP_BEFORE;
   if (app->snap_after)
@@ -654,19 +619,10 @@ set_update_scale (PlaybackApp * app, gboolean active)
       app->update_id =
           g_timeout_add (UPDATE_INTERVAL, (GSourceFunc) update_scale, app);
     }
-    if (app->slow_update_id == 0) {
-      app->slow_update_id =
-          g_timeout_add (SLOW_UPDATE_INTERVAL, (GSourceFunc) update_seek_range,
-          app);
-    }
   } else {
     if (app->update_id) {
       g_source_remove (app->update_id);
       app->update_id = 0;
-    }
-    if (app->slow_update_id) {
-      g_source_remove (app->slow_update_id);
-      app->slow_update_id = 0;
     }
   }
 }
@@ -922,9 +878,9 @@ play_scrub_toggle_cb (GtkToggleButton * button, PlaybackApp * app)
 }
 
 static void
-skip_toggle_common (gboolean * v, GtkToggleButton * button, PlaybackApp * app)
+skip_toggle_cb (GtkToggleButton * button, PlaybackApp * app)
 {
-  *v = gtk_toggle_button_get_active (button);
+  app->skip_seek = gtk_toggle_button_get_active (button);
   if (app->state == GST_STATE_PLAYING) {
     gint64 real;
 
@@ -933,24 +889,6 @@ skip_toggle_common (gboolean * v, GtkToggleButton * button, PlaybackApp * app)
         N_GRAD;
     do_seek (app, GST_FORMAT_TIME, real);
   }
-}
-
-static void
-skip_toggle_cb (GtkToggleButton * button, PlaybackApp * app)
-{
-  skip_toggle_common (&app->skip_seek, button, app);
-}
-
-static void
-skip_key_toggle_cb (GtkToggleButton * button, PlaybackApp * app)
-{
-  skip_toggle_common (&app->skip_seek_key_only, button, app);
-}
-
-static void
-skip_audio_toggle_cb (GtkToggleButton * button, PlaybackApp * app)
-{
-  skip_toggle_common (&app->skip_seek_no_audio, button, app);
 }
 
 static void
@@ -974,11 +912,7 @@ rate_spinbutton_changed_cb (GtkSpinButton * button, PlaybackApp * app)
   if (app->keyframe_seek)
     flags |= GST_SEEK_FLAG_KEY_UNIT;
   if (app->skip_seek)
-    flags |= GST_SEEK_FLAG_TRICKMODE;
-  if (app->skip_seek_key_only)
-    flags |= GST_SEEK_FLAG_TRICKMODE_KEY_UNITS;
-  if (app->skip_seek_no_audio)
-    flags |= GST_SEEK_FLAG_TRICKMODE_NO_AUDIO;
+    flags |= GST_SEEK_FLAG_SKIP;
 
   if (app->rate >= 0.0) {
     s_event = gst_event_new_seek (app->rate,
@@ -1178,7 +1112,6 @@ update_streams (PlaybackApp * app)
         str = gst_tag_list_to_string (tags);
         g_print ("video %d: %s\n", i, str);
         g_free (str);
-        gst_tag_list_unref (tags);
       }
       /* find good name for the label */
       name = g_strdup_printf ("video %d", i + 1);
@@ -1198,7 +1131,6 @@ update_streams (PlaybackApp * app)
         str = gst_tag_list_to_string (tags);
         g_print ("audio %d: %s\n", i, str);
         g_free (str);
-        gst_tag_list_unref (tags);
       }
       /* find good name for the label */
       name = g_strdup_printf ("audio %d", i + 1);
@@ -1228,7 +1160,6 @@ update_streams (PlaybackApp * app)
         if (value && G_VALUE_HOLDS_STRING (value)) {
           name = g_strdup_printf ("text %s", g_value_get_string (value));
         }
-        gst_tag_list_unref (tags);
       }
       /* find good name for the label if we didn't use a tag */
       if (name == NULL)
@@ -1318,7 +1249,6 @@ init_visualization_features (PlaybackApp * app)
     gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (app->vis_combo), name);
   }
   gtk_combo_box_set_active (GTK_COMBO_BOX (app->vis_combo), 0);
-  gst_plugin_feature_list_free (list);
 }
 
 static void
@@ -1464,7 +1394,6 @@ shot_cb (GtkButton * button, PlaybackApp * app)
     /* save the pixbuf */
     gdk_pixbuf_save (pixbuf, "snapshot.png", "png", &error, NULL);
     gst_buffer_unmap (buffer, &map);
-    g_clear_error (&error);
 
   done:
     gst_sample_unref (sample);
@@ -1898,11 +1827,7 @@ msg_segment_done (GstBus * bus, GstMessage * message, PlaybackApp * app)
   if (app->loop_seek)
     flags |= GST_SEEK_FLAG_SEGMENT;
   if (app->skip_seek)
-    flags |= GST_SEEK_FLAG_TRICKMODE;
-  if (app->skip_seek_key_only)
-    flags |= GST_SEEK_FLAG_TRICKMODE_KEY_UNITS;
-  if (app->skip_seek_no_audio)
-    flags |= GST_SEEK_FLAG_TRICKMODE_NO_AUDIO;
+    flags |= GST_SEEK_FLAG_SKIP;
 
   s_event = gst_event_new_seek (app->rate,
       GST_FORMAT_TIME, flags, GST_SEEK_TYPE_SET, G_GINT64_CONSTANT (0),
@@ -1944,7 +1869,7 @@ do_stream_buffering (PlaybackApp * app, gint percent)
     }
   } else {
     /* buffering busy */
-    if (!app->buffering && app->state == GST_STATE_PLAYING) {
+    if (app->buffering == FALSE && app->state == GST_STATE_PLAYING) {
       /* we were not buffering but PLAYING, PAUSE  the pipeline. */
       if (!app->is_live) {
         fprintf (stderr, "Buffering, setting pipeline to PAUSED ...\n");
@@ -2210,8 +2135,7 @@ realize_cb (GtkWidget * widget, PlaybackApp * app)
       app->embed_xid);
 #elif defined (GDK_WINDOWING_QUARTZ)
   app->embed_xid = (guintptr) gdk_quartz_window_get_nsview (window);
-  g_print ("Window realize: video window NSView = %" G_GUINTPTR_FORMAT "\n",
-      app->embed_xid);
+  g_print ("Window realize: video window NSView = %p\n", app->embed_xid);
 #elif defined (GDK_WINDOWING_X11)
   app->embed_xid = GDK_WINDOW_XID (window);
   g_print ("Window realize: video window XID = %" G_GUINTPTR_FORMAT "\n",
@@ -2595,11 +2519,11 @@ print_usage (int argc, char **argv)
 {
   gint i;
 
-  g_print ("Usage: %s <type> <argument>\n", argv[0]);
+  g_print ("usage: %s <type> <filename>\n", argv[0]);
   g_print ("   possible types:\n");
 
   for (i = 0; i < G_N_ELEMENTS (pipelines); i++) {
-    g_print ("     %d = %s %s\n", i, pipelines[i].name, pipelines[i].help);
+    g_print ("     %d = %s\n", i, pipelines[i].name);
   }
 }
 
@@ -2626,6 +2550,7 @@ create_ui (PlaybackApp * app)
   g_signal_connect (app->video_window, "motion-notify-event",
       G_CALLBACK (motion_notify_cb), app);
   gtk_widget_set_can_focus (app->video_window, TRUE);
+  gtk_widget_set_double_buffered (app->video_window, FALSE);
   gtk_widget_add_events (app->video_window,
       GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
       | GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
@@ -2636,28 +2561,23 @@ create_ui (PlaybackApp * app)
       "playback-test");
   gtk_statusbar_push (GTK_STATUSBAR (app->statusbar), app->status_id,
       "Stopped");
-  hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-  vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+  hbox = gtk_hbox_new (FALSE, 0);
+  vbox = gtk_vbox_new (FALSE, 0);
   gtk_container_set_border_width (GTK_CONTAINER (vbox), 3);
 
   /* media controls */
-  play_button = gtk_button_new_from_icon_name ("media-playback-start",
-      GTK_ICON_SIZE_BUTTON);
-  pause_button = gtk_button_new_from_icon_name ("media-playback-pause",
-      GTK_ICON_SIZE_BUTTON);
-  stop_button = gtk_button_new_from_icon_name ("media-playback-stop",
-      GTK_ICON_SIZE_BUTTON);
+  play_button = gtk_button_new_from_stock (GTK_STOCK_MEDIA_PLAY);
+  pause_button = gtk_button_new_from_stock (GTK_STOCK_MEDIA_PAUSE);
+  stop_button = gtk_button_new_from_stock (GTK_STOCK_MEDIA_STOP);
 
   /* seek expander */
   {
     GtkWidget *accurate_checkbox, *key_checkbox, *loop_checkbox,
         *flush_checkbox, *snap_before_checkbox, *snap_after_checkbox;
     GtkWidget *scrub_checkbox, *play_scrub_checkbox, *rate_label;
-    GtkWidget *skip_checkbox, *skip_key_checkbox, *skip_audio_checkbox,
-        *rate_spinbutton;
+    GtkWidget *skip_checkbox, *rate_spinbutton;
     GtkWidget *flagtable, *advanced_seek, *advanced_seek_grid;
     GtkWidget *duration_label, *position_label, *seek_button;
-    GtkWidget *start_label, *stop_label;
 
     seek = gtk_expander_new ("seek options");
     flagtable = gtk_grid_new ();
@@ -2672,11 +2592,7 @@ create_ui (PlaybackApp * app)
     flush_checkbox = gtk_check_button_new_with_label ("Flush");
     scrub_checkbox = gtk_check_button_new_with_label ("Scrub");
     play_scrub_checkbox = gtk_check_button_new_with_label ("Play Scrub");
-    skip_checkbox = gtk_check_button_new_with_label ("Trickmode Play");
-    skip_key_checkbox =
-        gtk_check_button_new_with_label ("Trickmode - Keyframes Only");
-    skip_audio_checkbox =
-        gtk_check_button_new_with_label ("Trickmode - No Audio");
+    skip_checkbox = gtk_check_button_new_with_label ("Play Skip");
     snap_before_checkbox = gtk_check_button_new_with_label ("Snap before");
     snap_after_checkbox = gtk_check_button_new_with_label ("Snap after");
     rate_spinbutton = gtk_spin_button_new_with_range (-100, 100, 0.1);
@@ -2697,10 +2613,6 @@ create_ui (PlaybackApp * app)
         "play video while seeking");
     gtk_widget_set_tooltip_text (skip_checkbox,
         "Skip frames while playing at high frame rates");
-    gtk_widget_set_tooltip_text (skip_key_checkbox,
-        "Skip everything except keyframes while playing at high frame rates");
-    gtk_widget_set_tooltip_text (skip_audio_checkbox,
-        "Do not decode audio during trick mode playback");
     gtk_widget_set_tooltip_text (snap_before_checkbox,
         "Favor snapping to the frame before the seek target");
     gtk_widget_set_tooltip_text (snap_after_checkbox,
@@ -2725,10 +2637,6 @@ create_ui (PlaybackApp * app)
         G_CALLBACK (play_scrub_toggle_cb), app);
     g_signal_connect (G_OBJECT (skip_checkbox), "toggled",
         G_CALLBACK (skip_toggle_cb), app);
-    g_signal_connect (G_OBJECT (skip_key_checkbox), "toggled",
-        G_CALLBACK (skip_key_toggle_cb), app);
-    g_signal_connect (G_OBJECT (skip_audio_checkbox), "toggled",
-        G_CALLBACK (skip_audio_toggle_cb), app);
     g_signal_connect (G_OBJECT (rate_spinbutton), "value-changed",
         G_CALLBACK (rate_spinbutton_changed_cb), app);
     g_signal_connect (G_OBJECT (snap_before_checkbox), "toggled",
@@ -2743,8 +2651,6 @@ create_ui (PlaybackApp * app)
     gtk_grid_attach (GTK_GRID (flagtable), scrub_checkbox, 1, 1, 1, 1);
     gtk_grid_attach (GTK_GRID (flagtable), play_scrub_checkbox, 2, 1, 1, 1);
     gtk_grid_attach (GTK_GRID (flagtable), skip_checkbox, 3, 0, 1, 1);
-    gtk_grid_attach (GTK_GRID (flagtable), skip_key_checkbox, 3, 1, 1, 1);
-    gtk_grid_attach (GTK_GRID (flagtable), skip_audio_checkbox, 3, 2, 1, 1);
     gtk_grid_attach (GTK_GRID (flagtable), rate_label, 4, 0, 1, 1);
     gtk_grid_attach (GTK_GRID (flagtable), rate_spinbutton, 4, 1, 1, 1);
     gtk_grid_attach (GTK_GRID (flagtable), snap_before_checkbox, 0, 2, 1, 1);
@@ -2785,18 +2691,6 @@ create_ui (PlaybackApp * app)
     gtk_grid_attach (GTK_GRID (advanced_seek_grid), app->seek_duration_label, 3,
         1, 1, 1);
 
-    start_label = gtk_label_new ("Seek start:");
-    gtk_grid_attach (GTK_GRID (advanced_seek_grid), start_label, 4, 0, 1, 1);
-    stop_label = gtk_label_new ("Seek stop:");
-    gtk_grid_attach (GTK_GRID (advanced_seek_grid), stop_label, 4, 1, 1, 1);
-
-    app->seek_start_label = gtk_label_new ("-1");
-    gtk_grid_attach (GTK_GRID (advanced_seek_grid), app->seek_start_label, 5,
-        0, 1, 1);
-    app->seek_stop_label = gtk_label_new ("-1");
-    gtk_grid_attach (GTK_GRID (advanced_seek_grid), app->seek_stop_label, 5,
-        1, 1, 1);
-
     gtk_container_add (GTK_CONTAINER (advanced_seek), advanced_seek_grid);
     gtk_grid_attach (GTK_GRID (flagtable), advanced_seek, 0, 3, 3, 2);
     gtk_container_add (GTK_CONTAINER (seek), flagtable);
@@ -2808,7 +2702,7 @@ create_ui (PlaybackApp * app)
     GtkWidget *step_button, *shuttle_checkbox;
 
     step = gtk_expander_new ("step options");
-    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+    hbox = gtk_hbox_new (FALSE, 0);
 
     app->step_format_combo = gtk_combo_box_text_new ();
     gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (app->step_format_combo),
@@ -2834,9 +2728,7 @@ create_ui (PlaybackApp * app)
     gtk_box_pack_start (GTK_BOX (hbox), app->step_rate_spinbutton, FALSE, FALSE,
         2);
 
-    step_button =
-        gtk_button_new_from_icon_name ("media-seek-forward",
-        GTK_ICON_SIZE_BUTTON);
+    step_button = gtk_button_new_from_stock (GTK_STOCK_MEDIA_FORWARD);
     gtk_button_set_label (GTK_BUTTON (step_button), "Step");
     gtk_box_pack_start (GTK_BOX (hbox), step_button, FALSE, FALSE, 2);
 
@@ -2852,7 +2744,7 @@ create_ui (PlaybackApp * app)
 
     adjustment =
         GTK_ADJUSTMENT (gtk_adjustment_new (0.0, -3.00, 4.0, 0.1, 1.0, 1.0));
-    app->shuttle_scale = gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+    app->shuttle_scale = gtk_hscale_new (adjustment);
     gtk_scale_set_digits (GTK_SCALE (app->shuttle_scale), 2);
     gtk_scale_set_value_pos (GTK_SCALE (app->shuttle_scale), GTK_POS_TOP);
     g_signal_connect (app->shuttle_scale, "value-changed",
@@ -3005,15 +2897,14 @@ create_ui (PlaybackApp * app)
     GtkWidget *vbox, *frame;
 
     colorbalance = gtk_expander_new ("color balance options");
-    vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    vbox = gtk_vbox_new (FALSE, 0);
 
     /* contrast scale */
     frame = gtk_frame_new ("Contrast");
     adjustment =
         GTK_ADJUSTMENT (gtk_adjustment_new (N_GRAD / 2.0, 0.00, N_GRAD, 0.1,
             1.0, 1.0));
-    app->contrast_scale =
-        gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+    app->contrast_scale = gtk_hscale_new (adjustment);
     gtk_scale_set_draw_value (GTK_SCALE (app->contrast_scale), FALSE);
     g_signal_connect (app->contrast_scale, "value-changed",
         G_CALLBACK (colorbalance_value_changed), app);
@@ -3025,8 +2916,7 @@ create_ui (PlaybackApp * app)
     adjustment =
         GTK_ADJUSTMENT (gtk_adjustment_new (N_GRAD / 2.0, 0.00, N_GRAD, 0.1,
             1.0, 1.0));
-    app->brightness_scale =
-        gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+    app->brightness_scale = gtk_hscale_new (adjustment);
     gtk_scale_set_draw_value (GTK_SCALE (app->brightness_scale), FALSE);
     g_signal_connect (app->brightness_scale, "value-changed",
         G_CALLBACK (colorbalance_value_changed), app);
@@ -3038,7 +2928,7 @@ create_ui (PlaybackApp * app)
     adjustment =
         GTK_ADJUSTMENT (gtk_adjustment_new (N_GRAD / 2.0, 0.00, N_GRAD, 0.1,
             1.0, 1.0));
-    app->hue_scale = gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+    app->hue_scale = gtk_hscale_new (adjustment);
     gtk_scale_set_draw_value (GTK_SCALE (app->hue_scale), FALSE);
     g_signal_connect (app->hue_scale, "value-changed",
         G_CALLBACK (colorbalance_value_changed), app);
@@ -3050,8 +2940,7 @@ create_ui (PlaybackApp * app)
     adjustment =
         GTK_ADJUSTMENT (gtk_adjustment_new (N_GRAD / 2.0, 0.00, N_GRAD, 0.1,
             1.0, 1.0));
-    app->saturation_scale =
-        gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+    app->saturation_scale = gtk_hscale_new (adjustment);
     gtk_scale_set_draw_value (GTK_SCALE (app->saturation_scale), FALSE);
     g_signal_connect (app->saturation_scale, "value-changed",
         G_CALLBACK (colorbalance_value_changed), app);
@@ -3064,7 +2953,7 @@ create_ui (PlaybackApp * app)
   /* seek bar */
   adjustment =
       GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.00, N_GRAD, 0.1, 1.0, 1.0));
-  app->seek_scale = gtk_scale_new (GTK_ORIENTATION_HORIZONTAL, adjustment);
+  app->seek_scale = gtk_hscale_new (adjustment);
   gtk_scale_set_digits (GTK_SCALE (app->seek_scale), 2);
   gtk_scale_set_value_pos (GTK_SCALE (app->seek_scale), GTK_POS_RIGHT);
   gtk_range_set_show_fill_level (GTK_RANGE (app->seek_scale), TRUE);
@@ -3085,7 +2974,7 @@ create_ui (PlaybackApp * app)
 
     playbin = gtk_expander_new ("playbin options");
     /* the playbin panel controls for the video/audio/subtitle tracks */
-    panel = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+    panel = gtk_hbox_new (FALSE, 0);
     app->video_combo = gtk_combo_box_text_new ();
     app->audio_combo = gtk_combo_box_text_new ();
     app->text_combo = gtk_combo_box_text_new ();
@@ -3194,9 +3083,8 @@ create_ui (PlaybackApp * app)
     g_signal_connect (G_OBJECT (app->volume_spinbutton), "value-changed",
         G_CALLBACK (volume_spinbutton_changed_cb), app);
     /* playbin panel for snapshot */
-    boxes2 = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-    shot_button =
-        gtk_button_new_from_icon_name ("document-save", GTK_ICON_SIZE_BUTTON);
+    boxes2 = gtk_hbox_new (FALSE, 0);
+    shot_button = gtk_button_new_from_stock (GTK_STOCK_SAVE);
     gtk_widget_set_tooltip_text (shot_button,
         "save a screenshot .png in the current directory");
     g_signal_connect (G_OBJECT (shot_button), "clicked", G_CALLBACK (shot_cb),
@@ -3299,7 +3187,7 @@ create_ui (PlaybackApp * app)
     gtk_grid_attach (GTK_GRID (boxes3), app->subtitle_fontdesc_button, 1, 5, 1,
         1);
 
-    pb2vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    pb2vbox = gtk_vbox_new (FALSE, 0);
     gtk_box_pack_start (GTK_BOX (pb2vbox), panel, FALSE, FALSE, 2);
     gtk_box_pack_start (GTK_BOX (pb2vbox), boxes, FALSE, FALSE, 2);
     gtk_box_pack_start (GTK_BOX (pb2vbox), boxes2, FALSE, FALSE, 2);
@@ -3327,8 +3215,7 @@ create_ui (PlaybackApp * app)
   gtk_box_pack_start (GTK_BOX (vbox), step, FALSE, FALSE, 2);
   gtk_box_pack_start (GTK_BOX (vbox), navigation, FALSE, FALSE, 2);
   gtk_box_pack_start (GTK_BOX (vbox), colorbalance, FALSE, FALSE, 2);
-  gtk_box_pack_start (GTK_BOX (vbox),
-      gtk_separator_new (GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 2);
+  gtk_box_pack_start (GTK_BOX (vbox), gtk_hseparator_new (), FALSE, FALSE, 2);
   gtk_box_pack_start (GTK_BOX (vbox), app->seek_scale, FALSE, FALSE, 2);
   gtk_box_pack_start (GTK_BOX (vbox), app->statusbar, FALSE, FALSE, 2);
 
@@ -3369,6 +3256,9 @@ set_defaults (PlaybackApp * app)
 static void
 reset_app (PlaybackApp * app)
 {
+  g_free (app->audiosink_str);
+  g_free (app->videosink_str);
+
   g_list_free (app->formats);
 
   g_mutex_clear (&app->state_mutex);
@@ -3382,8 +3272,7 @@ reset_app (PlaybackApp * app)
   g_list_free (app->paths);
   g_list_foreach (app->sub_paths, (GFunc) g_free, NULL);
   g_list_free (app->sub_paths);
-  if (app->vis_entries)
-    g_array_free (app->vis_entries, TRUE);
+
   g_print ("free pipeline\n");
   gst_object_unref (app->pipeline);
 }
@@ -3411,11 +3300,9 @@ main (int argc, char **argv)
 
   if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
     g_print ("Error initializing: %s\n", err->message);
-    g_option_context_free (ctx);
-    g_clear_error (&err);
     exit (1);
   }
-  g_option_context_free (ctx);
+
   GST_DEBUG_CATEGORY_INIT (playback_debug, "playback-test", 0,
       "playback example");
 
@@ -3424,19 +3311,7 @@ main (int argc, char **argv)
     exit (-1);
   }
 
-  app.pipeline_type = -1;
-  if (g_ascii_isdigit (argv[1][0])) {
-    app.pipeline_type = atoi (argv[1]);
-  } else {
-    gint i;
-
-    for (i = 0; i < G_N_ELEMENTS (pipelines); ++i) {
-      if (strcmp (pipelines[i].name, argv[1]) == 0) {
-        app.pipeline_type = i;
-        break;
-      }
-    }
-  }
+  app.pipeline_type = atoi (argv[1]);
 
   if (app.pipeline_type < 0 || app.pipeline_type >= G_N_ELEMENTS (pipelines)) {
     print_usage (argc, argv);

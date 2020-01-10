@@ -333,7 +333,8 @@ GST_START_TEST (test_missing_suburisource_handler)
 
   fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_READY),
       GST_STATE_CHANGE_SUCCESS);
-  gst_element_set_state (playbin, GST_STATE_PAUSED);
+  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PAUSED),
+      GST_STATE_CHANGE_FAILURE);
 
   /* there should be at least a missing-plugin message on the bus now and an
    * error message; the missing-plugin message should be first */
@@ -523,7 +524,7 @@ GST_START_TEST (test_source_setup)
   GstElement *src = NULL;
 
   if (!gst_registry_check_feature_version (gst_registry_get (), "redvideosrc",
-          GST_VERSION_MAJOR, GST_VERSION_MINOR, 0)) {
+          0, 10, 0)) {
     fail_unless (gst_element_register (NULL, "redvideosrc", GST_RANK_PRIMARY,
             gst_red_video_src_get_type ()));
   }
@@ -549,59 +550,6 @@ GST_START_TEST (test_source_setup)
 
   gst_object_unref (playbin);
   gst_object_unref (src);
-}
-
-GST_END_TEST;
-
-static void
-element_setup (GstElement * playbin, GstElement * element, GQueue * elts)
-{
-  GstElementFactory *f = gst_element_get_factory (element);
-
-  g_queue_push_tail (elts, f ? GST_OBJECT_NAME (f) : GST_OBJECT_NAME (element));
-}
-
-GST_START_TEST (test_element_setup)
-{
-  GstElement *playbin, *videosink;
-  GQueue elts = G_QUEUE_INIT;
-
-  if (!gst_registry_check_feature_version (gst_registry_get (), "redvideosrc",
-          GST_VERSION_MAJOR, GST_VERSION_MINOR, 0)) {
-    fail_unless (gst_element_register (NULL, "redvideosrc", GST_RANK_PRIMARY,
-            gst_red_video_src_get_type ()));
-  }
-
-  playbin = gst_element_factory_make ("playbin", NULL);
-  g_object_set (playbin, "uri", "redvideo://", NULL);
-
-  videosink = gst_element_factory_make ("fakesink", "myvideosink");
-  g_object_set (playbin, "video-sink", videosink, NULL);
-
-  g_signal_connect (playbin, "element-setup", G_CALLBACK (element_setup),
-      &elts);
-
-  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_PAUSED),
-      GST_STATE_CHANGE_ASYNC);
-  fail_unless_equals_int (gst_element_get_state (playbin, NULL, NULL,
-          GST_CLOCK_TIME_NONE), GST_STATE_CHANGE_SUCCESS);
-
-#define seen_element(e) g_queue_find_custom(&elts, e, (GCompareFunc) strcmp)
-
-  fail_unless (seen_element ("redvideosrc"));
-  fail_unless (seen_element ("uridecodebin"));
-  fail_unless (seen_element ("videoconvert"));
-  fail_unless (seen_element ("videoscale"));
-  fail_unless (seen_element ("fakesink"));
-
-#undef seen_element
-
-  g_queue_clear (&elts);
-
-  fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_NULL),
-      GST_STATE_CHANGE_SUCCESS);
-
-  gst_object_unref (playbin);
 }
 
 GST_END_TEST;
@@ -702,7 +650,8 @@ gst_red_video_src_class_init (GstRedVideoSrcClass * klass)
       );
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
   gst_element_class_set_metadata (element_class,
       "Red Video Src", "Source/Video", "yep", "me");
 
@@ -803,7 +752,8 @@ gst_codec_src_class_init (GstCodecSrcClass * klass)
       );
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
   gst_element_class_set_metadata (element_class,
       "Codec Src", "Source/Video", "yep", "me");
 
@@ -902,7 +852,6 @@ playbin_suite (void)
   tcase_add_test (tc_chain, test_missing_primary_decoder);
   tcase_add_test (tc_chain, test_refcount);
   tcase_add_test (tc_chain, test_source_setup);
-  tcase_add_test (tc_chain, test_element_setup);
 
 #if 0
   {

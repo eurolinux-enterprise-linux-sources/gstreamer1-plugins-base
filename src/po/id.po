@@ -1,21 +1,20 @@
 # Indonesian translations for gst-plugins-base package.
 # This file is put in the public domain.
 # Andika Triwidada <andika@gmail.com>, 2013.
-# Andhika Padmawan <andhika.padmawan@gmail.com>, 2010-2016.
+# Andhika Padmawan <andhika.padmawan@gmail.com>, 2010-2014.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.10.0\n"
+"Project-Id-Version: gst-plugins-base 1.4.0\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-11-14 20:50+0700\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-07-30 09:19+0700\n"
 "Last-Translator: Andhika Padmawan <andhika.padmawan@gmail.com>\n"
 "Language-Team: Indonesian <translation-team-id@lists.sourceforge.net>\n"
 "Language: id\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Tak dapat membuka divais untuk putar kembali dalam mode mono."
@@ -72,9 +71,16 @@ msgstr "Tak dapat mencari CD."
 msgid "Could not read CD."
 msgstr "Tak dapat membaca CD."
 
+msgid "Internal data stream error."
+msgstr "Galat arus data internal."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr "Elemen '%s' hilang - cek instalasi GStreamer anda."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr "Plugin %s dibutuhkan untuk memutar arus ini, tapi tidak diinstal."
 
 msgid "Could not determine type of stream"
 msgstr "Tak dapat menentukan tipe arus"
@@ -84,12 +90,6 @@ msgstr "Ini kelihatannya merupakan berkas teks"
 
 msgid "Could not create \"uridecodebin\" element."
 msgstr "Tak dapat membuat elemen \"uridecodebin\"."
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Tak dapat membuat elemen \"decodebin3”."
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Tak dapat membuat elemen \"urisourcebin\"."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -223,9 +223,6 @@ msgstr "Format subjudul TMPlayer"
 
 msgid "Kate subtitle format"
 msgstr "Format subjudul Kate"
-
-msgid "WebVTT subtitle format"
-msgstr "Format subjudul WebVTT"
 
 msgid "Uncompressed video"
 msgstr "Video tak dikompresi"
@@ -393,15 +390,6 @@ msgstr "menangkap panjang fokal"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Panjang fokal dari lensa digunakan ketika menangkap gambar, dalam mm"
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr "menangkap panjang fokal setara 35 mm"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"Panjang fokal setara 35 mm dari lensa digunakan ketika menangkap gambar, "
-"dalam mm"
-
 msgid "capturing digital zoom ratio"
 msgstr "menangkap rasio pembesaran digital"
 
@@ -529,109 +517,11 @@ msgstr ""
 "Jangan keluar setelah menampilkan senarai divais awal, tapi tunggu hingga "
 "divais ditambahkan/dihapus."
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Volume: %.0f%%"
-
 msgid "Buffering..."
 msgstr "Menyangga..."
 
 msgid "Clock lost, selecting a new one\n"
 msgstr "Jam hilang, pilih yang baru\n"
-
-msgid "Reached end of play list."
-msgstr "Mencapai akhir senarai putar."
-
-msgid "Paused"
-msgstr "Jeda"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Sekarang memutar %s\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Hampir selesai, menyiapkan judul berikutnya: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Kecepatan putar: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Tak dapat mengubah kecepatan putar ke %.2f"
-
-msgid "space"
-msgstr "spasi"
-
-msgid "pause/unpause"
-msgstr "jeda/lanjut"
-
-msgid "q or ESC"
-msgstr "q atau ESC"
-
-msgid "quit"
-msgstr "keluar"
-
-msgid "> or n"
-msgstr "> atau n"
-
-msgid "play next"
-msgstr "putar berikutnya"
-
-msgid "< or b"
-msgstr "< atau b"
-
-msgid "play previous"
-msgstr "putar sebelumnya"
-
-msgid "seek forward"
-msgstr "mencari ke depan"
-
-msgid "seek backward"
-msgstr "mencari ke belakang"
-
-msgid "volume up"
-msgstr "volume naik"
-
-msgid "volume down"
-msgstr "volume turun"
-
-msgid "increase playback rate"
-msgstr "tingkatkan kecepatan putar"
-
-msgid "decrease playback rate"
-msgstr "turunkan kecepatan putar"
-
-msgid "change playback direction"
-msgstr "ubah arah putar"
-
-msgid "enable/disable trick modes"
-msgstr "aktifkan/nonaktifkan mode trik"
-
-msgid "change audio track"
-msgstr "ubah urutan audio"
-
-msgid "change video track"
-msgstr "ubah urutan video"
-
-msgid "change subtitle track"
-msgstr "ubah urutan subjudul"
-
-msgid "seek to beginning"
-msgstr "mencari ke awal"
-
-msgid "show keyboard shortcuts"
-msgstr "tampilkan jalan pintas papan ketik"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Mode interaktif - kontrol papan ketik:"
-
-msgid "Output status information and property notifications"
-msgstr "Informasi status keluaran dan notifikasi properti"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
-msgstr "Kontrol properti ‘bendera’ playbin pengaturan perilaku putar"
 
 msgid "Video sink to use (default is autovideosink)"
 msgstr "Sink video yang digunakan (standar adalah autovideosink)"
@@ -645,17 +535,14 @@ msgstr "Aktifkan putar balik tanpa jeda"
 msgid "Shuffle playlist"
 msgstr "Acak senarai putar"
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Nonaktifkan kontrol interaktif via papan ketik"
+msgid "Interactive control via keyboard"
+msgstr "Kontrol interaktif via papan ketik"
 
 msgid "Volume"
 msgstr "Volume"
 
 msgid "Playlist file containing input media files"
 msgstr "Berkas senarai putar berisi masukan berkas media"
-
-msgid "Do not print any output (apart from errors)"
-msgstr "Jangan cetak keluaran apapun (selain galat)"
 
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
@@ -664,12 +551,3 @@ msgstr "Penggunaan: %s BERKAS1|URI1 [BERKAS2|URI2] [BERKAS3|URI3] ..."
 msgid "You must provide at least one filename or URI to play."
 msgstr ""
 "Anda harus menyediakan setidaknya satu nama berkas atau URI untuk diputar."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Tekan ‘k’ untuk melihat daftar jalan pintas papan ketik.\n"
-
-#~ msgid "Internal data stream error."
-#~ msgstr "Galat arus data internal."
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr "Plugin %s dibutuhkan untuk memutar arus ini, tapi tidak diinstal."

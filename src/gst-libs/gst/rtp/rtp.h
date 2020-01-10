@@ -22,7 +22,6 @@
 #ifndef __GST_RTP_H__
 #define __GST_RTP_H__
 
-#include <gst/rtp/gstrtpdefs.h>
 #include <gst/rtp/gstrtpbuffer.h>
 #include <gst/rtp/gstrtcpbuffer.h>
 #include <gst/rtp/gstrtppayloads.h>
@@ -30,6 +29,5 @@
 #include <gst/rtp/gstrtpbaseaudiopayload.h>
 #include <gst/rtp/gstrtpbasepayload.h>
 #include <gst/rtp/gstrtpbasedepayload.h>
-#include <gst/rtp/gstrtp-enumtypes.h>
 
 #endif /* __GST_RTP_H__ */

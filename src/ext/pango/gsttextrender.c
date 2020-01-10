@@ -34,7 +34,7 @@
  * <refsect2>
  * <title>Example launch lines</title>
  * |[
- * gst-launch-1.0 -v filesrc location=subtitles.srt ! subparse ! textrender ! videoconvert ! autovideosink
+ * gst-launch -v filesrc location=subtitles.srt ! subparse ! textrender ! xvimagesink
  * ]|
  * </refsect2>
  */
@@ -188,16 +188,16 @@ gst_text_render_class_init (GstTextRenderClass * klass)
   gobject_class->set_property = gst_text_render_set_property;
   gobject_class->get_property = gst_text_render_get_property;
 
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &src_template_factory);
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &sink_template_factory);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&src_template_factory));
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&sink_template_factory));
 
   gst_element_class_set_static_metadata (gstelement_class, "Text renderer",
       "Filter/Editor/Video",
       "Renders a text string to an image bitmap",
       "David Schleef <ds@schleef.org>, "
-      "GStreamer maintainers <gstreamer-devel@lists.freedesktop.org>");
+      "GStreamer maintainers <gstreamer-devel@lists.sourceforge.net>");
 
   fontmap = pango_cairo_font_map_get_default ();
   klass->pango_context =

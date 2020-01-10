@@ -28,20 +28,11 @@
 
 #include <gst/gst.h>
 
-static GMainLoop *loop;
-
-static void
-error_eos_cb (GstBus * bus, GstMessage * msg, GMainLoop * main_loop)
-{
-  g_main_loop_quit (main_loop);
-}
-
 gint
 main (gint argc, gchar * argv[])
 {
   GstElement *player;
   GstStateChangeReturn res;
-  GstBus *bus;
 
   gst_init (&argc, &argv);
 
@@ -53,18 +44,11 @@ main (gint argc, gchar * argv[])
     exit (-1);
   }
 
-  loop = g_main_loop_new (NULL, TRUE);
-  bus = gst_pipeline_get_bus (GST_PIPELINE (player));
-  gst_bus_add_signal_watch (bus);
-
-  g_signal_connect (bus, "message::eos", G_CALLBACK (error_eos_cb), loop);
-  g_signal_connect (bus, "message::error", G_CALLBACK (error_eos_cb), loop);
-
   g_object_set (G_OBJECT (player), "uri", argv[1], NULL);
 
   g_print ("play...\n");
   res = gst_element_set_state (player, GST_STATE_PLAYING);
-  if (res == GST_STATE_CHANGE_FAILURE) {
+  if (res != GST_STATE_CHANGE_SUCCESS) {
     g_print ("could not play\n");
     return -1;
   }
@@ -74,8 +58,8 @@ main (gint argc, gchar * argv[])
 
   g_print ("pause...\n");
   res = gst_element_set_state (player, GST_STATE_PAUSED);
-  if (res == GST_STATE_CHANGE_FAILURE) {
-    g_print ("could not pause\n");
+  if (res != GST_STATE_CHANGE_SUCCESS) {
+    g_print ("could not play\n");
     return -1;
   }
 
@@ -84,7 +68,7 @@ main (gint argc, gchar * argv[])
 
   g_print ("play...\n");
   res = gst_element_set_state (player, GST_STATE_PLAYING);
-  if (res == GST_STATE_CHANGE_FAILURE) {
+  if (res != GST_STATE_CHANGE_SUCCESS) {
     g_print ("could not play\n");
     return -1;
   }
@@ -104,12 +88,12 @@ main (gint argc, gchar * argv[])
 
   g_print ("play...\n");
   res = gst_element_set_state (player, GST_STATE_PLAYING);
-  if (res == GST_STATE_CHANGE_FAILURE) {
+  if (res != GST_STATE_CHANGE_SUCCESS) {
     g_print ("could not play\n");
     return -1;
   }
 
-  g_main_loop_run (loop);
+  g_main_loop_run (g_main_loop_new (NULL, TRUE));
 
   return 0;
 }

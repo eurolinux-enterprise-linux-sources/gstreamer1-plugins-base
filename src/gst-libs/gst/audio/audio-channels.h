@@ -160,10 +160,6 @@ gboolean       gst_audio_get_channel_reorder_map (gint channels,
                                                   const GstAudioChannelPosition * from,
                                                   const GstAudioChannelPosition * to,
                                                   gint *reorder_map);
-guint64        gst_audio_channel_get_fallback_mask (gint channels);
-
-gchar*         gst_audio_channel_positions_to_string (const GstAudioChannelPosition * position,
-                                                      gint channels);
 
 G_END_DECLS
 

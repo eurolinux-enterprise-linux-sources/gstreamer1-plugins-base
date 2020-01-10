@@ -171,36 +171,6 @@ GST_START_TEST (test_rtp_buffer_validate_corrupt)
 
 GST_END_TEST;
 
-GST_START_TEST (test_rtp_buffer_validate_padding)
-{
-  GstBuffer *buf;
-  guint8 packet_with_padding[] = {
-    0xa0, 0x60, 0x6c, 0x49, 0x58, 0xab, 0xaa, 0x65, 0x65, 0x2e, 0xaf, 0xce,
-    0x68, 0xce, 0x3c, 0x80, 0x00, 0x00, 0x00, 0x04
-  };
-  GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
-
-  buf = gst_buffer_new_and_alloc (sizeof (packet_with_padding));
-  gst_buffer_fill (buf, 0, packet_with_padding, sizeof (packet_with_padding));
-  fail_unless (gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp));
-  gst_rtp_buffer_unmap (&rtp);
-  gst_buffer_unref (buf);
-
-  /* Set the padding to something invalid */
-  buf = gst_buffer_new_and_alloc (sizeof (packet_with_padding));
-  gst_buffer_fill (buf, 0, packet_with_padding, sizeof (packet_with_padding));
-  gst_buffer_memset (buf, gst_buffer_get_size (buf) - 1, 0xff, 1);
-  fail_if (gst_rtp_buffer_map (buf, GST_MAP_READ, &rtp));
-
-  memset (&rtp, 0, sizeof (rtp));
-  fail_unless (gst_rtp_buffer_map (buf, GST_MAP_READ |
-          GST_RTP_BUFFER_MAP_FLAG_SKIP_PADDING, &rtp));
-  gst_rtp_buffer_unmap (&rtp);
-  gst_buffer_unref (buf);
-}
-
-GST_END_TEST;
-
 #if 0
 GST_START_TEST (test_rtp_buffer_list)
 {
@@ -787,351 +757,6 @@ GST_START_TEST (test_rtcp_buffer)
   /* close and validate */
   gst_rtcp_buffer_unmap (&rtcp);
   fail_unless (gst_rtcp_buffer_validate (buf) == TRUE);
-  fail_unless (gst_rtcp_buffer_validate_reduced (buf) == TRUE);
-  gst_buffer_unref (buf);
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_reduced_buffer)
-{
-  GstBuffer *buf;
-  GstRTCPPacket packet;
-  GstRTCPBuffer rtcp = { NULL, };
-  gsize offset;
-  gsize maxsize;
-
-  buf = gst_rtcp_buffer_new (1400);
-  fail_unless (buf != NULL);
-  fail_unless_equals_int (gst_buffer_get_sizes (buf, &offset, &maxsize), 0);
-  fail_unless_equals_int (offset, 0);
-  fail_unless_equals_int (maxsize, 1400);
-
-  gst_rtcp_buffer_map (buf, GST_MAP_READWRITE, &rtcp);
-
-  fail_unless (gst_rtcp_buffer_validate (buf) == FALSE);
-  fail_unless (gst_rtcp_buffer_get_first_packet (&rtcp, &packet) == FALSE);
-  fail_unless (gst_rtcp_buffer_get_packet_count (&rtcp) == 0);
-
-  /* add an SR packet */
-  fail_unless (gst_rtcp_buffer_add_packet (&rtcp, GST_RTCP_TYPE_PSFB,
-          &packet) == TRUE);
-
-  /* close and validate */
-  gst_rtcp_buffer_unmap (&rtcp);
-  fail_unless (gst_rtcp_buffer_validate (buf) == FALSE);
-  fail_unless (gst_rtcp_buffer_validate_reduced (buf) == TRUE);
-  gst_buffer_unref (buf);
-}
-
-GST_END_TEST;
-
-
-GST_START_TEST (test_rtcp_validate_with_padding)
-{
-  /* Compound packet with padding in the last packet. Padding is included in
-   * the length of the last packet. */
-  guint8 rtcp_pkt[] = {
-    0x80, 0xC9, 0x00, 0x07,     /* Type RR, length = 7 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-    0xA0, 0xCA, 0x00, 0x0A,     /* P=1, Type SDES, length = 10 (includes padding) */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x01, 0x0F, 0x00, 0x00,     /* Type 1 (CNAME), length 15 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x02, 0x09, 0x00,     /* Type 2 (NAME), length 9 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,     /* Type 0 (no length, 2 unused bytes) */
-    0x00, 0x00, 0x00, 0x04      /* RTCP padding */
-  };
-
-  fail_unless (gst_rtcp_buffer_validate_data (rtcp_pkt, sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_validate_with_padding_wrong_padlength)
-{
-  /* Compound packet with padding in the last packet. Padding is included in
-   * the length of the last packet. */
-  guint8 rtcp_pkt[] = {
-    0x80, 0xC9, 0x00, 0x07,     /* Type RR, length = 7 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-    0xA0, 0xCA, 0x00, 0x0A,     /* P=1, Type SDES, length = 10 (includes padding) */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x01, 0x0F, 0x00, 0x00,     /* Type 1 (CNAME), length 15 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x02, 0x09, 0x00,     /* Type 2 (NAME), length 9 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,     /* Type 0 (no length, 2 unused bytes) */
-    0x00, 0x00, 0x00, 0x03      /* RTCP padding (wrong length) */
-  };
-
-  fail_if (gst_rtcp_buffer_validate_data (rtcp_pkt, sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_validate_with_padding_excluded_from_length)
-{
-  /* Compound packet with padding in the last packet. Padding is not included
-   * in the length. */
-  guint8 rtcp_pkt[] = {
-    0x80, 0xC9, 0x00, 0x07,     /* Type RR, length = 7 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-    0xA0, 0xCA, 0x00, 0x09,     /* P=1, Type SDES, length = 9 (excludes padding) */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x01, 0x0F, 0x00, 0x00,     /* Type 1 (CNAME), length 15 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x02, 0x09, 0x00,     /* Type 2 (NAME), length 9 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,     /* Type 0 (no length, 2 unused bytes) */
-    0x00, 0x00, 0x00, 0x04      /* RTCP padding */
-  };
-
-  fail_if (gst_rtcp_buffer_validate_data (rtcp_pkt, sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_validate_with_padding_set_in_first_packet)
-{
-  /* Compound packet with padding in the last packet but with the pad
-     bit set on first packet */
-  guint8 rtcp_pkt[] = {
-    0xA0, 0xC9, 0x00, 0x07,     /* P=1, Type RR, length = 7 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-    0x80, 0xCA, 0x00, 0x0a,     /* Type SDES, length = 10 (include padding) */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x01, 0x0F, 0x00, 0x00,     /* Type 1 (CNAME), length 15 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x02, 0x09, 0x00,     /* Type 2 (NAME), length 9 */
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,     /* Type 0 (no length, 2 unused bytes) */
-    0x00, 0x00, 0x00, 0x04      /* RTCP padding */
-  };
-
-  fail_if (gst_rtcp_buffer_validate_data (rtcp_pkt, sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_validate_reduced_without_padding)
-{
-  /* Reduced size packet without padding */
-  guint8 rtcp_pkt[] = {
-    0x80, 0xcd, 0x00, 0x07,     /* Type FB, length = 8 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-  };
-
-  fail_unless (gst_rtcp_buffer_validate_data_reduced (rtcp_pkt,
-          sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_validate_reduced_with_padding)
-{
-  /* Reduced size packet with padding. */
-  guint8 rtcp_pkt[] = {
-    0xA0, 0xcd, 0x00, 0x08,     /* P=1, Type FB, length = 8 */
-    0x97, 0x6d, 0x21, 0x6a,
-    0x4d, 0x16, 0xaf, 0x14,
-    0x10, 0x1f, 0xd9, 0x91,
-    0x0f, 0xb7, 0x50, 0x88,
-    0x3b, 0x79, 0x31, 0x50,
-    0xbe, 0x19, 0x12, 0xa8,
-    0xbb, 0xce, 0x9e, 0x3e,
-    0x00, 0x00, 0x00, 0x04      /* RTCP padding */
-  };
-
-  fail_if (gst_rtcp_buffer_validate_data_reduced (rtcp_pkt, sizeof (rtcp_pkt)));
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_buffer_profile_specific_extension)
-{
-  GstBuffer *buf;
-  GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-  GstRTCPPacket packet;
-  const guint8 pse[] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77 };
-  const guint8 pse2[] = { 0x01, 0x23, 0x45, 0x67 };
-
-  fail_unless ((buf = gst_rtcp_buffer_new (1400)) != NULL);
-  gst_rtcp_buffer_map (buf, GST_MAP_READWRITE, &rtcp);
-
-  fail_unless (gst_rtcp_buffer_validate (buf) == FALSE);
-  fail_unless (gst_rtcp_buffer_get_first_packet (&rtcp, &packet) == FALSE);
-  fail_unless (gst_rtcp_buffer_get_packet_count (&rtcp) == 0);
-
-  /* add an SR packet with sender info */
-  fail_unless (gst_rtcp_buffer_add_packet (&rtcp, GST_RTCP_TYPE_SR, &packet));
-  gst_rtcp_packet_sr_set_sender_info (&packet, 0x44556677,
-      G_GUINT64_CONSTANT (1), 0x11111111, 101, 123456);
-  fail_unless_equals_int (0,
-      gst_rtcp_packet_get_profile_specific_ext_length (&packet));
-  fail_unless_equals_int (6, gst_rtcp_packet_get_length (&packet));
-
-  /* add profile-specific extension */
-  fail_unless (gst_rtcp_packet_add_profile_specific_ext (&packet,
-          pse, sizeof (pse)));
-  {
-    guint8 *data = NULL;
-    guint len = 0;
-
-    fail_unless_equals_int (8, gst_rtcp_packet_get_length (&packet));
-    fail_unless_equals_int (sizeof (pse) / 4,
-        gst_rtcp_packet_get_profile_specific_ext_length (&packet));
-
-    /* gst_rtcp_packet_get_profile_specific_ext */
-    fail_unless (gst_rtcp_packet_get_profile_specific_ext (&packet, &data,
-            &len));
-    fail_unless_equals_int (sizeof (pse), len);
-    fail_unless (data != NULL);
-    fail_unless_equals_int (0, memcmp (pse, data, sizeof (pse)));
-
-    /* gst_rtcp_packet_copy_profile_specific_ext */
-    fail_unless (gst_rtcp_packet_copy_profile_specific_ext (&packet, &data,
-            &len));
-    fail_unless_equals_int (sizeof (pse), len);
-    fail_unless (data != NULL);
-    fail_unless_equals_int (0, memcmp (pse, data, sizeof (pse)));
-    g_free (data);
-  }
-
-  /* append more profile-specific extension */
-  fail_unless (gst_rtcp_packet_add_profile_specific_ext (&packet,
-          pse2, sizeof (pse2)));
-  {
-    guint8 *data = NULL;
-    guint len = 0;
-    guint concat_len;
-    guint8 *concat_pse;
-
-    /* Expect the second extension to be appended to the first */
-    concat_len = sizeof (pse) + sizeof (pse2);
-    concat_pse = g_malloc (concat_len);
-    memcpy (concat_pse, pse, sizeof (pse));
-    memcpy (concat_pse + sizeof (pse), pse2, sizeof (pse2));
-
-    fail_unless_equals_int (9, gst_rtcp_packet_get_length (&packet));
-    fail_unless_equals_int (concat_len / 4,
-        gst_rtcp_packet_get_profile_specific_ext_length (&packet));
-
-    /* gst_rtcp_packet_get_profile_specific_ext */
-    fail_unless (gst_rtcp_packet_get_profile_specific_ext (&packet, &data,
-            &len));
-    fail_unless_equals_int (concat_len, len);
-    fail_unless (data != NULL);
-    fail_unless_equals_int (0, memcmp (concat_pse, data, len));
-
-    /* gst_rtcp_packet_copy_profile_specific_ext */
-    fail_unless (gst_rtcp_packet_copy_profile_specific_ext (&packet, &data,
-            &len));
-    fail_unless_equals_int (concat_len, len);
-    fail_unless (data != NULL);
-    fail_unless_equals_int (0, memcmp (concat_pse, data, len));
-    g_free (data);
-    g_free (concat_pse);
-  }
-
-  /* close and validate */
-  gst_rtcp_buffer_unmap (&rtcp);
-  fail_unless (gst_rtcp_buffer_validate (buf) == TRUE);
-  gst_buffer_unref (buf);
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_rtcp_buffer_app)
-{
-  GstBuffer *buf;
-  GstRTCPBuffer rtcp = GST_RTCP_BUFFER_INIT;
-  GstRTCPPacket packet;
-  guint mtu = 1000;
-  const guint8 data[] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77 };
-  guint max_data_length = (mtu - 12) / 4;
-  guint8 *data_ptr;
-
-  fail_unless ((buf = gst_rtcp_buffer_new (mtu)) != NULL);
-  gst_rtcp_buffer_map (buf, GST_MAP_READWRITE, &rtcp);
-
-  /* Not a valid packet yet */
-  fail_if (gst_rtcp_buffer_validate (buf));
-  fail_if (gst_rtcp_buffer_get_first_packet (&rtcp, &packet));
-  fail_unless_equals_int (gst_rtcp_buffer_get_packet_count (&rtcp), 0);
-
-  /* Add APP packet  */
-  fail_unless (gst_rtcp_buffer_add_packet (&rtcp, GST_RTCP_TYPE_APP, &packet));
-  gst_rtcp_packet_app_set_subtype (&packet, 0x15);
-  gst_rtcp_packet_app_set_ssrc (&packet, 0x01234567);
-  gst_rtcp_packet_app_set_name (&packet, "Test");
-
-  /* Check maximum allowed data */
-  fail_if (gst_rtcp_packet_app_set_data_length (&packet, max_data_length + 1));
-  fail_unless (gst_rtcp_packet_app_set_data_length (&packet, max_data_length));
-
-  /* Add data */
-  fail_unless (gst_rtcp_packet_app_set_data_length (&packet,
-          (sizeof (data) + 3) / 4));
-  fail_unless_equals_int (gst_rtcp_packet_app_get_data_length (&packet), 2);
-  fail_unless ((data_ptr = gst_rtcp_packet_app_get_data (&packet)));
-  memcpy (data_ptr, data, sizeof (data));
-
-  gst_rtcp_buffer_unmap (&rtcp);
-
-  /* Map again with only the READ flag and check fields */
-  gst_rtcp_buffer_map (buf, GST_MAP_READ, &rtcp);
-  fail_unless_equals_int (gst_rtcp_packet_app_get_subtype (&packet), 0x15);
-  fail_unless_equals_int (gst_rtcp_packet_app_get_ssrc (&packet), 0x01234567);
-  fail_unless (memcmp (gst_rtcp_packet_app_get_name (&packet), "Test", 4) == 0);
-  fail_unless_equals_int (gst_rtcp_packet_app_get_data_length (&packet), 2);
-  fail_unless ((data_ptr = gst_rtcp_packet_app_get_data (&packet)));
-  fail_unless (memcmp (data_ptr, data, sizeof (data)) == 0);
-  gst_rtcp_buffer_unmap (&rtcp);
-
   gst_buffer_unref (buf);
 }
 
@@ -1362,24 +987,11 @@ rtp_suite (void)
   suite_add_tcase (s, tc_chain);
   tcase_add_test (tc_chain, test_rtp_buffer);
   tcase_add_test (tc_chain, test_rtp_buffer_validate_corrupt);
-  tcase_add_test (tc_chain, test_rtp_buffer_validate_padding);
   tcase_add_test (tc_chain, test_rtp_buffer_set_extension_data);
   //tcase_add_test (tc_chain, test_rtp_buffer_list_set_extension);
   tcase_add_test (tc_chain, test_rtp_seqnum_compare);
 
   tcase_add_test (tc_chain, test_rtcp_buffer);
-  tcase_add_test (tc_chain, test_rtcp_reduced_buffer);
-  tcase_add_test (tc_chain, test_rtcp_validate_with_padding);
-  tcase_add_test (tc_chain, test_rtcp_validate_with_padding_wrong_padlength);
-  tcase_add_test (tc_chain,
-      test_rtcp_validate_with_padding_excluded_from_length);
-  tcase_add_test (tc_chain,
-      test_rtcp_validate_with_padding_set_in_first_packet);
-  tcase_add_test (tc_chain, test_rtcp_validate_reduced_without_padding);
-  tcase_add_test (tc_chain, test_rtcp_validate_reduced_with_padding);
-  tcase_add_test (tc_chain, test_rtcp_buffer_profile_specific_extension);
-  tcase_add_test (tc_chain, test_rtcp_buffer_app);
-
   tcase_add_test (tc_chain, test_rtp_ntp64_extension);
   tcase_add_test (tc_chain, test_rtp_ntp56_extension);
 
@@ -1392,4 +1004,19 @@ rtp_suite (void)
   return s;
 }
 
-GST_CHECK_MAIN (rtp);
+int
+main (int argc, char **argv)
+{
+  int nf;
+
+  Suite *s = rtp_suite ();
+  SRunner *sr = srunner_create (s);
+
+  gst_check_init (&argc, &argv);
+
+  srunner_run_all (sr, CK_NORMAL);
+  nf = srunner_ntests_failed (sr);
+  srunner_free (sr);
+
+  return nf;
+}

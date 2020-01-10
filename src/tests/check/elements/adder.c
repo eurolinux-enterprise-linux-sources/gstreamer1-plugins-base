@@ -33,7 +33,6 @@
 #include <gst/check/gstcheck.h>
 #include <gst/check/gstconsistencychecker.h>
 #include <gst/base/gstbasesrc.h>
-#include <gst/audio/audio.h>
 
 static GMainLoop *main_loop;
 
@@ -86,7 +85,7 @@ GST_START_TEST (test_filter_caps)
   GstPad *pad;
 
   filter_caps = gst_caps_new_simple ("audio/x-raw",
-      "format", G_TYPE_STRING, GST_AUDIO_NE (F32),
+      "format", G_TYPE_STRING, "F32LE",
       "layout", G_TYPE_STRING, "interleaved",
       "rate", G_TYPE_INT, 44100, "channels", G_TYPE_INT, 1, NULL);
 
@@ -418,7 +417,7 @@ GST_START_TEST (test_play_twice)
   /* cleanup */
   g_main_loop_unref (main_loop);
   gst_consistency_checker_free (consist);
-  gst_event_unref (play_seek_event);
+  gst_event_ref (play_seek_event);
   gst_bus_remove_signal_watch (bus);
   gst_object_unref (bus);
   gst_object_unref (bin);
@@ -524,7 +523,7 @@ GST_START_TEST (test_play_twice_then_add_and_play_again)
 
   /* cleanup */
   g_main_loop_unref (main_loop);
-  gst_event_unref (play_seek_event);
+  gst_event_ref (play_seek_event);
   gst_consistency_checker_free (consist);
   gst_bus_remove_signal_watch (bus);
   gst_object_unref (bus);
@@ -691,7 +690,6 @@ GST_START_TEST (test_live_seeking)
     g_main_loop_unref (main_loop);
   if (play_seek_event)
     gst_event_unref (play_seek_event);
-  gst_bus_remove_signal_watch (bus);
   gst_object_unref (bus);
   gst_object_unref (bin);
 }
@@ -1198,7 +1196,6 @@ GST_START_TEST (test_loop)
 
 GST_END_TEST;
 
-#if 0
 GST_START_TEST (test_flush_start_flush_stop)
 {
   GstPadTemplate *sink_template;
@@ -1256,7 +1253,7 @@ GST_START_TEST (test_flush_start_flush_stop)
 }
 
 GST_END_TEST;
-#endif
+
 
 static Suite *
 adder_suite (void)
@@ -1277,12 +1274,7 @@ adder_suite (void)
   tcase_add_test (tc_chain, test_duration_is_max);
   tcase_add_test (tc_chain, test_duration_unknown_overrides);
   tcase_add_test (tc_chain, test_loop);
-  /* This test is racy and occasionally fails in interesting ways
-   * https://bugzilla.gnome.org/show_bug.cgi?id=708891
-   * It's unlikely that it will ever be fixed for adder, works with audiomixer */
-#if 0
   tcase_add_test (tc_chain, test_flush_start_flush_stop);
-#endif
 
   /* Use a longer timeout */
 #ifdef HAVE_VALGRIND

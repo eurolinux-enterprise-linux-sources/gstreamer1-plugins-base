@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>multisocketsink: GStreamer Base Plugins 1.0 Plugins Reference Manual</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<title>GStreamer Base Plugins 1.0 Plugins Reference Manual: multisocketsink</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="GStreamer Base Plugins 1.0 Plugins Reference Manual">
 <link rel="up" href="ch01.html" title="gst-plugins-base Elements">
 <link rel="prev" href="gst-plugins-base-plugins-multifdsink.html" title="multifdsink">
-<link rel="next" href="gst-plugins-base-plugins-oggaviparse.html" title="oggaviparse">
-<meta name="generator" content="GTK-Doc V1.25 (XML mode)">
+<link rel="next" href="gst-plugins-base-plugins-oggdemux.html" title="oggdemux">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -16,49 +16,26 @@
 <td width="100%" align="left" class="shortcuts">
 <a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
                   <a href="#gst-plugins-base-plugins-multisocketsink.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
-                  <a href="#gst-plugins-base-plugins-multisocketsink.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
-                  <a href="#gst-plugins-base-plugins-multisocketsink.properties" class="shortcut">Properties</a></span><span id="nav_signals">  <span class="dim">|</span> 
+                  <a href="#gst-plugins-base-plugins-multisocketsink.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_signals">  <span class="dim">|</span> 
                   <a href="#gst-plugins-base-plugins-multisocketsink.signals" class="shortcut">Signals</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
 <td><a accesskey="p" href="gst-plugins-base-plugins-multifdsink.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="gst-plugins-base-plugins-oggaviparse.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="gst-plugins-base-plugins-oggdemux.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="gst-plugins-base-plugins-multisocketsink"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="gst-plugins-base-plugins-multisocketsink.top_of_page"></a>multisocketsink</span></h2>
-<p>multisocketsink</p>
+<p>multisocketsink — Send data to multiple sockets</p>
 </td>
 <td class="gallery_image" valign="top" align="right"></td>
 </tr></table></div>
 <div class="refsect1">
-<a name="gst-plugins-base-plugins-multisocketsink.properties"></a><h2>Properties</h2>
-<div class="informaltable"><table class="informaltable" border="0">
-<colgroup>
-<col width="150px" class="properties_type">
-<col width="300px" class="properties_name">
-<col width="200px" class="properties_flags">
-</colgroup>
-<tbody>
-<tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
-<td class="property_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink--send-dispatched" title="The “send-dispatched” property">send-dispatched</a></td>
-<td class="property_flags">Read / Write</td>
-</tr>
-<tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
-<td class="property_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink--send-messages" title="The “send-messages” property">send-messages</a></td>
-<td class="property_flags">Read / Write</td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<div class="refsect1">
 <a name="gst-plugins-base-plugins-multisocketsink.signals"></a><h2>Signals</h2>
-<div class="informaltable"><table class="informaltable" border="0">
+<div class="informaltable"><table border="0">
 <colgroup>
 <col width="150px" class="signals_return">
 <col width="300px" class="signals_name">
@@ -68,67 +45,81 @@
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-add" title="The “add” signal">add</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></td>
+<td class="signal_flags">Action</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-add-full" title="The “add-full” signal">add-full</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></td>
+<td class="signal_flags">Action</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-client-added" title="The “client-added” signal">client-added</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
+<td class="signal_flags">Run Last</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-client-removed" title="The “client-removed” signal">client-removed</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
+<td class="signal_flags">Run Last</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-client-socket-removed" title="The “client-socket-removed” signal">client-socket-removed</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
+<td class="signal_flags">Run Last</td>
 </tr>
 <tr>
 <td class="signal_type">
-<a href="/usr/share/gtk-doc/html/gstreamer-1.0GstStructure.html#GstStructure-struct"><span class="returnvalue">GstStructure</span></a>*</td>
+<a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstStructure.html"><span class="returnvalue">GstStructure</span></a>*</td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-get-stats" title="The “get-stats” signal">get-stats</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></td>
+<td class="signal_flags">Action</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-remove" title="The “remove” signal">remove</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></td>
+<td class="signal_flags">Action</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-remove-flush" title="The “remove-flush” signal">remove-flush</a></td>
-<td class="signal_flags"><a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></td>
+<td class="signal_flags">Action</td>
 </tr>
 </tbody>
 </table></div>
 </div>
 <a name="GstMultiSocketSink"></a><div class="refsect1">
 <a name="gst-plugins-base-plugins-multisocketsink.other"></a><h2>Types and Values</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="name">
 <col class="description">
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td class="datatype_keyword">struct</td>
 <td class="function_name"><a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink-struct" title="struct GstMultiSocketSink">GstMultiSocketSink</a></td>
-</tr></tbody>
+</tr>
+<tr>
+<td class="datatype_keyword">enum</td>
+<td class="function_name"><a class="link" href="gst-plugins-base-plugins-multifdsink.html#GstRecoverPolicy" title="enum GstRecoverPolicy">GstRecoverPolicy</a></td>
+</tr>
+<tr>
+<td class="datatype_keyword">enum</td>
+<td class="function_name"><a class="link" href="gst-plugins-base-plugins-multifdsink.html#GstSyncMethod" title="enum GstSyncMethod">GstSyncMethod</a></td>
+</tr>
+<tr>
+<td class="datatype_keyword">enum</td>
+<td class="function_name"><a class="link" href="gst-plugins-base-plugins-multifdsink.html#GstClientStatus" title="enum GstClientStatus">GstClientStatus</a></td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-multisocketsink.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
-    <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-        <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstObject.html#GstObject-struct">GstObject</a>
-            <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstElement.html#GstElement-struct">GstElement</a>
-                <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-libs-1.0GstBaseSink.html#GstBaseSink-struct">GstBaseSink</a>
+<pre class="screen">    <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
+        <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstObject.html">GstObject</a>
+            <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstElement.html">GstElement</a>
+                <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-libs/html/GstBaseSink.html">GstBaseSink</a>
                     <span class="lineart">╰──</span> GstMultiHandleSink
                         <span class="lineart">╰──</span> GstMultiSocketSink
                             <span class="lineart">╰──</span> <a class="link" href="gst-plugins-base-plugins-tcpserversink.html#GstTCPServerSink">GstTCPServerSink</a>
@@ -201,7 +192,7 @@ drop late buffers.</p>
 <div class="refsynopsisdiv">
 <h2>Synopsis</h2>
 <div class="refsect2">
-<a name="id-1.2.22.8.12.1"></a><h3>Element Information</h3>
+<a name="id-1.2.21.7.11.1.1"></a><h3>Element Information</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -227,7 +218,7 @@ drop late buffers.</p>
 </div>
 <hr>
 <div class="refsect2">
-<a name="id-1.2.22.8.12.2"></a><h3>Element Pads</h3>
+<a name="id-1.2.21.7.11.1.2"></a><h3>Element Pads</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -254,10 +245,11 @@ drop late buffers.</p>
 </table></div>
 </div>
 </div>
+<p>
+</p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-multisocketsink.functions_details"></a><h2>Functions</h2>
-<p></p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-multisocketsink.other_details"></a><h2>Types and Values</h2>
@@ -266,35 +258,144 @@ drop late buffers.</p>
 <pre class="programlisting">struct GstMultiSocketSink;</pre>
 <p>The multisocketsink object structure.</p>
 </div>
-</div>
-<div class="refsect1">
-<a name="gst-plugins-base-plugins-multisocketsink.property-details"></a><h2>Property Details</h2>
+<hr>
 <div class="refsect2">
-<a name="GstMultiSocketSink--send-dispatched"></a><h3>The <code class="literal">“send-dispatched”</code> property</h3>
-<pre class="programlisting">  “send-dispatched”          <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
-<p>Sends a GstNetworkMessageDispatched event upstream whenever a buffer
-is sent to a client.
-The event is a CUSTOM event name GstNetworkMessageDispatched and
-contains:</p>
-<p>  "object"  G_TYPE_OBJECT     : the object identifying the client
-  "buffer"  GST_TYPE_BUFFER   : the buffer sent to the client</p>
-<p>Flags: Read / Write</p>
-<p>Default value: FALSE</p>
-<p class="since">Since: 1.8.0</p>
+<a name="GstRecoverPolicy"></a><h3>enum GstRecoverPolicy</h3>
+<p>Possible values for the recovery procedure to use when a client consumes
+data too slow and has a backlag of more that soft-limit buffers.</p>
+<div class="refsect3">
+<a name="id-1.2.21.9.3.4"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="300px" class="enum_members_name">
+<col class="enum_members_description">
+<col width="200px" class="enum_members_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="enum_member_name"><p><a name="GST-RECOVER-POLICY-NONE:CAPS"></a>GST_RECOVER_POLICY_NONE</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-RECOVER-POLICY-RESYNC-LATEST:CAPS"></a>GST_RECOVER_POLICY_RESYNC_LATEST</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-RECOVER-POLICY-RESYNC-SOFT-LIMIT:CAPS"></a>GST_RECOVER_POLICY_RESYNC_SOFT_LIMIT</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-RECOVER-POLICY-RESYNC-KEYFRAME:CAPS"></a>GST_RECOVER_POLICY_RESYNC_KEYFRAME</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <hr>
 <div class="refsect2">
-<a name="GstMultiSocketSink--send-messages"></a><h3>The <code class="literal">“send-messages”</code> property</h3>
-<pre class="programlisting">  “send-messages”            <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
-<p>Sends a GstNetworkMessage event upstream whenever a buffer
-is received from a client.
-The event is a CUSTOM event name GstNetworkMessage and contains:</p>
-<p>  "object"  G_TYPE_OBJECT     : the object identifying the client
-  "buffer"  GST_TYPE_BUFFER   : the buffer with data received from the
-                                client</p>
-<p>Flags: Read / Write</p>
-<p>Default value: FALSE</p>
-<p class="since">Since: 1.8.0</p>
+<a name="GstSyncMethod"></a><h3>enum GstSyncMethod</h3>
+<p>This enum defines the selection of the first buffer that is sent
+to a new client.</p>
+<div class="refsect3">
+<a name="id-1.2.21.9.4.4"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="300px" class="enum_members_name">
+<col class="enum_members_description">
+<col width="200px" class="enum_members_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-LATEST:CAPS"></a>GST_SYNC_METHOD_LATEST</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-NEXT-KEYFRAME:CAPS"></a>GST_SYNC_METHOD_NEXT_KEYFRAME</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-LATEST-KEYFRAME:CAPS"></a>GST_SYNC_METHOD_LATEST_KEYFRAME</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-BURST:CAPS"></a>GST_SYNC_METHOD_BURST</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-BURST-KEYFRAME:CAPS"></a>GST_SYNC_METHOD_BURST_KEYFRAME</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-SYNC-METHOD-BURST-WITH-KEYFRAME:CAPS"></a>GST_SYNC_METHOD_BURST_WITH_KEYFRAME</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="GstClientStatus"></a><h3>enum GstClientStatus</h3>
+<p>This specifies the reason why a client was removed from
+multisocketsink and is received in the "client-removed" signal.</p>
+<div class="refsect3">
+<a name="id-1.2.21.9.5.4"></a><h4>Members</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="300px" class="enum_members_name">
+<col class="enum_members_description">
+<col width="200px" class="enum_members_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-OK:CAPS"></a>GST_CLIENT_STATUS_OK</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-CLOSED:CAPS"></a>GST_CLIENT_STATUS_CLOSED</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-REMOVED:CAPS"></a>GST_CLIENT_STATUS_REMOVED</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-SLOW:CAPS"></a>GST_CLIENT_STATUS_SLOW</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-ERROR:CAPS"></a>GST_CLIENT_STATUS_ERROR</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-DUPLICATE:CAPS"></a>GST_CLIENT_STATUS_DUPLICATE</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+<tr>
+<td class="enum_member_name"><p><a name="GST-CLIENT-STATUS-FLUSHING:CAPS"></a>GST_CLIENT_STATUS_FLUSHING</p></td>
+<td class="enum_member_description"> </td>
+<td class="enum_member_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 </div>
 <div class="refsect1">
@@ -303,12 +404,12 @@ The event is a CUSTOM event name GstNetworkMessage and contains:</p>
 <a name="GstMultiSocketSink-add"></a><h3>The <code class="literal">“add”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>Hand the given open socket to multisocketsink to write to.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-add.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.2.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -333,25 +434,25 @@ user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.ht
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></p>
+<p>Flags: Action</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-add-full"></a><h3>The <code class="literal">“add-full”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a>          *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>                     *socket,
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>                     *socket,
                <span class="type">GstMultiHandleSinkSyncMethod</span> sync,
-               <a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a>                    format_min,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a>                      value_min,
-               <a href="/usr/share/gtk-doc/html/gstreamer-1.0gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a>                    format_max,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a>                      value_max,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                     user_data)</pre>
+               <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a>                    format_min,
+               <span class="type">guint64</span>                      value_min,
+               <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/gstreamer-GstFormat.html#GstFormat"><span class="type">GstFormat</span></a>                    format_max,
+               <span class="type">guint64</span>                      value_max,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                     user_data)</pre>
 <p>Hand the given open socket to multisocketsink to write to and
 specify the burst parameters for the new connection.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-add-full.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.3.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -407,21 +508,21 @@ units.</p></td>
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></p>
+<p>Flags: Action</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-client-added"></a><h3>The <code class="literal">“client-added”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GObject-struct"><span class="type">GObject</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GObject"><span class="type">GObject</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>The given socket was added to multisocketsink. This signal will
 be emitted from the streaming thread so application should be prepared
 for that.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-client-added.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.4.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -446,16 +547,16 @@ for that.</p>
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
+<p>Flags: Run Last</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-client-removed"></a><h3>The <code class="literal">“client-removed”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a>            *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>                       *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gint"><span class="type">gint</span></a>                           socket,
                <span class="type">GstMultiHandleSinkClientStatus</span> status,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                       user_data)</pre>
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                       user_data)</pre>
 <p>The given socket is about to be removed from multisocketsink. This
 signal will be emitted from the streaming thread so applications should
 be prepared for that.</p>
@@ -466,8 +567,8 @@ the get-stats signal from this callback. For the same reason it is
 not safe to <code class="function">close()</code> and reuse <em class="parameter"><code>socket</code></em>
  in this callback.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-client-removed.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.5.6"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -497,15 +598,15 @@ not safe to <code class="function">close()</code> and reuse <em class="parameter
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
+<p>Flags: Run Last</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-client-socket-removed"></a><h3>The <code class="literal">“client-socket-removed”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>The given socket was removed from multisocketsink. This signal will
 be emitted from the streaming thread so applications should be prepared
 for that.</p>
@@ -517,8 +618,8 @@ with <em class="parameter"><code>socket</code></em>
 . It is however safe to <code class="function">close()</code> and reuse <em class="parameter"><code>fd</code></em>
  in the callback.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-client-socket-removed.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.6.6"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -543,20 +644,20 @@ with <em class="parameter"><code>socket</code></em>
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
+<p>Flags: Run Last</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-get-stats"></a><h3>The <code class="literal">“get-stats”</code> signal</h3>
-<pre class="programlisting"><a href="/usr/share/gtk-doc/html/gstreamer-1.0GstStructure.html#GstStructure-struct"><span class="returnvalue">GstStructure</span></a>*
+<pre class="programlisting"><a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstStructure.html"><span class="returnvalue">GstStructure</span></a>*
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>Get statistics about <em class="parameter"><code>socket</code></em>
 . This function returns a GstStructure.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-get-stats.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.7.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -582,27 +683,28 @@ user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.ht
 </table></div>
 </div>
 <div class="refsect3">
-<a name="GstMultiSocketSink-get-stats.returns"></a><h4>Returns</h4>
+<a name="id-1.2.21.10.7.6"></a><h4>Returns</h4>
 <p> a GstStructure with the statistics. The structure contains
 values that represent: total number of bytes sent, time
 when the client was added, time when the client was
 disconnected/removed, time the client is/was active, last activity
 time (in epoch seconds), number of buffers dropped.
 All times are expressed in nanoseconds (GstClockTime).</p>
+<p></p>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></p>
+<p>Flags: Action</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-remove"></a><h3>The <code class="literal">“remove”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>Remove the given open socket from multisocketsink.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-remove.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.8.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -627,20 +729,20 @@ user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.ht
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></p>
+<p>Flags: Action</p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="GstMultiSocketSink-remove-flush"></a><h3>The <code class="literal">“remove-flush”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="gst-plugins-base-plugins-multisocketsink.html#GstMultiSocketSink"><span class="type">GstMultiSocketSink</span></a> *gstmultisocketsink,
-               <a href="/usr/share/gtk-doc/html/gioGSocket.html#GSocket-struct"><span class="type">GSocket</span></a>            *socket,
-               <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+               <a href="https://developer.gnome.org/gio/unstable/GSocket.html"><span class="type">GSocket</span></a>            *socket,
+               <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>Remove the given open socket from multisocketsink after flushing all
 the pending data to the socket.</p>
 <div class="refsect3">
-<a name="GstMultiSocketSink-remove-flush.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<a name="id-1.2.21.10.9.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
 <col class="parameters_description">
@@ -665,7 +767,7 @@ the pending data to the socket.</p>
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="/usr/share/gtk-doc/html/gobjectgobject-Signals.html#G-SIGNAL-ACTION:CAPS">Action</a></p>
+<p>Flags: Action</p>
 </div>
 </div>
 <div class="refsect1">
@@ -674,6 +776,7 @@ the pending data to the socket.</p>
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.25</div>
+<hr>
+          Generated by GTK-Doc V1.21</div>
 </body>
 </html>

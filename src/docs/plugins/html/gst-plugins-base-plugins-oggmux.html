@@ -2,13 +2,13 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>oggmux: GStreamer Base Plugins 1.0 Plugins Reference Manual</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<title>GStreamer Base Plugins 1.0 Plugins Reference Manual: oggmux</title>
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="GStreamer Base Plugins 1.0 Plugins Reference Manual">
 <link rel="up" href="ch01.html" title="gst-plugins-base Elements">
 <link rel="prev" href="gst-plugins-base-plugins-oggdemux.html" title="oggdemux">
-<link rel="next" href="gst-plugins-base-plugins-oggparse.html" title="oggparse">
-<meta name="generator" content="GTK-Doc V1.25 (XML mode)">
+<link rel="next" href="gst-plugins-base-plugins-playbin.html" title="playbin">
+<meta name="generator" content="GTK-Doc V1.21 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -23,20 +23,20 @@
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
 <td><a accesskey="p" href="gst-plugins-base-plugins-oggdemux.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="gst-plugins-base-plugins-oggparse.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="gst-plugins-base-plugins-playbin.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="gst-plugins-base-plugins-oggmux"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
 <td valign="top">
 <h2><span class="refentrytitle"><a name="gst-plugins-base-plugins-oggmux.top_of_page"></a>oggmux</span></h2>
-<p>oggmux</p>
+<p>oggmux — mux ogg streams (info about ogg: http://xiph.org)</p>
 </td>
 <td class="gallery_image" valign="top" align="right"></td>
 </tr></table></div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.properties"></a><h2>Properties</h2>
-<div class="informaltable"><table class="informaltable" border="0">
+<div class="informaltable"><table border="0">
 <colgroup>
 <col width="150px" class="properties_type">
 <col width="300px" class="properties_name">
@@ -44,22 +44,22 @@
 </colgroup>
 <tbody>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></td>
+<td class="property_type"><span class="type">guint64</span></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-oggmux.html#GstOggMux--max-delay" title="The “max-delay” property">max-delay</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></td>
+<td class="property_type"><span class="type">guint64</span></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-oggmux.html#GstOggMux--max-page-delay" title="The “max-page-delay” property">max-page-delay</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></td>
+<td class="property_type"><span class="type">guint64</span></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-oggmux.html#GstOggMux--max-tolerance" title="The “max-tolerance” property">max-tolerance</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
 <tr>
-<td class="property_type"><a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_type"><a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
 <td class="property_name"><a class="link" href="gst-plugins-base-plugins-oggmux.html#GstOggMux--skeleton" title="The “skeleton” property">skeleton</a></td>
 <td class="property_flags">Read / Write</td>
 </tr>
@@ -68,7 +68,7 @@
 </div>
 <a name="GstOggMux"></a><div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.other"></a><h2>Types and Values</h2>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="name">
 <col class="description">
@@ -81,10 +81,10 @@
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
-    <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gobjectgobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-        <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstObject.html#GstObject-struct">GstObject</a>
-            <span class="lineart">╰──</span> <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstElement.html#GstElement-struct">GstElement</a>
+<pre class="screen">    <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <span class="lineart">╰──</span> <a href="https://developer.gnome.org/gobject/unstable/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
+        <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstObject.html">GstObject</a>
+            <span class="lineart">╰──</span> <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstElement.html">GstElement</a>
                 <span class="lineart">╰──</span> GstOggMux
 </pre>
 </div>
@@ -92,30 +92,14 @@
 <a name="gst-plugins-base-plugins-oggmux.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 GstOggMux implements
- <a href="/usr/share/gtk-doc/html/gstreamer-1.0GstPreset.html#GstPreset-struct">GstPreset</a>.</p>
+ <a href="http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer/html/GstPreset.html">GstPreset</a>.</p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.description"></a><h2>Description</h2>
-<p>This element merges streams (audio and video) into ogg files.</p>
-<div class="refsect2">
-<a name="id-1.2.25.8.3"></a><h3>Example pipelines</h3>
-<div class="informalexample">
-  <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
-    <tbody>
-      <tr>
-        <td class="listing_lines" align="right"><pre>1</pre></td>
-        <td class="listing_code"><pre class="programlisting">gst<span class="gtkdoc opt">-</span>launch<span class="gtkdoc opt">-</span><span class="number">1.0</span> v4l2src num<span class="gtkdoc opt">-</span>buffers<span class="gtkdoc opt">=</span><span class="number">500</span> <span class="gtkdoc opt">!</span> video<span class="gtkdoc opt">/</span>x<span class="gtkdoc opt">-</span>raw<span class="gtkdoc opt">,</span>width<span class="gtkdoc opt">=</span><span class="number">320</span><span class="gtkdoc opt">,</span>height<span class="gtkdoc opt">=</span><span class="number">240</span> <span class="gtkdoc opt">!</span> videoconvert <span class="gtkdoc opt">!</span> videorate <span class="gtkdoc opt">!</span> theoraenc <span class="gtkdoc opt">!</span> oggmux <span class="gtkdoc opt">!</span> filesink location<span class="gtkdoc opt">=</span>video<span class="gtkdoc opt">.</span>ogg</pre></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
- Encodes a video stream captured from a v4l2-compatible camera to Ogg/Theora
-(the encoding will stop automatically after 500 frames)
-</div>
 <div class="refsynopsisdiv">
 <h2>Synopsis</h2>
 <div class="refsect2">
-<a name="id-1.2.25.8.4.1"></a><h3>Element Information</h3>
+<a name="id-1.2.23.8.2.1"></a><h3>Element Information</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -141,7 +125,7 @@ GstOggMux implements
 </div>
 <hr>
 <div class="refsect2">
-<a name="id-1.2.25.8.4.2"></a><h3>Element Pads</h3>
+<a name="id-1.2.23.8.2.2"></a><h3>Element Pads</h3>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
@@ -296,24 +280,26 @@ GstOggMux implements
 </table></div>
 </div>
 </div>
+<p>
+</p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.functions_details"></a><h2>Functions</h2>
-<p></p>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.other_details"></a><h2>Types and Values</h2>
 <div class="refsect2">
 <a name="GstOggMux-struct"></a><h3>struct GstOggMux</h3>
 <pre class="programlisting">struct GstOggMux;</pre>
-<p>The ogg muxer object structure.</p>
+<p>
+</p>
 </div>
 </div>
 <div class="refsect1">
 <a name="gst-plugins-base-plugins-oggmux.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="GstOggMux--max-delay"></a><h3>The <code class="literal">“max-delay”</code> property</h3>
-<pre class="programlisting">  “max-delay”                <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></pre>
+<pre class="programlisting">  “max-delay”                <span class="type">guint64</span></pre>
 <p>Maximum delay in multiplexing streams.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: 500000000</p>
@@ -321,7 +307,7 @@ GstOggMux implements
 <hr>
 <div class="refsect2">
 <a name="GstOggMux--max-page-delay"></a><h3>The <code class="literal">“max-page-delay”</code> property</h3>
-<pre class="programlisting">  “max-page-delay”           <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></pre>
+<pre class="programlisting">  “max-page-delay”           <span class="type">guint64</span></pre>
 <p>Maximum delay for sending out a page.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: 500000000</p>
@@ -329,7 +315,7 @@ GstOggMux implements
 <hr>
 <div class="refsect2">
 <a name="GstOggMux--max-tolerance"></a><h3>The <code class="literal">“max-tolerance”</code> property</h3>
-<pre class="programlisting">  “max-tolerance”            <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#guint64"><span class="type">guint64</span></a></pre>
+<pre class="programlisting">  “max-tolerance”            <span class="type">guint64</span></pre>
 <p>Maximum timestamp difference for maintaining perfect granules.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: 40000000</p>
@@ -337,18 +323,15 @@ GstOggMux implements
 <hr>
 <div class="refsect2">
 <a name="GstOggMux--skeleton"></a><h3>The <code class="literal">“skeleton”</code> property</h3>
-<pre class="programlisting">  “skeleton”                 <a href="/usr/share/gtk-doc/html/glibglib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<pre class="programlisting">  “skeleton”                 <a href="https://developer.gnome.org/glib/unstable/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
 <p>Whether to include a Skeleton track.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: FALSE</p>
 </div>
 </div>
-<div class="refsect1">
-<a name="gst-plugins-base-plugins-oggmux.see-also"></a><h2>See Also</h2>
-<a class="link" href="gst-plugins-base-plugins-oggdemux.html" title="oggdemux">oggdemux</a>
-</div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.25</div>
+<hr>
+          Generated by GTK-Doc V1.21</div>
 </body>
 </html>

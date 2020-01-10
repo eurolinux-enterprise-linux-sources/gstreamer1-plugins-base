@@ -97,10 +97,6 @@ GType   gst_audio_filter_get_type (void);
 void    gst_audio_filter_class_add_pad_templates (GstAudioFilterClass * klass,
                                                   GstCaps             * allowed_caps);
 
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioFilter, gst_object_unref)
-#endif
-
 G_END_DECLS
 
 #endif /* __GST_AUDIO_FILTER_H__ */

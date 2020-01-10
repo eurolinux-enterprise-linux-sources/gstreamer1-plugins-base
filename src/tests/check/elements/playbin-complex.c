@@ -26,7 +26,7 @@
 #include <gst/check/gstcheck.h>
 #include <gst/base/gstpushsrc.h>
 #include <gst/base/gstbasesink.h>
-#include <gst/audio/audio.h>
+#include <gst/audio/streamvolume.h>
 #include <gst/video/gstvideodecoder.h>
 
 #ifndef GST_DISABLE_REGISTRY
@@ -170,7 +170,8 @@ gst_caps_src_class_init (GstCapsSrcClass * klass)
       GST_PAD_SRC, GST_PAD_ALWAYS,
       GST_STATIC_CAPS_ANY);
 
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
   gst_element_class_set_metadata (element_class,
       "CapsSource", "Source/Generic", "yep", "me");
 
@@ -320,7 +321,8 @@ gst_audio_codec_sink_class_init (GstAudioCodecSinkClass * klass)
       g_param_spec_boolean ("mute", "Mute",
           "Mute", FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
   gst_element_class_set_metadata (element_class,
       "AudioCodecSink", "Sink/Audio", "yep", "me");
 
@@ -370,7 +372,8 @@ gst_video_codec_sink_class_init (GstVideoCodecSinkClass * klass)
       );
   GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
   gst_element_class_set_metadata (element_class,
       "VideoCodecSink", "Sink/Video", "yep", "me");
 
@@ -410,7 +413,7 @@ static GstStaticPadTemplate cd_sink_templ = GST_STATIC_PAD_TEMPLATE ("sink",
         " stream0 = (string)" STREAM_TYPES " ,"
         " stream1 = (string)" STREAM_TYPES)
     );
-static GstStaticPadTemplate cd_src_templ = GST_STATIC_PAD_TEMPLATE ("src_%u",
+static GstStaticPadTemplate cd_src_templ = GST_STATIC_PAD_TEMPLATE ("src_%d",
     GST_PAD_SRC, GST_PAD_SOMETIMES,
     GST_STATIC_CAPS ("audio/x-raw; audio/x-compressed; "
         "video/x-raw; video/x-compressed")
@@ -438,8 +441,10 @@ gst_codec_demuxer_class_init (GstCodecDemuxerClass * klass)
 
   gobject_class->finalize = gst_codec_demuxer_finalize;
 
-  gst_element_class_add_static_pad_template (element_class, &cd_sink_templ);
-  gst_element_class_add_static_pad_template (element_class, &cd_src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&cd_sink_templ));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&cd_src_templ));
   gst_element_class_set_metadata (element_class,
       "CodecDemuxer", "Codec/Demuxer", "yep", "me");
 }
@@ -495,7 +500,7 @@ gst_codec_demuxer_setup_pad (GstCodecDemuxer * demux, GstPad ** pad,
 
       templ =
           gst_element_class_get_pad_template (GST_ELEMENT_GET_CLASS (demux),
-          "src_%u");
+          "src_%d");
       if (pad == &demux->srcpad0)
         *pad = gst_pad_new_from_template (templ, "src_0");
       else
@@ -516,7 +521,7 @@ gst_codec_demuxer_setup_pad (GstCodecDemuxer * demux, GstPad ** pad,
       caps = gst_caps_new_empty_simple ("video/x-compressed");
     } else if (g_str_equal (streaminfo, "raw-audio")) {
       caps = gst_caps_new_simple ("audio/x-raw",
-          "format", G_TYPE_STRING, GST_AUDIO_NE (S16),
+          "format", G_TYPE_STRING, "S16LE",
           "layout", G_TYPE_STRING, "interleaved",
           "rate", G_TYPE_INT, 48000, "channels", G_TYPE_INT, 2, NULL);
     } else {
@@ -642,7 +647,8 @@ gst_video_sink1_class_init (GstVideoSink1Class * klass)
           GST_VIDEO_CAPS_MAKE (GST_VIDEO_FORMATS_ALL))
       );
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
 
   gst_element_class_set_static_metadata (element_class,
       "Fake Video Sink1", "Sink/Video",
@@ -663,7 +669,8 @@ gst_video_sink2_class_init (GstVideoSink2Class * klass)
       GST_PAD_SINK, GST_PAD_ALWAYS,
       GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE (GST_VIDEO_FORMATS_ALL)));
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
 
   gst_element_class_set_static_metadata (element_class,
       "Fake Video Sink2", "Sink/Video",
@@ -703,8 +710,10 @@ gst_video_decoder1_class_init (GstVideoDecoder1Class * klass)
               GST_VIDEO_FORMATS_ALL) ";"
           GST_VIDEO_CAPS_MAKE (GST_VIDEO_FORMATS_ALL)));
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
   gst_element_class_set_static_metadata (element_class,
       "Fake theora video decoder1", "Codec/Decoder/Video",
       "decode theora stream",
@@ -732,8 +741,10 @@ gst_video_decoder2_class_init (GstVideoDecoder2Class * klass)
       GST_PAD_SRC, GST_PAD_ALWAYS,
       GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE (GST_VIDEO_FORMATS_ALL)));
 
-  gst_element_class_add_static_pad_template (element_class, &sink_templ);
-  gst_element_class_add_static_pad_template (element_class, &src_templ);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&sink_templ));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&src_templ));
   gst_element_class_set_static_metadata (element_class,
       "Fake theora video decoder2", "Codec/Decoder/Video",
       "decode theora stream",
@@ -1211,7 +1222,7 @@ GST_START_TEST (test_raw_single_audio_stream_manual_sink)
   playbin =
       create_playbin
       ("caps:audio/x-raw,"
-      " format=(string)" GST_AUDIO_NE (S16) ", " "layout=(string)interleaved, "
+      " format=(string)S16LE, " "layout=(string)interleaved, "
       " rate=(int)48000, " " channels=(int)2", TRUE);
 
   fail_unless_equals_int (gst_element_set_state (playbin, GST_STATE_READY),

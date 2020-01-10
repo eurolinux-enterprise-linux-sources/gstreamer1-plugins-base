@@ -71,7 +71,8 @@ state_cb (GstBus * bus, GstMessage * msg, GstElement * pipeline)
 }
 
 static void
-pad_added_cb (GstElement * decodebin, GstPad * pad, GstElement * pipeline)
+new_decoded_pad_cb (GstElement * decodebin, GstPad * pad, gboolean last,
+    GstElement * pipeline)
 {
   GstPadLinkReturn ret;
   GstElement *fakesink;
@@ -148,7 +149,8 @@ main (gint argc, gchar * argv[])
 
   gst_element_link_pads (source, "src", decoder, "sink");
 
-  g_signal_connect (decoder, "pad-added", G_CALLBACK (pad_added_cb), pipeline);
+  g_signal_connect (decoder, "new-decoded-pad",
+      G_CALLBACK (new_decoded_pad_cb), pipeline);
 
   res = gst_element_set_state (pipeline, GST_STATE_PLAYING);
   if (res == GST_STATE_CHANGE_FAILURE) {

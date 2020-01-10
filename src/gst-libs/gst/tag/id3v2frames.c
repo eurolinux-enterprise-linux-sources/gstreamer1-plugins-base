@@ -59,7 +59,6 @@ static gboolean
 id3v2_genre_fields_to_taglist (ID3TagsWorking * work, const gchar * tag_name,
     GArray * tag_fields);
 static gboolean parse_picture_frame (ID3TagsWorking * work);
-static gboolean parse_private_frame_data (ID3TagsWorking * work);
 
 #define ID3V2_ENCODING_ISO8859 0x00
 #define ID3V2_ENCODING_UTF16   0x01
@@ -202,9 +201,6 @@ id3v2_parse_frame (ID3TagsWorking * work)
   } else if (!strcmp (work->frame_id, "UFID")) {
     /* Unique file identifier */
     tag_str = parse_unique_file_identifier (work, &tag_name);
-  } else if (!strcmp (work->frame_id, "PRIV")) {
-    /* private frame */
-    result = parse_private_frame_data (work);
   }
 #ifdef HAVE_ZLIB
   if (work->frame_flags & ID3V2_FRAME_FORMAT_COMPRESSION) {
@@ -466,49 +462,6 @@ parse_id_string (ID3TagsWorking * work, gchar ** p_str, gint * p_len,
   return TRUE;
 }
 
-static gboolean
-parse_private_frame_data (ID3TagsWorking * work)
-{
-  GstBuffer *binary_data = NULL;
-  GstStructure *owner_info = NULL;
-  guint8 *owner_str = NULL;
-  gsize owner_len;
-  GstSample *priv_frame = NULL;
-
-  if (work->parse_size == 0) {
-    /* private frame data not available */
-    return FALSE;
-  }
-
-  owner_str =
-      (guint8 *) memchr ((guint8 *) work->parse_data, 0, work->parse_size);
-
-  if (owner_str == NULL) {
-    GST_WARNING ("Invalid PRIV frame received");
-    return FALSE;
-  }
-
-  owner_len = (gsize) (owner_str - work->parse_data) + 1;
-
-  owner_info =
-      gst_structure_new ("ID3PrivateFrame", "owner", G_TYPE_STRING,
-      work->parse_data, NULL);
-
-  binary_data = gst_buffer_new_and_alloc (work->parse_size - owner_len);
-  gst_buffer_fill (binary_data, 0, work->parse_data + owner_len,
-      work->parse_size - owner_len);
-
-  priv_frame = gst_sample_new (binary_data, NULL, NULL, owner_info);
-
-  gst_tag_list_add (work->tags, GST_TAG_MERGE_APPEND,
-      GST_TAG_PRIVATE_DATA, priv_frame, NULL);
-
-  gst_sample_unref (priv_frame);
-  gst_buffer_unref (binary_data);
-
-  return TRUE;
-}
-
 static gchar *
 parse_unique_file_identifier (ID3TagsWorking * work, const gchar ** tag_name)
 {
@@ -703,16 +656,11 @@ parse_relative_volume_adjustment_two (ID3TagsWorking * work)
     }
   }
 
-  if (peak_bits > 0) {
-    peak = peak << (64 - GST_ROUND_UP_8 (peak_bits));
-    peak_val =
-        gst_guint64_to_gdouble (peak) /
-        gst_util_guint64_to_gdouble (G_MAXINT64);
-    GST_LOG ("RVA2 frame: id=%s, chan=%u, adj=%.2fdB, peak_bits=%u, peak=%.2f",
-        id, chan, gain_dB, (guint) peak_bits, peak_val);
-  } else {
-    peak_val = 0;
-  }
+  peak = peak << (64 - GST_ROUND_UP_8 (peak_bits));
+  peak_val =
+      gst_guint64_to_gdouble (peak) / gst_util_guint64_to_gdouble (G_MAXINT64);
+  GST_LOG ("RVA2 frame: id=%s, chan=%u, adj=%.2fdB, peak_bits=%u, peak=%.2f",
+      id, chan, gain_dB, (guint) peak_bits, peak_val);
 
   if (chan == ID3V2_RVA2_CHANNEL_MASTER && strcmp (id, "track") == 0) {
     gain_tag_name = GST_TAG_TRACK_GAIN;
@@ -995,17 +943,21 @@ id3v2_genre_fields_to_taglist (ID3TagsWorking * work, const gchar * tag_name,
   return result;
 }
 
+static const gchar utf16enc[] = "UTF-16";
+static const gchar utf16leenc[] = "UTF-16LE";
+static const gchar utf16beenc[] = "UTF-16BE";
+
 static gboolean
-find_utf16_bom (gchar * data, gint * p_data_endianness)
+find_utf16_bom (gchar * data, const gchar ** p_in_encoding)
 {
   guint16 marker = (GST_READ_UINT8 (data) << 8) | GST_READ_UINT8 (data + 1);
 
   switch (marker) {
     case 0xFFFE:
-      *p_data_endianness = G_LITTLE_ENDIAN;
+      *p_in_encoding = utf16leenc;
       return TRUE;
     case 0xFEFF:
-      *p_data_endianness = G_BIG_ENDIAN;
+      *p_in_encoding = utf16beenc;
       return TRUE;
     default:
       break;
@@ -1090,69 +1042,32 @@ parse_insert_string_field (guint8 encoding, gchar * data, gint data_size,
     case ID3V2_ENCODING_UTF16:
     case ID3V2_ENCODING_UTF16BE:
     {
-      gunichar2 *utf16;
-      gint data_endianness;
-      glong n_read = 0, size = 0;
-      guint len, i;
+      const gchar *in_encode;
 
       if (encoding == ID3V2_ENCODING_UTF16)
-        data_endianness = G_BYTE_ORDER;
+        in_encode = utf16enc;
       else
-        data_endianness = G_BIG_ENDIAN;
+        in_encode = utf16beenc;
 
       /* Sometimes we see strings with multiple BOM markers at the start.
        * In that case, we assume the innermost one is correct. If that fails
        * to produce valid UTF-8, we try the other endianness anyway */
-      while (data_size > 2 && find_utf16_bom (data, &data_endianness)) {
+      while (data_size > 2 && find_utf16_bom (data, &in_encode)) {
         data += 2;              /* skip BOM */
         data_size -= 2;
       }
 
-      /* alloc needed to ensure correct alignment which is required by GLib */
-      len = data_size / 2;
-      utf16 = g_try_new (gunichar2, len + 1);
-      if (utf16 == NULL)
-        break;
+      field = g_convert (data, data_size, "UTF-8", in_encode, NULL, NULL, NULL);
 
-      memcpy (utf16, data, 2 * len);
-
-      GST_LOG ("Trying interpreting data as UTF-16-%s first",
-          (data_endianness == G_LITTLE_ENDIAN) ? "LE" : "BE");
-
-      if (data_endianness != G_BYTE_ORDER) {
-        /* convert to native endian UTF-16 */
-        for (i = 0; i < len; ++i)
-          utf16[i] = GUINT16_SWAP_LE_BE (utf16[i]);
+      if (field == NULL || g_utf8_validate (field, -1, NULL) == FALSE) {
+        /* As a fallback, try interpreting UTF-16 in the other endianness */
+        if (in_encode == utf16beenc)
+          field = g_convert (data, data_size, "UTF-8", utf16leenc,
+              NULL, NULL, NULL);
       }
-
-      /* convert to UTF-8 */
-      field = g_utf16_to_utf8 (utf16, len, &n_read, &size, NULL);
-      if (field != NULL && n_read > 0 && g_utf8_validate (field, -1, NULL)) {
-        g_free (utf16);
-        break;
-      }
-
-      GST_DEBUG ("Trying interpreting data as UTF-16-%s now as fallback",
-          (data_endianness == G_LITTLE_ENDIAN) ? "BE" : "LE");
-
-      for (i = 0; i < len; ++i)
-        utf16[i] = GUINT16_SWAP_LE_BE (utf16[i]);
-
-      g_free (field);
-      n_read = size = 0;
-
-      /* try again */
-      field = g_utf16_to_utf8 (utf16, len, &n_read, &size, NULL);
-      g_free (utf16);
-
-      if (field != NULL && n_read > 0 && g_utf8_validate (field, -1, NULL))
-        break;
-
-      GST_DEBUG ("Could not convert UTF-16 string to UTF-8");
-      g_free (field);
-      field = NULL;
-      break;
     }
+
+      break;
     case ID3V2_ENCODING_ISO8859:
       if (g_utf8_validate (data, data_size, NULL))
         field = g_strndup (data, data_size);

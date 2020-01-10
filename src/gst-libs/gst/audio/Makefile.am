@@ -6,11 +6,7 @@ glib_enum_headers= 		\
 	audio.h			\
 	audio-format.h			\
 	audio-channels.h			\
-	audio-channel-mixer.h			\
-	audio-converter.h 	\
 	audio-info.h			\
-	audio-quantize.h			\
-	audio-resampler.h			\
 	gstaudioringbuffer.h
 
 glib_enum_define = GST_AUDIO
@@ -26,17 +22,11 @@ lib_LTLIBRARIES = \
 
 CLEANFILES = $(BUILT_SOURCES)
 
-EXTRA_DIST += dbesi0.c
-
 libgstaudio_@GST_API_VERSION@_la_SOURCES = \
 	audio.c \
 	audio-format.c \
 	audio-channels.c \
-	audio-channel-mixer.c \
-	audio-converter.c \
 	audio-info.c \
-	audio-quantize.c \
-	audio-resampler.c \
 	gstaudioringbuffer.c \
 	gstaudioclock.c \
 	gstaudiocdsrc.c \
@@ -48,7 +38,6 @@ libgstaudio_@GST_API_VERSION@_la_SOURCES = \
 	gstaudiometa.c \
 	gstaudiosink.c \
 	gstaudiosrc.c \
-	gstaudioutilsprivate.c \
 	streamvolume.c \
 	gstaudioiec61937.c
 
@@ -59,11 +48,7 @@ libgstaudio_@GST_API_VERSION@include_HEADERS = \
 	audio.h \
 	audio-format.h \
 	audio-channels.h \
-	audio-channel-mixer.h \
-	audio-converter.h \
 	audio-info.h \
-	audio-quantize.h \
-	audio-resampler.h \
 	gstaudioringbuffer.h \
 	gstaudioclock.h \
 	gstaudiofilter.h \
@@ -81,66 +66,12 @@ libgstaudio_@GST_API_VERSION@include_HEADERS = \
 nodist_libgstaudio_@GST_API_VERSION@include_HEADERS = \
 	audio-enumtypes.h
 
-noinst_HEADERS = \
-	gstaudioutilsprivate.h 		\
-	audio-resampler-private.h 	\
-	audio-resampler-macros.h 	\
-	audio-resampler-x86.h 		\
-	audio-resampler-x86-sse.h	\
-	audio-resampler-x86-sse2.h	\
-	audio-resampler-x86-sse41.h	\
-	audio-resampler-neon.h
-
 libgstaudio_@GST_API_VERSION@_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_BASE_CFLAGS) $(GST_CFLAGS) \
 		$(ORC_CFLAGS)
 libgstaudio_@GST_API_VERSION@_la_LIBADD = \
   $(top_builddir)/gst-libs/gst/tag/libgsttag-@GST_API_VERSION@.la \
   $(GST_BASE_LIBS) $(GST_LIBS) $(LIBM) $(ORC_LIBS)
 libgstaudio_@GST_API_VERSION@_la_LDFLAGS = $(GST_LIB_LDFLAGS) $(GST_ALL_LDFLAGS) $(GST_LT_LDFLAGS)
-
-
-# Arch-specific bits
-
-noinst_LTLIBRARIES =
-
-if HAVE_X86
-# Don't use full GST_LT_LDFLAGS in LDFLAGS because we get things like
-# -version-info that cause a warning on private libs
-
-noinst_LTLIBRARIES += libaudio_resampler_sse.la
-libaudio_resampler_sse_la_SOURCES = audio-resampler-x86-sse.c
-libaudio_resampler_sse_la_CFLAGS = \
-	$(libgstaudio_@GST_API_VERSION@_la_CFLAGS) \
-	$(SSE_CFLAGS)
-libaudio_resampler_sse_la_LDFLAGS = \
-	$(GST_LIB_LDFLAGS) \
-	$(GST_ALL_LDFLAGS)
-libgstaudio_@GST_API_VERSION@_la_LIBADD += libaudio_resampler_sse.la
-
-noinst_LTLIBRARIES += libaudio_resampler_sse2.la
-libaudio_resampler_sse2_la_SOURCES = audio-resampler-x86-sse2.c
-libaudio_resampler_sse2_la_CFLAGS = \
-	$(libgstaudio_@GST_API_VERSION@_la_CFLAGS) \
-	$(SSE2_CFLAGS)
-libaudio_resampler_sse2_la_LDFLAGS = \
-	$(GST_LIB_LDFLAGS) \
-	$(GST_ALL_LDFLAGS)
-libgstaudio_@GST_API_VERSION@_la_LIBADD += libaudio_resampler_sse2.la
-
-noinst_LTLIBRARIES += libaudio_resampler_sse41.la
-libaudio_resampler_sse41_la_SOURCES = audio-resampler-x86-sse41.c
-libaudio_resampler_sse41_la_CFLAGS = \
-	$(libgstaudio_@GST_API_VERSION@_la_CFLAGS) \
-	$(SSE41_CFLAGS)
-libaudio_resampler_sse41_la_LDFLAGS = \
-	$(GST_LIB_LDFLAGS) \
-	$(GST_ALL_LDFLAGS)
-libgstaudio_@GST_API_VERSION@_la_LIBADD += libaudio_resampler_sse41.la
-
-endif
-
-
-# Introspection
 
 include $(top_srcdir)/common/gst-glib-gen.mak
 
@@ -153,14 +84,12 @@ gir_sources=$(patsubst %,$(srcdir)/%, $(libgstaudio_@GST_API_VERSION@_la_SOURCES
 gir_sources+=$(patsubst %,$(builddir)/%, $(built_sources))
 
 GstAudio-@GST_API_VERSION@.gir: $(INTROSPECTION_SCANNER) libgstaudio-@GST_API_VERSION@.la
-	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" GI_SCANNER_DISABLE_CACHE=yes\
+	$(AM_V_GEN)PKG_CONFIG_PATH="$(GST_PKG_CONFIG_PATH)" \
 		GST_PLUGIN_SYSTEM_PATH_1_0="" GST_PLUGIN_PATH_1_0="" GST_REGISTRY_UPDATE=no \
-		CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CC="$(CC)" PKG_CONFIG="$(PKG_CONFIG)" DLLTOOL="$(DLLTOOL)" \
 		$(INTROSPECTION_SCANNER) -v --namespace GstAudio \
 		--nsversion=@GST_API_VERSION@ \
 		--warn-all \
-		--identifier-prefix=Gst \
-		--symbol-prefix=gst \
+		--strip-prefix=Gst \
 		-I$(top_srcdir)/gst-libs \
 		-I$(top_builddir)/gst-libs \
 		--c-include "gst/audio/audio.h" \
@@ -178,7 +107,7 @@ GstAudio-@GST_API_VERSION@.gir: $(INTROSPECTION_SCANNER) libgstaudio-@GST_API_VE
 		--pkg gstreamer-@GST_API_VERSION@ \
 		--pkg gstreamer-base-@GST_API_VERSION@ \
 		--pkg-export gstreamer-audio-@GST_API_VERSION@ \
-		--add-init-section="$(INTROSPECTION_INIT)" \
+		--add-init-section="gst_init(NULL,NULL);" \
 		--output $@ \
 		$(gir_headers) \
 		$(gir_sources)
@@ -204,3 +133,19 @@ typelibs_DATA = $(BUILT_GIRSOURCES:.gir=.typelib)
 
 CLEANFILES += $(BUILT_GIRSOURCES) $(typelibs_DATA)
 endif
+
+Android.mk: Makefile.am $(BUILT_SOURCES)
+	androgenizer -:PROJECT libgstaudio -:SHARED libgstaudio-@GST_API_VERSION@ \
+	 -:TAGS eng debug \
+         -:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
+	 -:SOURCES $(libgstaudio_@GST_API_VERSION@_la_SOURCES) \
+	           $(nodist_libgstaudio_@GST_API_VERSION@_la_SOURCES) \
+	 -:CFLAGS $(DEFS) $(DEFAULT_INCLUDES) $(libgstaudio_@GST_API_VERSION@_la_CFLAGS) \
+	 -:LDFLAGS $(libgstaudio_@GST_API_VERSION@_la_LDFLAGS) \
+	           $(libgstaudio_@GST_API_VERSION@_la_LIBADD) \
+	           -ldl \
+	 -:HEADER_TARGET gstreamer-@GST_API_VERSION@/gst/tag \
+	 -:HEADERS $(libgstaudio_@GST_API_VERSION@include_HEADERS) \
+	           $(nodist_libgstaudio_@GST_API_VERSION@include_HEADERS) \
+	 -:PASSTHROUGH LOCAL_ARM_MODE:=arm \
+	> $@

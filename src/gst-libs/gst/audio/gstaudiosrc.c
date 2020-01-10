@@ -218,7 +218,7 @@ audioringbuffer_thread_func (GstAudioRingBuffer * buf)
   message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
       GST_STREAM_STATUS_TYPE_ENTER, GST_ELEMENT_CAST (src));
   g_value_init (&val, GST_TYPE_G_THREAD);
-  g_value_set_boxed (&val, g_thread_self ());
+  g_value_set_boxed (&val, src->thread);
   gst_message_set_stream_status_object (message, &val);
   g_value_unset (&val);
   GST_DEBUG_OBJECT (src, "posting ENTER stream status");
@@ -291,7 +291,7 @@ stop_running:
     message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
         GST_STREAM_STATUS_TYPE_LEAVE, GST_ELEMENT_CAST (src));
     g_value_init (&val, GST_TYPE_G_THREAD);
-    g_value_set_boxed (&val, g_thread_self ());
+    g_value_set_boxed (&val, src->thread);
     gst_message_set_stream_status_object (message, &val);
     g_value_unset (&val);
     GST_DEBUG_OBJECT (src, "posting LEAVE stream status");
@@ -393,14 +393,7 @@ gst_audio_src_ring_buffer_acquire (GstAudioRingBuffer * buf,
     goto could_not_open;
 
   buf->size = spec->segtotal * spec->segsize;
-  buf->memory = g_malloc (buf->size);
-  if (buf->spec.type == GST_AUDIO_RING_BUFFER_FORMAT_TYPE_RAW) {
-    gst_audio_format_fill_silence (buf->spec.info.finfo, buf->memory,
-        buf->size);
-  } else {
-    /* FIXME, non-raw formats get 0 as the empty sample */
-    memset (buf->memory, 0, buf->size);
-  }
+  buf->memory = g_malloc0 (buf->size);
 
   abuf = GST_AUDIO_SRC_RING_BUFFER (buf);
   abuf->running = TRUE;

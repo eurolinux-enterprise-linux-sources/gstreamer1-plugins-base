@@ -84,8 +84,7 @@ struct _GstAudioInfo {
   gpointer _gst_reserved[GST_PADDING];
 };
 
-#define GST_TYPE_AUDIO_INFO                  (gst_audio_info_get_type ())
-GType gst_audio_info_get_type                (void);
+GType gst_audio_info_get_type        (void);
 
 #define GST_AUDIO_INFO_IS_VALID(i)           ((i)->finfo != NULL && (i)->rate > 0 && (i)->channels > 0 && (i)->bpf > 0)
 
@@ -130,10 +129,6 @@ gboolean       gst_audio_info_convert     (const GstAudioInfo * info,
 
 gboolean       gst_audio_info_is_equal    (const GstAudioInfo *info,
                                            const GstAudioInfo *other);
-
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAudioInfo, gst_audio_info_free)
-#endif
 
 G_END_DECLS
 

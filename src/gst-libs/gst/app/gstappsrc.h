@@ -42,8 +42,6 @@ typedef struct _GstAppSrc GstAppSrc;
 typedef struct _GstAppSrcClass GstAppSrcClass;
 typedef struct _GstAppSrcPrivate GstAppSrcPrivate;
 
-/* FIXME 2.0: Make the instance/class struct private */
-
 /**
  * GstAppSrcCallbacks: (skip)
  * @need_data: Called when the appsrc needs more data. A buffer or EOS should be
@@ -109,10 +107,9 @@ struct _GstAppSrcClass
   /* actions */
   GstFlowReturn (*push_buffer)     (GstAppSrc *appsrc, GstBuffer *buffer);
   GstFlowReturn (*end_of_stream)   (GstAppSrc *appsrc);
-  GstFlowReturn (*push_sample)     (GstAppSrc *appsrc, GstSample *sample);
 
   /*< private >*/
-  gpointer     _gst_reserved[GST_PADDING-1];
+  gpointer     _gst_reserved[GST_PADDING];
 };
 
 GType gst_app_src_get_type(void);
@@ -126,9 +123,6 @@ GstCaps*         gst_app_src_get_caps                (GstAppSrc *appsrc);
 
 void             gst_app_src_set_size                (GstAppSrc *appsrc, gint64 size);
 gint64           gst_app_src_get_size                (GstAppSrc *appsrc);
-
-void             gst_app_src_set_duration            (GstAppSrc *appsrc, GstClockTime duration);
-GstClockTime     gst_app_src_get_duration            (GstAppSrc *appsrc);
 
 void             gst_app_src_set_stream_type         (GstAppSrc *appsrc, GstAppStreamType type);
 GstAppStreamType gst_app_src_get_stream_type         (GstAppSrc *appsrc);
@@ -146,17 +140,13 @@ gboolean         gst_app_src_get_emit_signals        (GstAppSrc *appsrc);
 
 GstFlowReturn    gst_app_src_push_buffer             (GstAppSrc *appsrc, GstBuffer *buffer);
 GstFlowReturn    gst_app_src_end_of_stream           (GstAppSrc *appsrc);
-GstFlowReturn    gst_app_src_push_sample             (GstAppSrc *appsrc, GstSample *sample);
 
 void             gst_app_src_set_callbacks           (GstAppSrc * appsrc,
                                                       GstAppSrcCallbacks *callbacks,
                                                       gpointer user_data,
                                                       GDestroyNotify notify);
 
-#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(GstAppSrc, gst_object_unref)
-#endif
-
 G_END_DECLS
 
 #endif
+

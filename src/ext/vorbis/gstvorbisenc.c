@@ -29,12 +29,12 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch-1.0 -v audiotestsrc wave=sine num-buffers=100 ! audioconvert ! vorbisenc ! oggmux ! filesink location=sine.ogg
+ * gst-launch -v audiotestsrc wave=sine num-buffers=100 ! audioconvert ! vorbisenc ! oggmux ! filesink location=sine.ogg
  * ]| Encode a test sine signal to Ogg/Vorbis.  Note that the resulting file
  * will be really small because a sine signal compresses very well.
  * |[
- * gst-launch-1.0 -v autoaudiosrc ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
- * ]| Record from a sound card and encode to Ogg/Vorbis.
+ * gst-launch -v alsasrc ! audioconvert ! vorbisenc ! oggmux ! filesink location=alsasrc.ogg
+ * ]| Record from a sound card using ALSA and encode to Ogg/Vorbis.
  * </refsect2>
  */
 #ifdef HAVE_CONFIG_H
@@ -56,6 +56,16 @@
 GST_DEBUG_CATEGORY_EXTERN (vorbisenc_debug);
 #define GST_CAT_DEFAULT vorbisenc_debug
 
+static GstStaticPadTemplate vorbis_enc_sink_factory =
+GST_STATIC_PAD_TEMPLATE ("sink",
+    GST_PAD_SINK,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS ("audio/x-raw, "
+        "format = (string) " GST_AUDIO_NE (F32) ", "
+        "layout = (string) interleaved, "
+        "rate = (int) [ 1, 200000 ], " "channels = (int) [ 1, 255 ]")
+    );
+
 static GstStaticPadTemplate vorbis_enc_src_factory =
 GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
@@ -76,7 +86,6 @@ enum
 };
 
 static GstFlowReturn gst_vorbis_enc_output_buffers (GstVorbisEnc * vorbisenc);
-static GstCaps *gst_vorbis_enc_generate_sink_caps (void);
 
 
 #define MAX_BITRATE_DEFAULT     -1
@@ -92,6 +101,8 @@ static gboolean gst_vorbis_enc_set_format (GstAudioEncoder * enc,
     GstAudioInfo * info);
 static GstFlowReturn gst_vorbis_enc_handle_frame (GstAudioEncoder * enc,
     GstBuffer * in_buf);
+static GstCaps *gst_vorbis_enc_getcaps (GstAudioEncoder * enc,
+    GstCaps * filter);
 static gboolean gst_vorbis_enc_sink_event (GstAudioEncoder * enc,
     GstEvent * event);
 
@@ -114,8 +125,6 @@ gst_vorbis_enc_class_init (GstVorbisEncClass * klass)
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
   GstAudioEncoderClass *base_class;
-  GstCaps *sink_caps;
-  GstPadTemplate *sink_templ;
 
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
@@ -156,14 +165,10 @@ gst_vorbis_enc_class_init (GstVorbisEncClass * klass)
           "The last status message", NULL,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  sink_caps = gst_vorbis_enc_generate_sink_caps ();
-  sink_templ = gst_pad_template_new ("sink",
-      GST_PAD_SINK, GST_PAD_ALWAYS, sink_caps);
-  gst_element_class_add_pad_template (gstelement_class, sink_templ);
-  gst_caps_unref (sink_caps);
-
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &vorbis_enc_src_factory);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vorbis_enc_src_factory));
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vorbis_enc_sink_factory));
 
   gst_element_class_set_static_metadata (gstelement_class,
       "Vorbis audio encoder", "Codec/Encoder/Audio",
@@ -174,6 +179,7 @@ gst_vorbis_enc_class_init (GstVorbisEncClass * klass)
   base_class->stop = GST_DEBUG_FUNCPTR (gst_vorbis_enc_stop);
   base_class->set_format = GST_DEBUG_FUNCPTR (gst_vorbis_enc_set_format);
   base_class->handle_frame = GST_DEBUG_FUNCPTR (gst_vorbis_enc_handle_frame);
+  base_class->getcaps = GST_DEBUG_FUNCPTR (gst_vorbis_enc_getcaps);
   base_class->sink_event = GST_DEBUG_FUNCPTR (gst_vorbis_enc_sink_event);
   base_class->flush = GST_DEBUG_FUNCPTR (gst_vorbis_enc_flush);
 }
@@ -182,8 +188,6 @@ static void
 gst_vorbis_enc_init (GstVorbisEnc * vorbisenc)
 {
   GstAudioEncoder *enc = GST_AUDIO_ENCODER (vorbisenc);
-
-  GST_PAD_SET_ACCEPT_TEMPLATE (GST_AUDIO_ENCODER_SINK_PAD (enc));
 
   vorbisenc->channels = -1;
   vorbisenc->frequency = -1;
@@ -222,7 +226,6 @@ gst_vorbis_enc_start (GstAudioEncoder * enc)
   GST_DEBUG_OBJECT (enc, "start");
   vorbisenc->tags = gst_tag_list_new_empty ();
   vorbisenc->header_sent = FALSE;
-  vorbisenc->last_size = 0;
 
   return TRUE;
 }
@@ -282,6 +285,27 @@ gst_vorbis_enc_generate_sink_caps (void)
           "rate", GST_TYPE_INT_RANGE, 1, 200000,
           "channels", GST_TYPE_INT_RANGE, 9, 255,
           "channel-mask", GST_TYPE_BITMASK, G_GUINT64_CONSTANT (0), NULL));
+
+  return caps;
+}
+
+static GstCaps *
+gst_vorbis_enc_getcaps (GstAudioEncoder * enc, GstCaps * filter)
+{
+  GstVorbisEnc *vorbisenc = GST_VORBISENC (enc);
+  GstCaps *caps;
+
+  if (vorbisenc->sinkcaps == NULL)
+    vorbisenc->sinkcaps = gst_vorbis_enc_generate_sink_caps ();
+
+  if (filter) {
+    GstCaps *int_caps = gst_caps_intersect_full (filter, vorbisenc->sinkcaps,
+        GST_CAPS_INTERSECT_FIRST);
+    caps = gst_audio_encoder_proxy_getcaps (enc, int_caps, filter);
+    gst_caps_unref (int_caps);
+  } else {
+    caps = gst_audio_encoder_proxy_getcaps (enc, vorbisenc->sinkcaps, filter);
+  }
 
   return caps;
 }
@@ -540,199 +564,11 @@ gst_vorbis_enc_flush (GstAudioEncoder * enc)
   vorbisenc->header_sent = FALSE;
 }
 
-/* copied and adapted from ext/ogg/gstoggstream.c */
-static gint64
-packet_duration_vorbis (GstVorbisEnc * enc, ogg_packet * packet)
-{
-  int mode;
-  int size;
-  int duration;
-
-  if (packet->bytes == 0 || packet->packet[0] & 1)
-    return 0;
-
-  mode = (packet->packet[0] >> 1) & ((1 << enc->vorbis_log2_num_modes) - 1);
-  size = enc->vorbis_mode_sizes[mode] ? enc->long_size : enc->short_size;
-
-  if (enc->last_size == 0) {
-    duration = 0;
-  } else {
-    duration = enc->last_size / 4 + size / 4;
-  }
-  enc->last_size = size;
-
-  GST_DEBUG_OBJECT (enc, "duration %d", (int) duration);
-
-  return duration;
-}
-
-/* copied and adapted from ext/ogg/gstoggstream.c */
-static void
-parse_vorbis_header_packet (GstVorbisEnc * enc, ogg_packet * packet)
-{
-  /*
-   * on the first (b_o_s) packet, determine the long and short sizes,
-   * and then calculate l/2, l/4 - s/4, 3 * l/4 - s/4, l/2 - s/2 and s/2
-   */
-
-  enc->long_size = 1 << (packet->packet[28] >> 4);
-  enc->short_size = 1 << (packet->packet[28] & 0xF);
-}
-
-/* copied and adapted from ext/ogg/gstoggstream.c */
-static void
-parse_vorbis_codebooks_packet (GstVorbisEnc * enc, ogg_packet * op)
-{
-  /*
-   * the code pages, a whole bunch of other fairly useless stuff, AND,
-   * RIGHT AT THE END (of a bunch of variable-length compressed rubbish that
-   * basically has only one actual set of values that everyone uses BUT YOU
-   * CAN'T BE SURE OF THAT, OH NO YOU CAN'T) is the only piece of data that's
-   * actually useful to us - the packet modes (because it's inconceivable to
-   * think people might want _just that_ and nothing else, you know, for
-   * seeking and stuff).
-   *
-   * Fortunately, because of the mandate that non-used bits must be zero
-   * at the end of the packet, we might be able to sneakily work backwards
-   * and find out the information we need (namely a mapping of modes to
-   * packet sizes)
-   */
-  unsigned char *current_pos = &op->packet[op->bytes - 1];
-  int offset;
-  int size;
-  int size_check;
-  int *mode_size_ptr;
-  int i;
-  int ii;
-
-  /*
-   * This is the format of the mode data at the end of the packet for all
-   * Vorbis Version 1 :
-   *
-   * [ 6:number_of_modes ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:framing(1) ]
-   *
-   * e.g.:
-   *
-   *              <-
-   * 0 0 0 0 0 1 0 0
-   * 0 0 1 0 0 0 0 0
-   * 0 0 1 0 0 0 0 0
-   * 0 0 1|0 0 0 0 0
-   * 0 0 0 0|0|0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0 0 0|0 0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0 0 0|0 0 0 0
-   * 0 0 0|1|0 0 0 0 |
-   * 0 0 0 0 0 0 0 0 V
-   * 0 0 0|0 0 0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0 1|0 0 0 0 0
-   * 0 0|1|0 0 0 0 0
-   *
-   *
-   * i.e. each entry is an important bit, 32 bits of 0, 8 bits of blah, a
-   * bit of 1.
-   * Let's find our last 1 bit first.
-   *
-   */
-
-  size = 0;
-
-  offset = 8;
-  while (!((1 << --offset) & *current_pos)) {
-    if (offset == 0) {
-      offset = 8;
-      current_pos -= 1;
-    }
-  }
-
-  while (1) {
-
-    /*
-     * from current_pos-5:(offset+1) to current_pos-1:(offset+1) should
-     * be zero
-     */
-    offset = (offset + 7) % 8;
-    if (offset == 7)
-      current_pos -= 1;
-
-    if (((current_pos[-5] & ~((1 << (offset + 1)) - 1)) != 0)
-        ||
-        current_pos[-4] != 0
-        ||
-        current_pos[-3] != 0
-        ||
-        current_pos[-2] != 0
-        || ((current_pos[-1] & ((1 << (offset + 1)) - 1)) != 0)
-        ) {
-      break;
-    }
-
-    size += 1;
-
-    current_pos -= 5;
-
-  }
-
-  /* Give ourselves a chance to recover if we went back too far by using
-   * the size check. */
-  for (ii = 0; ii < 2; ii++) {
-    if (offset > 4) {
-      size_check = (current_pos[0] >> (offset - 5)) & 0x3F;
-    } else {
-      /* mask part of byte from current_pos */
-      size_check = (current_pos[0] & ((1 << (offset + 1)) - 1));
-      /* shift to appropriate position */
-      size_check <<= (5 - offset);
-      /* or in part of byte from current_pos - 1 */
-      size_check |= (current_pos[-1] & ~((1 << (offset + 3)) - 1)) >>
-          (offset + 3);
-    }
-
-    size_check += 1;
-    if (size_check == size) {
-      break;
-    }
-    offset = (offset + 1) % 8;
-    if (offset == 0)
-      current_pos += 1;
-    current_pos += 5;
-    size -= 1;
-  }
-
-  /* Store mode size information in our info struct */
-  i = -1;
-  while ((1 << (++i)) < size);
-  enc->vorbis_log2_num_modes = i;
-
-  mode_size_ptr = enc->vorbis_mode_sizes;
-
-  for (i = 0; i < size; i++) {
-    offset = (offset + 1) % 8;
-    if (offset == 0)
-      current_pos += 1;
-    *mode_size_ptr++ = (current_pos[0] >> offset) & 0x1;
-    current_pos += 5;
-  }
-
-}
-
 static GstBuffer *
 gst_vorbis_enc_buffer_from_header_packet (GstVorbisEnc * vorbisenc,
     ogg_packet * packet)
 {
   GstBuffer *outbuf;
-
-  if (packet->bytes > 0 && packet->packet[0] == '\001') {
-    parse_vorbis_header_packet (vorbisenc, packet);
-  } else if (packet->bytes > 0 && packet->packet[0] == '\005') {
-    parse_vorbis_codebooks_packet (vorbisenc, packet);
-  }
 
   outbuf =
       gst_audio_encoder_allocate_output_buffer (GST_AUDIO_ENCODER (vorbisenc),
@@ -780,17 +616,16 @@ gst_vorbis_enc_sink_event (GstAudioEncoder * enc, GstEvent * event)
 /*
  * (really really) FIXME: move into core (dixit tpm)
  */
-/*
+/**
  * _gst_caps_set_buffer_array:
- * @caps: (transfer full): a #GstCaps
+ * @caps: a #GstCaps
  * @field: field in caps to set
  * @buf: header buffers
  *
  * Adds given buffers to an array of buffers set as the given @field
  * on the given @caps.  List of buffer arguments must be NULL-terminated.
  *
- * Returns: (transfer full): input caps with a streamheader field added, or NULL
- *     if some error occurred
+ * Returns: input caps with a streamheader field added, or NULL if some error
  */
 static GstCaps *
 _gst_caps_set_buffer_array (GstCaps * caps, const gchar * field,
@@ -948,7 +783,6 @@ static GstFlowReturn
 gst_vorbis_enc_output_buffers (GstVorbisEnc * vorbisenc)
 {
   GstFlowReturn ret;
-  gint64 duration;
 
   /* vorbis does some data preanalysis, then divides up blocks for
      more involved (potentially parallel) processing.  Get a single
@@ -970,20 +804,6 @@ gst_vorbis_enc_output_buffers (GstVorbisEnc * vorbisenc)
           gst_audio_encoder_allocate_output_buffer (GST_AUDIO_ENCODER
           (vorbisenc), op.bytes);
       gst_buffer_fill (buf, 0, op.packet, op.bytes);
-
-      /* we have to call this every packet, not just on e_o_s, since
-         each packet's duration depends on the previous one's */
-      duration = packet_duration_vorbis (vorbisenc, &op);
-      if (op.e_o_s) {
-        gint64 samples = op.granulepos - vorbisenc->samples_out;
-        if (samples < duration) {
-          gint64 trim_end = duration - samples;
-          GST_DEBUG_OBJECT (vorbisenc,
-              "Adding trim-end %" G_GUINT64_FORMAT, trim_end);
-          gst_buffer_add_audio_clipping_meta (buf, GST_FORMAT_DEFAULT, 0,
-              trim_end);
-        }
-      }
       /* tracking granulepos should tell us samples accounted for */
       ret =
           gst_audio_encoder_finish_frame (GST_AUDIO_ENCODER

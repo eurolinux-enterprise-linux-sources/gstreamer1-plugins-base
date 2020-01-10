@@ -43,7 +43,7 @@ GST_START_TEST (test_add)
 GST_END_TEST;
 
 static Suite *
-clocks_suite (void)
+volume_suite (void)
 {
   Suite *s = suite_create ("clocks");
   TCase *tc_chain = tcase_create ("general");
@@ -54,4 +54,19 @@ clocks_suite (void)
   return s;
 }
 
-GST_CHECK_MAIN (clocks);
+int
+main (int argc, char **argv)
+{
+  int nf;
+
+  Suite *s = volume_suite ();
+  SRunner *sr = srunner_create (s);
+
+  gst_check_init (&argc, &argv);
+
+  srunner_run_all (sr, CK_NORMAL);
+  nf = srunner_ntests_failed (sr);
+  srunner_free (sr);
+
+  return nf;
+}

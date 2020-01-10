@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: gst-plugins-0.8.0\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
 "PO-Revision-Date: 2004-03-19 18:29+0200\n"
 "Last-Translator: Metin Amiroff <metin@karegen.com>\n"
 "Language-Team: Azerbaijani <translation-team-az@lists.sourceforge.net>\n"
@@ -77,8 +77,15 @@ msgstr "\"%s\" vfs faylı bağlana bilmədi."
 msgid "Could not read CD."
 msgstr "\"%s\" avadanlığına yazıla bilmədi."
 
+msgid "Internal data stream error."
+msgstr ""
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
+msgstr ""
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
 msgstr ""
 
 #, fuzzy
@@ -90,14 +97,6 @@ msgstr ""
 
 #, fuzzy
 msgid "Could not create \"uridecodebin\" element."
-msgstr "\"%s\" faylına yazıla bilmədi."
-
-#, fuzzy
-msgid "Could not create \"decodebin3\" element."
-msgstr "\"%s\" faylına yazıla bilmədi."
-
-#, fuzzy
-msgid "Could not create \"urisourcebin\" element."
 msgstr "\"%s\" faylına yazıla bilmədi."
 
 #, c-format
@@ -231,9 +230,6 @@ msgid "TMPlayer subtitle format"
 msgstr ""
 
 msgid "Kate subtitle format"
-msgstr ""
-
-msgid "WebVTT subtitle format"
 msgstr ""
 
 msgid "Uncompressed video"
@@ -402,13 +398,6 @@ msgstr ""
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr ""
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr ""
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-
 msgid "capturing digital zoom ratio"
 msgstr ""
 
@@ -532,109 +521,10 @@ msgid ""
 "added/removed."
 msgstr ""
 
-#, fuzzy, c-format
-msgid "Volume: %.0f%%"
-msgstr "Səs"
-
 msgid "Buffering..."
 msgstr ""
 
 msgid "Clock lost, selecting a new one\n"
-msgstr ""
-
-msgid "Reached end of play list."
-msgstr ""
-
-msgid "Paused"
-msgstr ""
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr ""
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr ""
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr ""
-
-#, fuzzy, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "CD avadanlığı oxuma üçün açıla bilmədi."
-
-msgid "space"
-msgstr ""
-
-msgid "pause/unpause"
-msgstr ""
-
-msgid "q or ESC"
-msgstr ""
-
-msgid "quit"
-msgstr ""
-
-msgid "> or n"
-msgstr ""
-
-msgid "play next"
-msgstr ""
-
-msgid "< or b"
-msgstr ""
-
-msgid "play previous"
-msgstr ""
-
-msgid "seek forward"
-msgstr ""
-
-msgid "seek backward"
-msgstr ""
-
-#, fuzzy
-msgid "volume up"
-msgstr "Səs"
-
-msgid "volume down"
-msgstr ""
-
-msgid "increase playback rate"
-msgstr ""
-
-msgid "decrease playback rate"
-msgstr ""
-
-msgid "change playback direction"
-msgstr ""
-
-msgid "enable/disable trick modes"
-msgstr ""
-
-msgid "change audio track"
-msgstr ""
-
-msgid "change video track"
-msgstr ""
-
-msgid "change subtitle track"
-msgstr ""
-
-msgid "seek to beginning"
-msgstr ""
-
-msgid "show keyboard shortcuts"
-msgstr ""
-
-msgid "Interactive mode - keyboard controls:"
-msgstr ""
-
-msgid "Output status information and property notifications"
-msgstr ""
-
-msgid "Control playback behaviour setting playbin 'flags' property"
 msgstr ""
 
 msgid "Video sink to use (default is autovideosink)"
@@ -649,7 +539,7 @@ msgstr ""
 msgid "Shuffle playlist"
 msgstr ""
 
-msgid "Disable interactive control via the keyboard"
+msgid "Interactive control via keyboard"
 msgstr ""
 
 msgid "Volume"
@@ -658,17 +548,11 @@ msgstr "Səs"
 msgid "Playlist file containing input media files"
 msgstr ""
 
-msgid "Do not print any output (apart from errors)"
-msgstr ""
-
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 msgstr ""
 
 msgid "You must provide at least one filename or URI to play."
-msgstr ""
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
 msgstr ""
 
 #~ msgid "Bass"

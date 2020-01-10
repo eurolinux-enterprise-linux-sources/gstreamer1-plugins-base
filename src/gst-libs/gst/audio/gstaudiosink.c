@@ -232,7 +232,7 @@ audioringbuffer_thread_func (GstAudioRingBuffer * buf)
   message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
       GST_STREAM_STATUS_TYPE_ENTER, GST_ELEMENT_CAST (sink));
   g_value_init (&val, GST_TYPE_G_THREAD);
-  g_value_set_boxed (&val, g_thread_self ());
+  g_value_set_boxed (&val, sink->thread);
   gst_message_set_stream_status_object (message, &val);
   g_value_unset (&val);
   GST_DEBUG_OBJECT (sink, "posting ENTER stream status");
@@ -307,7 +307,7 @@ stop_running:
     message = gst_message_new_stream_status (GST_OBJECT_CAST (buf),
         GST_STREAM_STATUS_TYPE_LEAVE, GST_ELEMENT_CAST (sink));
     g_value_init (&val, GST_TYPE_G_THREAD);
-    g_value_set_boxed (&val, g_thread_self ());
+    g_value_set_boxed (&val, sink->thread);
     gst_message_set_stream_status_object (message, &val);
     g_value_unset (&val);
     GST_DEBUG_OBJECT (sink, "posting LEAVE stream status");
@@ -399,6 +399,7 @@ gst_audio_sink_ring_buffer_acquire (GstAudioRingBuffer * buf,
   GstAudioSink *sink;
   GstAudioSinkClass *csink;
   gboolean result = FALSE;
+  GstAudioClock *clock;
 
   sink = GST_AUDIO_SINK (GST_OBJECT_PARENT (buf));
   csink = GST_AUDIO_SINK_GET_CLASS (sink);
@@ -408,21 +409,15 @@ gst_audio_sink_ring_buffer_acquire (GstAudioRingBuffer * buf,
   if (!result)
     goto could_not_prepare;
 
+  /* our clock will now start from 0 again */
+  clock = GST_AUDIO_CLOCK (GST_AUDIO_BASE_SINK (sink)->provided_clock);
+  gst_audio_clock_reset (clock, 0);
+
   /* set latency to one more segment as we need some headroom */
   spec->seglatency = spec->segtotal + 1;
 
   buf->size = spec->segtotal * spec->segsize;
-
-  buf->memory = g_malloc (buf->size);
-
-  if (buf->spec.type == GST_AUDIO_RING_BUFFER_FORMAT_TYPE_RAW) {
-    gst_audio_format_fill_silence (buf->spec.info.finfo, buf->memory,
-        buf->size);
-  } else {
-    /* FIXME, non-raw formats get 0 as the empty sample */
-    memset (buf->memory, 0, buf->size);
-  }
-
+  buf->memory = g_malloc0 (buf->size);
 
   return TRUE;
 
@@ -480,7 +475,6 @@ thread_failed:
       GST_ERROR_OBJECT (sink, "could not create thread %s", error->message);
     else
       GST_ERROR_OBJECT (sink, "could not create thread for unknown reason");
-    g_clear_error (&error);
     return FALSE;
   }
 }

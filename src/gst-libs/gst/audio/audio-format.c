@@ -35,13 +35,9 @@
 
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
 # define audio_orc_unpack_s16le audio_orc_unpack_s16
-# define audio_orc_unpack_s16le_trunc audio_orc_unpack_s16_trunc
 # define audio_orc_unpack_s16be audio_orc_unpack_s16_swap
-# define audio_orc_unpack_s16be_trunc audio_orc_unpack_s16_swap_trunc
 # define audio_orc_unpack_u16le audio_orc_unpack_u16
-# define audio_orc_unpack_u16le_trunc audio_orc_unpack_u16_trunc
 # define audio_orc_unpack_u16be audio_orc_unpack_u16_swap
-# define audio_orc_unpack_u16be_trunc audio_orc_unpack_u16_swap_trunc
 # define audio_orc_unpack_s24_32le audio_orc_unpack_s24_32
 # define audio_orc_unpack_s24_32be audio_orc_unpack_s24_32_swap
 # define audio_orc_unpack_u24_32le audio_orc_unpack_u24_32
@@ -72,13 +68,9 @@
 # define audio_orc_pack_f64be audio_orc_pack_f64_swap
 #else
 # define audio_orc_unpack_s16le audio_orc_unpack_s16_swap
-# define audio_orc_unpack_s16le_trunc audio_orc_unpack_s16_swap_trunc
 # define audio_orc_unpack_s16be audio_orc_unpack_s16
-# define audio_orc_unpack_s16be_trunc audio_orc_unpack_s16_trunc
 # define audio_orc_unpack_u16le audio_orc_unpack_u16_swap
-# define audio_orc_unpack_u16le_trunc audio_orc_unpack_u16_swap_trunc
 # define audio_orc_unpack_u16be audio_orc_unpack_u16
-# define audio_orc_unpack_u16be_trunc audio_orc_unpack_u16_trunc
 # define audio_orc_unpack_s24_32le audio_orc_unpack_s24_32_swap
 # define audio_orc_unpack_s24_32be audio_orc_unpack_s24_32
 # define audio_orc_unpack_u24_32le audio_orc_unpack_u24_32_swap
@@ -109,49 +101,46 @@
 # define audio_orc_pack_f64be audio_orc_pack_f64
 #endif
 
-#define MAKE_ORC_PACK_UNPACK(fmt,fmt_t)                         \
-static void unpack_ ##fmt (const GstAudioFormatInfo *info,      \
-    GstAudioPackFlags flags, gpointer dest,                     \
-    const gpointer data, gint length) {                         \
-  if (flags & GST_AUDIO_PACK_FLAG_TRUNCATE_RANGE)               \
-    audio_orc_unpack_ ##fmt_t (dest, data, length);             \
-  else                                                          \
-    audio_orc_unpack_ ##fmt (dest, data, length);               \
-}                                                               \
-static void pack_ ##fmt (const GstAudioFormatInfo *info,        \
-    GstAudioPackFlags flags, const gpointer src,                \
-    gpointer data, gint length) {                               \
-  audio_orc_pack_ ##fmt (data, src, length);                    \
+#define MAKE_ORC_PACK_UNPACK(fmt) \
+static void unpack_ ##fmt (const GstAudioFormatInfo *info, \
+    GstAudioPackFlags flags, gpointer dest,                \
+    const gpointer data, gint length) {                    \
+  audio_orc_unpack_ ##fmt (dest, data, length);                  \
+}                                                          \
+static void pack_ ##fmt (const GstAudioFormatInfo *info,   \
+    GstAudioPackFlags flags, const gpointer src,           \
+    gpointer data, gint length) {                          \
+  audio_orc_pack_ ##fmt (data, src, length);                     \
 }
 
 #define PACK_S8 GST_AUDIO_FORMAT_S32, unpack_s8, pack_s8
-MAKE_ORC_PACK_UNPACK (s8, s8_trunc)
+MAKE_ORC_PACK_UNPACK (s8)
 #define PACK_U8 GST_AUDIO_FORMAT_S32, unpack_u8, pack_u8
-    MAKE_ORC_PACK_UNPACK (u8, u8_trunc)
+    MAKE_ORC_PACK_UNPACK (u8)
 #define PACK_S16LE GST_AUDIO_FORMAT_S32, unpack_s16le, pack_s16le
-    MAKE_ORC_PACK_UNPACK (s16le, s16le_trunc)
+    MAKE_ORC_PACK_UNPACK (s16le)
 #define PACK_S16BE GST_AUDIO_FORMAT_S32, unpack_s16be, pack_s16be
-    MAKE_ORC_PACK_UNPACK (s16be, s16be_trunc)
+    MAKE_ORC_PACK_UNPACK (s16be)
 #define PACK_U16LE GST_AUDIO_FORMAT_S32, unpack_u16le, pack_u16le
-    MAKE_ORC_PACK_UNPACK (u16le, u16le_trunc)
+    MAKE_ORC_PACK_UNPACK (u16le)
 #define PACK_U16BE GST_AUDIO_FORMAT_S32, unpack_u16be, pack_u16be
-    MAKE_ORC_PACK_UNPACK (u16be, u16be_trunc)
+    MAKE_ORC_PACK_UNPACK (u16be)
 #define PACK_S24_32LE GST_AUDIO_FORMAT_S32, unpack_s24_32le, pack_s24_32le
-    MAKE_ORC_PACK_UNPACK (s24_32le, s24_32le)
+    MAKE_ORC_PACK_UNPACK (s24_32le)
 #define PACK_S24_32BE GST_AUDIO_FORMAT_S32, unpack_s24_32be, pack_s24_32be
-    MAKE_ORC_PACK_UNPACK (s24_32be, s24_32be)
+    MAKE_ORC_PACK_UNPACK (s24_32be)
 #define PACK_U24_32LE GST_AUDIO_FORMAT_S32, unpack_u24_32le, pack_u24_32le
-    MAKE_ORC_PACK_UNPACK (u24_32le, u24_32le)
+    MAKE_ORC_PACK_UNPACK (u24_32le)
 #define PACK_U24_32BE GST_AUDIO_FORMAT_S32, unpack_u24_32be, pack_u24_32be
-    MAKE_ORC_PACK_UNPACK (u24_32be, u24_32be)
+    MAKE_ORC_PACK_UNPACK (u24_32be)
 #define PACK_S32LE GST_AUDIO_FORMAT_S32, unpack_s32le, pack_s32le
-    MAKE_ORC_PACK_UNPACK (s32le, s32le)
+    MAKE_ORC_PACK_UNPACK (s32le)
 #define PACK_S32BE GST_AUDIO_FORMAT_S32, unpack_s32be, pack_s32be
-    MAKE_ORC_PACK_UNPACK (s32be, s32be)
+    MAKE_ORC_PACK_UNPACK (s32be)
 #define PACK_U32LE GST_AUDIO_FORMAT_S32, unpack_u32le, pack_u32le
-    MAKE_ORC_PACK_UNPACK (u32le, u32le)
+    MAKE_ORC_PACK_UNPACK (u32le)
 #define PACK_U32BE GST_AUDIO_FORMAT_S32, unpack_u32be, pack_u32be
-    MAKE_ORC_PACK_UNPACK (u32be, u32be)
+    MAKE_ORC_PACK_UNPACK (u32be)
 #define SIGNED  (1U<<31)
 /* pack from signed integer 32 to integer */
 #define WRITE24_TO_LE(p,v) p[0] = v & 0xff; p[1] = (v >> 8) & 0xff; p[2] = (v >> 16) & 0xff
@@ -208,13 +197,13 @@ static void pack_ ##name (const GstAudioFormatInfo *info,               \
 #define PACK_U18BE GST_AUDIO_FORMAT_S32, unpack_u18be, pack_u18be
     MAKE_PACK_UNPACK (u18be, 3, SIGNED, 14, READ24_FROM_BE, WRITE24_TO_BE)
 #define PACK_F32LE GST_AUDIO_FORMAT_F64, unpack_f32le, pack_f32le
-    MAKE_ORC_PACK_UNPACK (f32le, f32le)
+    MAKE_ORC_PACK_UNPACK (f32le)
 #define PACK_F32BE GST_AUDIO_FORMAT_F64, unpack_f32be, pack_f32be
-    MAKE_ORC_PACK_UNPACK (f32be, f32be)
+    MAKE_ORC_PACK_UNPACK (f32be)
 #define PACK_F64LE GST_AUDIO_FORMAT_F64, unpack_f64le, pack_f64le
-    MAKE_ORC_PACK_UNPACK (f64le, f64le)
+    MAKE_ORC_PACK_UNPACK (f64le)
 #define PACK_F64BE GST_AUDIO_FORMAT_F64, unpack_f64be, pack_f64be
-    MAKE_ORC_PACK_UNPACK (f64be, f64be)
+    MAKE_ORC_PACK_UNPACK (f64be)
 #define SINT (GST_AUDIO_FORMAT_FLAG_INTEGER | GST_AUDIO_FORMAT_FLAG_SIGNED)
 #define SINT_PACK (SINT | GST_AUDIO_FORMAT_FLAG_UNPACK)
 #define UINT (GST_AUDIO_FORMAT_FLAG_INTEGER)
@@ -236,7 +225,7 @@ static void pack_ ##name (const GstAudioFormatInfo *info,               \
 #define SILENT_U20BE     { 0x08, 0x00, 0x00, 0x08, 0x00, 0x00 }
 #define SILENT_U18LE     { 0x00, 0x00, 0x02, 0x00, 0x00, 0x02 }
 #define SILENT_U18BE     { 0x02, 0x00, 0x00, 0x02, 0x00, 0x00 }
-     static const GstAudioFormatInfo formats[] = {
+     static GstAudioFormatInfo formats[] = {
        {GST_AUDIO_FORMAT_UNKNOWN, "UNKNOWN", "Unknown audio", 0, 0, 0, 0},
        {GST_AUDIO_FORMAT_ENCODED, "ENCODED", "Encoded audio",
            GST_AUDIO_FORMAT_FLAG_COMPLEX, 0, 0, 0},
@@ -374,7 +363,7 @@ gst_audio_format_build_integer (gboolean sign, gint endianness,
   gint i, e;
 
   for (i = 0; i < G_N_ELEMENTS (formats); i++) {
-    const GstAudioFormatInfo *finfo = &formats[i];
+    GstAudioFormatInfo *finfo = &formats[i];
 
     /* must be int */
     if (!GST_AUDIO_FORMAT_INFO_IS_INTEGER (finfo))

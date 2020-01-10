@@ -29,7 +29,6 @@
 #include <glib/gstdio.h>
 #include <glib/gprintf.h>
 
-static gboolean have_theora, have_ogg;
 
 GST_START_TEST (test_disco_init)
 {
@@ -41,67 +40,6 @@ GST_START_TEST (test_disco_init)
   fail_unless (err == NULL);
 
   g_object_unref (dc);
-}
-
-GST_END_TEST;
-
-GST_START_TEST (test_disco_serializing)
-{
-  GError *err = NULL;
-  GstDiscoverer *dc;
-  GstDiscovererInfo *info, *dinfo;
-  gchar *uri;
-  GVariant *serialized, *reserialized;
-  GList *audio_streams;
-  gchar *path =
-      g_build_filename (GST_TEST_FILES_PATH, "theora-vorbis.ogg", NULL);
-
-  /* high timeout, in case we're running under valgrind */
-  dc = gst_discoverer_new (5 * GST_SECOND, &err);
-  fail_unless (dc != NULL);
-  fail_unless (err == NULL);
-
-  uri = gst_filename_to_uri (path, &err);
-  g_free (path);
-  fail_unless (err == NULL);
-
-  info = gst_discoverer_discover_uri (dc, uri, &err);
-  fail_unless (info);
-  if (have_theora && have_ogg) {
-    fail_unless_equals_int (gst_discoverer_info_get_result (info),
-        GST_DISCOVERER_OK);
-  } else {
-    fail_unless_equals_int (gst_discoverer_info_get_result (info),
-        GST_DISCOVERER_MISSING_PLUGINS);
-    g_clear_error (&err);
-    goto missing_plugins;
-  }
-  serialized =
-      gst_discoverer_info_to_variant (info, GST_DISCOVERER_SERIALIZE_ALL);
-
-
-  fail_unless (serialized);
-  dinfo = gst_discoverer_info_from_variant (serialized);
-
-  fail_unless (dinfo);
-  audio_streams = gst_discoverer_info_get_audio_streams (dinfo);
-  fail_unless_equals_int (g_list_length (audio_streams), 1);
-  gst_discoverer_stream_info_list_free (audio_streams);
-
-  reserialized =
-      gst_discoverer_info_to_variant (dinfo, GST_DISCOVERER_SERIALIZE_ALL);
-
-  fail_unless (g_variant_equal (serialized, reserialized));
-
-  gst_discoverer_info_unref (dinfo);
-  g_variant_unref (serialized);
-  g_variant_unref (reserialized);
-
-missing_plugins:
-
-  gst_discoverer_info_unref (info);
-  g_object_unref (dc);
-  g_free (uri);
 }
 
 GST_END_TEST;
@@ -140,6 +78,7 @@ GST_START_TEST (test_disco_sync)
 }
 
 GST_END_TEST;
+
 static void
 test_disco_sync_reuse (const gchar * test_fn, guint num, GstClockTime timeout)
 {
@@ -249,11 +188,6 @@ discoverer_suite (void)
   Suite *s = suite_create ("discoverer");
   TCase *tc_chain = tcase_create ("general");
 
-  have_theora = gst_registry_check_feature_version (gst_registry_get (),
-      "theoradec", GST_VERSION_MAJOR, GST_VERSION_MINOR, 0);
-  have_ogg = gst_registry_check_feature_version (gst_registry_get (),
-      "oggdemux", GST_VERSION_MAJOR, GST_VERSION_MINOR, 0);
-
   suite_add_tcase (s, tc_chain);
   tcase_add_test (tc_chain, test_disco_init);
   tcase_add_test (tc_chain, test_disco_sync);
@@ -261,7 +195,6 @@ discoverer_suite (void)
   tcase_add_test (tc_chain, test_disco_sync_reuse_mp3);
   tcase_add_test (tc_chain, test_disco_sync_reuse_timeout);
   tcase_add_test (tc_chain, test_disco_missing_plugins);
-  tcase_add_test (tc_chain, test_disco_serializing);
   return s;
 }
 

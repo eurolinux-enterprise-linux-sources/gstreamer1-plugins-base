@@ -153,7 +153,8 @@ enum
 enum
 {
   PROP_0,
-  PROP_HANDLE_READ
+  PROP_HANDLE_READ,
+  PROP_LAST
 };
 
 static void gst_multi_fd_sink_stop_pre (GstMultiHandleSink * mhsink);
@@ -952,7 +953,7 @@ gst_multi_fd_sink_handle_clients (GstMultiFdSink * sink)
 
           res = fcntl (fd, F_GETFL, &flags);
           if (res == -1) {
-            GST_WARNING_OBJECT (sink, "fcntl failed for %d, removing: %s (%d)",
+            GST_WARNING_OBJECT (sink, "fnctl failed for %d, removing: %s (%d)",
                 fd, g_strerror (errno), errno);
             if (errno == EBADF) {
               mhclient->status = GST_CLIENT_STATUS_ERROR;

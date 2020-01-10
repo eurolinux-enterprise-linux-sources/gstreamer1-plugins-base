@@ -62,7 +62,6 @@
 #include <gst/video/gstvideofilter.h>
 #include <gst/video/gstvideosink.h>
 #include <gst/video/colorbalance.h>
-#include <gst/video/videodirection.h>
 #include <gst/video/videoorientation.h>
 #include <gst/video/videooverlay.h>
 #include <gst/video/navigation.h>
@@ -83,21 +82,24 @@
 #   include "struct_i386.h"
 #   define HAVE_ABI_SIZES TRUE
 # endif
-#elif defined HAVE_CPU_X86_64
-# include "struct_x86_64.h"
-# define HAVE_ABI_SIZES TRUE
-#elif defined HAVE_CPU_ARM
-# include "struct_arm.h"
-# define HAVE_ABI_SIZES FALSE
-#elif defined HAVE_CPU_PPC
-# include "struct_ppc32.h"
-# define HAVE_ABI_SIZES TRUE
-#elif defined HAVE_CPU_PPC64
-# include "struct_ppc64.h"
-# define HAVE_ABI_SIZES TRUE
+#else
+#ifdef HAVE_CPU_X86_64
+#include "struct_x86_64.h"
+#define HAVE_ABI_SIZES TRUE
+#else
+#ifdef HAVE_CPU_ARM
+#include "struct_arm.h"
+#define HAVE_ABI_SIZES FALSE
+#else
+#ifdef __powerpc__
+#include "struct_ppc32.h"
+#define HAVE_ABI_SIZES TRUE
 #else /* in case someone wants to generate a new arch */
-# include "struct_i386.h"
-# define HAVE_ABI_SIZES FALSE
+#include "struct_i386.h"
+#define HAVE_ABI_SIZES FALSE
+#endif
+#endif
+#endif
 #endif
 
 GST_START_TEST (test_ABI)

@@ -163,7 +163,7 @@ static struct rtsp_header rtsp_headers[] = {
   {"Host", FALSE},
   {"Pragma", TRUE},
   {"X-Server-IP-Address", FALSE},
-  {"x-sessioncookie", FALSE},
+  {"X-Sessioncookie", FALSE},
 
   {"RTCP-Interval", FALSE},
 

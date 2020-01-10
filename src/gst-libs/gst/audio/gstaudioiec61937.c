@@ -114,15 +114,12 @@ gst_audio_iec61937_frame_size (const GstAudioRingBufferSpec * spec)
 
       if (version == 1 && layer == 1)
         frames = 384;
-      else if (version == 2 && layer == 1 && spec->info.rate <= 12000)
+      else if (version == 2 && layer == 1 && spec->info.rate < 32000)
         frames = 768;
-      else if (version == 2 && layer == 2 && spec->info.rate <= 12000)
+      else if (version == 2 && layer == 1 && spec->info.rate < 32000)
         frames = 2304;
-      else {
-        /* MPEG-1 layer 2,3, MPEG-2 with or without extension,
-         * MPEG-2 layer 3 low sample freq. */
+      else
         frames = 1152;
-      }
 
       return frames * 4;
     }
@@ -276,18 +273,17 @@ gst_audio_iec61937_payload (const guint8 * src, guint src_n, guint8 * dst,
        *                            06 = MPEG 2, with extension
        *                            08 - MPEG 2 LSF, Layer 1
        *                            09 - MPEG 2 LSF, Layer 2
-       *                            10 - MPEG 2 LSF, Layer 3
-       *                 FIXME: we don't handle type 06 at the moment */
+       *                            10 - MPEG 2 LSF, Layer 3 */
       if (version == 1 && layer == 1)
         dst[five] = 0x04;
       else if ((version == 1 && (layer == 2 || layer == 3)) ||
-          (version == 2 && spec->info.rate >= 12000))
+          (version == 2 && spec->info.rate >= 32000))
         dst[five] = 0x05;
-      else if (version == 2 && layer == 1 && spec->info.rate < 12000)
+      else if (version == 2 && layer == 1 && spec->info.rate < 32000)
         dst[five] = 0x08;
-      else if (version == 2 && layer == 2 && spec->info.rate < 12000)
+      else if (version == 2 && layer == 2 && spec->info.rate < 32000)
         dst[five] = 0x09;
-      else if (version == 2 && layer == 3 && spec->info.rate < 12000)
+      else if (version == 2 && layer == 3 && spec->info.rate < 32000)
         dst[five] = 0x0A;
       else
         g_return_val_if_reached (FALSE);

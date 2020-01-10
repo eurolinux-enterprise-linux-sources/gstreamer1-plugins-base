@@ -55,7 +55,6 @@ struct _GstXvImageMemory
   GstMemory parent;
 
   gint im_format;
-  GstVideoInfo info;
   GstVideoRectangle crop;
 
   XvImage *xvimage;
@@ -230,7 +229,6 @@ gst_xvimage_memory_share (GstXvImageMemory * mem, gssize offset, gsize size)
       &mem->parent, mem->parent.maxsize, mem->parent.align,
       mem->parent.offset + offset, size);
 
-  sub->info = mem->info;
   sub->im_format = mem->im_format;
   sub->crop = mem->crop;
   sub->xvimage = mem->xvimage;
@@ -258,8 +256,8 @@ gst_xvimage_memory_copy (GstMemory * gmem, gssize offset, gsize size)
 
   copy = (GstXvImageMemory *)
       gst_xvimage_allocator_alloc (GST_XVIMAGE_ALLOCATOR_CAST (gmem->allocator),
-      mem->im_format, &mem->info, mem->xvimage->width,
-      mem->xvimage->height, &mem->crop, NULL);
+      mem->im_format, mem->xvimage->width, mem->xvimage->height, &mem->crop,
+      NULL);
 
   memcpy (copy->xvimage->data + copy->parent.offset,
       mem->xvimage->data + mem->parent.offset, mem->xvimage->data_size);
@@ -342,22 +340,20 @@ gst_xvimage_allocator_peek_context (GstXvImageAllocator * allocator)
 
 GstMemory *
 gst_xvimage_allocator_alloc (GstXvImageAllocator * allocator, gint im_format,
-    const GstVideoInfo * info, gint padded_width, gint padded_height,
-    const GstVideoRectangle * crop, GError ** error)
+    gint padded_width, gint padded_height, GstVideoRectangle * crop,
+    GError ** error)
 {
   int (*handler) (Display *, XErrorEvent *);
   gboolean success = FALSE;
   GstXvContext *context;
-  gint align, offset;
+  gint align = 15, offset;
   GstXvImageMemory *mem;
-  gint expected_size = 0;
 
   context = allocator->context;
 
   mem = g_slice_new (GstXvImageMemory);
 
   mem->im_format = im_format;
-  mem->info = *info;
 #ifdef HAVE_XSHM
   mem->SHMInfo.shmaddr = ((void *) -1);
   mem->SHMInfo.shmid = -1;
@@ -375,6 +371,7 @@ gst_xvimage_allocator_alloc (GstXvImageAllocator * allocator, gint im_format,
 
 #ifdef HAVE_XSHM
   if (context->use_xshm) {
+    int expected_size;
 
     mem->xvimage = XvShmCreateImage (context->disp,
         context->xv_port_id, im_format, NULL, padded_width, padded_height,
@@ -404,47 +401,45 @@ gst_xvimage_allocator_alloc (GstXvImageAllocator * allocator, gint im_format,
 
     /* calculate the expected size.  This is only for sanity checking the
      * number we get from X. */
-    if (GST_VIDEO_FORMAT_INFO_IS_YUV (info->finfo)) {
-      switch (GST_VIDEO_FORMAT_INFO_FORMAT (info->finfo)) {
-        case GST_VIDEO_FORMAT_I420:
-        case GST_VIDEO_FORMAT_YV12:
-        {
-          gint pitches[3];
-          gint offsets[3];
-          guint plane;
+    switch (im_format) {
+      case GST_MAKE_FOURCC ('I', '4', '2', '0'):
+      case GST_MAKE_FOURCC ('Y', 'V', '1', '2'):
+      {
+        gint pitches[3];
+        gint offsets[3];
+        guint plane;
 
-          offsets[0] = 0;
-          pitches[0] = GST_ROUND_UP_4 (padded_width);
-          offsets[1] = offsets[0] + pitches[0] * GST_ROUND_UP_2 (padded_height);
-          pitches[1] = GST_ROUND_UP_8 (padded_width) / 2;
-          offsets[2] =
-              offsets[1] + pitches[1] * GST_ROUND_UP_2 (padded_height) / 2;
-          pitches[2] = GST_ROUND_UP_8 (pitches[0]) / 2;
+        offsets[0] = 0;
+        pitches[0] = GST_ROUND_UP_4 (padded_width);
+        offsets[1] = offsets[0] + pitches[0] * GST_ROUND_UP_2 (padded_height);
+        pitches[1] = GST_ROUND_UP_8 (padded_width) / 2;
+        offsets[2] =
+            offsets[1] + pitches[1] * GST_ROUND_UP_2 (padded_height) / 2;
+        pitches[2] = GST_ROUND_UP_8 (pitches[0]) / 2;
 
-          expected_size =
-              offsets[2] + pitches[2] * GST_ROUND_UP_2 (padded_height) / 2;
+        expected_size =
+            offsets[2] + pitches[2] * GST_ROUND_UP_2 (padded_height) / 2;
 
-          for (plane = 0; plane < mem->xvimage->num_planes; plane++) {
-            GST_DEBUG_OBJECT (allocator,
-                "Plane %u has a expected pitch of %d bytes, " "offset of %d",
-                plane, pitches[plane], offsets[plane]);
-          }
-          break;
+        for (plane = 0; plane < mem->xvimage->num_planes; plane++) {
+          GST_DEBUG_OBJECT (allocator,
+              "Plane %u has a expected pitch of %d bytes, " "offset of %d",
+              plane, pitches[plane], offsets[plane]);
         }
-        case GST_VIDEO_FORMAT_YUY2:
-        case GST_VIDEO_FORMAT_UYVY:
-          expected_size = padded_height * GST_ROUND_UP_4 (padded_width * 2);
-          break;
-        default:
-          break;
+        break;
       }
-    } else if (GST_VIDEO_FORMAT_INFO_IS_RGB (info->finfo) &&
-        GST_VIDEO_FORMAT_INFO_N_PLANES (info->finfo) == 1) {
-      expected_size = padded_height * GST_ROUND_UP_4 (padded_width *
-          GST_VIDEO_FORMAT_INFO_PSTRIDE (info->finfo, 0));
+      case GST_MAKE_FOURCC ('Y', 'U', 'Y', '2'):
+      case GST_MAKE_FOURCC ('U', 'Y', 'V', 'Y'):
+        expected_size = padded_height * GST_ROUND_UP_4 (padded_width * 2);
+        break;
+      default:
+        expected_size = 0;
+        break;
     }
-    if (expected_size != 0 && mem->xvimage->data_size < expected_size)
-      goto unexpected_size;
+    if (expected_size != 0 && mem->xvimage->data_size != expected_size) {
+      GST_WARNING_OBJECT (allocator,
+          "unexpected XShm image size (got %d, expected %d)",
+          mem->xvimage->data_size, expected_size);
+    }
 
     /* Be verbose about our XvImage stride */
     {
@@ -458,9 +453,8 @@ gst_xvimage_allocator_alloc (GstXvImageAllocator * allocator, gint im_format,
     }
 
     /* get shared memory */
-    align = 0;
     mem->SHMInfo.shmid =
-        shmget (IPC_PRIVATE, mem->xvimage->data_size, IPC_CREAT | 0777);
+        shmget (IPC_PRIVATE, mem->xvimage->data_size + align, IPC_CREAT | 0777);
     if (mem->SHMInfo.shmid == -1)
       goto shmget_failed;
 
@@ -495,7 +489,6 @@ gst_xvimage_allocator_alloc (GstXvImageAllocator * allocator, gint im_format,
       goto create_failed;
 
     /* we have to use the returned data_size for our image size */
-    align = 15;                 /* g_malloc aligns to 8, we need 16 */
     mem->xvimage->data = g_malloc (mem->xvimage->data_size + align);
 
     XSync (context->disp, FALSE);
@@ -528,14 +521,6 @@ beach:
   return GST_MEMORY_CAST (mem);
 
   /* ERRORS */
-unexpected_size:
-  {
-    g_mutex_unlock (&context->lock);
-    g_set_error (error, GST_RESOURCE_ERROR, GST_RESOURCE_ERROR_WRITE,
-        "unexpected XShm image size (got %d, expected %d)",
-        mem->xvimage->data_size, expected_size);
-    goto beach;
-  }
 create_failed:
   {
     g_mutex_unlock (&context->lock);
@@ -640,9 +625,9 @@ gst_xvimage_memory_render (GstXvImageMemory * mem, GstVideoRectangle * src_crop,
   }
 #ifdef HAVE_XSHM
   if (context->use_xshm) {
-    GST_LOG ("XvShmPutImage with image %dx%d and window %dx%d, from xvimage %p",
-        src_crop->w, src_crop->h, window->render_rect.w, window->render_rect.h,
-        mem);
+    GST_LOG ("XvShmPutImage with image %dx%d and window %dx%d, from xvimage %"
+        GST_PTR_FORMAT, src_crop->w, src_crop->h,
+        window->render_rect.w, window->render_rect.h, mem);
 
     XvShmPutImage (context->disp,
         context->xv_port_id,

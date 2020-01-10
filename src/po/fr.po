@@ -4,90 +4,92 @@
 #
 # Nicolas Velin <nicolas@velin.fr>, 2008.
 # Claude Paroz <claude@2xlibre.net>, 2008-2011.
-# Stéphane Aulery <lkppo@free.fr>, 2015-2016.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.10.0\n"
+"Project-Id-Version: gst-plugins-base 0.10.32.2\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-12-23 20:39+0100\n"
-"Last-Translator: Stéphane Aulery <lkppo@free.fr>\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2011-04-28 09:19+0200\n"
+"Last-Translator: Claude Paroz <claude@2xlibre.net>\n"
 "Language-Team: French <traduc@traduc.org>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 "Plural-Forms: nplurals=2; plural=n>1;\n"
 
 msgid "Could not open device for playback in mono mode."
-msgstr "Impossible d’utiliser le périphérique pour la lecture en mode mono."
+msgstr "Impossible d'utiliser le périphérique pour la lecture en mode mono."
 
 msgid "Could not open device for playback in stereo mode."
-msgstr "Impossible d’utiliser le périphérique pour la lecture en mode stéréo."
+msgstr "Impossible d'utiliser le périphérique pour la lecture en mode stéréo."
 
 #, c-format
 msgid "Could not open device for playback in %d-channel mode."
 msgstr ""
-"Impossible d’utiliser le périphérique pour la lecture en mode %d voie(s)."
+"Impossible d'utiliser le périphérique pour la lecture en mode %d canaux."
 
 msgid ""
 "Could not open audio device for playback. Device is being used by another "
 "application."
 msgstr ""
-"Impossible d’utiliser le périphérique audio pour la lecture. Celui-ci est "
+"Impossible d'utiliser le périphérique audio pour la lecture. Celui-ci est "
 "occupé par une autre application."
 
 msgid "Could not open audio device for playback."
-msgstr "Impossible d’utiliser le périphérique audio pour la lecture."
+msgstr "Impossible d'utiliser le périphérique audio pour la lecture."
 
 msgid "Error outputting to audio device. The device has been disconnected."
 msgstr ""
-"Erreur de sortie vers le périphérique audio. Le périphérique a été "
-"déconnecté."
 
 msgid "Could not open device for recording in mono mode."
 msgstr ""
-"Impossible d’utiliser le périphérique pour l’enregistrement en mode mono."
+"Impossible d'utiliser le périphérique pour l'enregistrement en mode mono."
 
 msgid "Could not open device for recording in stereo mode."
 msgstr ""
-"Impossible d’utiliser le périphérique pour l’enregistrement en mode stéréo."
+"Impossible d'utiliser le périphérique pour l'enregistrement en mode stéréo."
 
 #, c-format
 msgid "Could not open device for recording in %d-channel mode"
 msgstr ""
-"Impossible d’utiliser le périphérique pour l'enregistrement en mode %d "
-"voie(s)."
+"Impossible d'utiliser le périphérique pour l'enregistrement en mode %d "
+"canaux."
 
 msgid ""
 "Could not open audio device for recording. Device is being used by another "
 "application."
 msgstr ""
-"Impossible d’utiliser le périphérique audio pour l’enregistrement. Celui-ci "
+"Impossible d'utiliser le périphérique audio pour l'enregistrement. Celui-ci "
 "est occupé par une autre application."
 
 msgid "Could not open audio device for recording."
-msgstr "Impossible d’utiliser le périphérique audio pour l’enregistrement."
+msgstr "Impossible d'utiliser le périphérique audio pour l'enregistrement."
 
 msgid "Error recording from audio device. The device has been disconnected."
 msgstr ""
-"Erreur d’enregistrement de puis le périphèrique audio. Le périphèrique a été "
-"déconnecté."
 
 msgid "Could not open CD device for reading."
-msgstr "Impossible d’utiliser le lecteur CD pour la lecture."
+msgstr "Impossible d'utiliser le lecteur CD pour la lecture."
 
 msgid "Could not seek CD."
-msgstr "Impossible de rechercher sur le CD."
+msgstr "Impossible de se positionner sur le CD."
 
 msgid "Could not read CD."
 msgstr "Impossible de lire le CD."
 
+msgid "Internal data stream error."
+msgstr "Erreur interne de flux de données."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
-msgstr "Élément « %s » manquant — Vérifiez votre installation de GStreamer."
+msgstr "Élément « %s » manquant, contrôlez votre installation de GStreamer."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"Un greffon %s est requis pour lire ce flux, mais il n'est pas installé."
 
 msgid "Could not determine type of stream"
 msgstr "Impossible de déterminer le type de flux"
@@ -95,14 +97,9 @@ msgstr "Impossible de déterminer le type de flux"
 msgid "This appears to be a text file"
 msgstr "Ce fichier semble être un fichier texte"
 
+#, fuzzy
 msgid "Could not create \"uridecodebin\" element."
-msgstr "Impossible de créer un élément « uridecodebin »."
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Impossible de créer un élément « decodebin3 »."
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Impossible de créer un élément « urisourcebin »."
+msgstr "Impossible de créer un élément « decodebin »."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -113,17 +110,17 @@ msgstr "L'élément autovideosink est manquant."
 
 #, c-format
 msgid "Configured videosink %s is not working."
-msgstr "L’élément videosink %s configuré ne fonctionne pas."
+msgstr "L'élément videosink configuré %s ne fonctionne pas."
 
 #, c-format
 msgid "Both autovideosink and %s elements are not working."
 msgstr "Les éléments autovideosink et %s ne fonctionnent pas."
 
 msgid "The autovideosink element is not working."
-msgstr "L’élément autovideosink ne fonctionne pas."
+msgstr "L'élément autovideosink ne fonctionne pas."
 
 msgid "Custom text sink element is not usable."
-msgstr "L’élément récepteur de text personnalisé n’est pas utilisable."
+msgstr "L'élément sink text personnalisé n'est pas utilisable."
 
 msgid "No volume control found"
 msgstr "Aucun contrôle de volume trouvé"
@@ -137,24 +134,24 @@ msgstr "L'élément autoaudiosink est manquant."
 
 #, c-format
 msgid "Configured audiosink %s is not working."
-msgstr "L’élément autoaudiosink %s configuré ne fonctionne pas."
+msgstr "L'élément autoaudiosink configuré %s ne fonctionne pas."
 
 #, c-format
 msgid "Both autoaudiosink and %s elements are not working."
 msgstr "Les éléments autoaudiosink et %s ne fonctionnent pas."
 
 msgid "The autoaudiosink element is not working."
-msgstr "L’élément autoaudiosink ne fonctionne pas."
+msgstr "L'élément autoaudiosink ne fonctionne pas."
 
 msgid "Can't play a text file without video or visualizations."
-msgstr "Impossible de lire un fichier texte sans vidéo ou aperçus."
+msgstr "Impossible de lire un fichier texte sans vidéo ou visualisation."
 
 #, c-format
 msgid "No decoder available for type '%s'."
-msgstr "Aucun décodeur n’est disponible pour le type « %s »."
+msgstr "Aucun décodeur n'est disponible pour le type « %s »."
 
 msgid "No URI specified to play from."
-msgstr "Aucun URI source indiquée pour la lecture."
+msgstr "Aucun URI source indiqué pour la lecture."
 
 #, c-format
 msgid "Invalid URI \"%s\"."
@@ -165,17 +162,17 @@ msgstr "Ce type de flux ne peut pas encore être lu."
 
 #, c-format
 msgid "No URI handler implemented for \"%s\"."
-msgstr "Aucun gestionnaire d’URI implémenté pour « %s »."
+msgstr "Aucun gestionnaire d'URI implémenté pour « %s »."
 
 msgid "Source element is invalid."
 msgstr "Élément source non valide."
 
 #, c-format
 msgid "Error while sending data to \"%s:%d\"."
-msgstr "Erreur lors de l’envoi de données vers « %s:%d »."
+msgstr "Erreur lors de l'envoi de données vers « %s:%d »."
 
 msgid "Can't record audio fast enough"
-msgstr "Impossible d’enregistrer assez rapidement les données audio"
+msgstr "Impossible d'enregistrer assez rapidement les données audio"
 
 msgid "This CD has no audio tracks"
 msgstr "Ce CD ne contient aucune piste audio"
@@ -215,19 +212,22 @@ msgid "Run-length encoding"
 msgstr "Codage par plages"
 
 msgid "Timed Text"
-msgstr "Timed Text"
+msgstr ""
 
 msgid "Subtitle"
-msgstr "Sous-titre"
+msgstr ""
 
+#, fuzzy
 msgid "MPL2 subtitle format"
-msgstr "Format de sous-titres MPL2"
+msgstr "Format de sous-titres TMPlayer"
 
+#, fuzzy
 msgid "DKS subtitle format"
-msgstr "Format de sous-titres DKS"
+msgstr "Format de sous-titres Sami"
 
+#, fuzzy
 msgid "QTtext subtitle format"
-msgstr "Format de sous-titres QTtext"
+msgstr "Format de sous-titres Kate"
 
 msgid "Sami subtitle format"
 msgstr "Format de sous-titres Sami"
@@ -238,45 +238,45 @@ msgstr "Format de sous-titres TMPlayer"
 msgid "Kate subtitle format"
 msgstr "Format de sous-titres Kate"
 
-msgid "WebVTT subtitle format"
-msgstr "Format de sous-titres WebVTT"
-
+#, fuzzy
 msgid "Uncompressed video"
-msgstr "Video non compressée"
+msgstr "YUV non compressé"
 
+#, fuzzy
 msgid "Uncompressed gray"
-msgstr "Niveaux de gris non compressés"
+msgstr "Image niveaux de gris non compressée"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Uncompressed packed YUV %s"
-msgstr "YUV empaqueté %s non compressé"
+msgstr "YUV empaqueté 4:2:2 non compressé"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Uncompressed semi-planar YUV %s"
-msgstr "YUV semi-planaire %s non compressé"
+msgstr "YUV planaire 4:2:0 non compressé"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Uncompressed planar YUV %s"
-msgstr "YUV planaire %s non compressé"
+msgstr "YUV planaire 4:2:0 non compressé"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Uncompressed palettized %d-bit %s"
 msgstr "%2$s %1$d bits en palette non compressé"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Uncompressed %d-bit %s"
-msgstr "%2$s %1$d bits non compressé"
+msgstr "%2$s %1$d bits en palette non compressé"
 
 #, c-format
 msgid "DivX MPEG-4 Version %d"
 msgstr "MPEG-4 DivX version %d"
 
+#, fuzzy
 msgid "Uncompressed audio"
-msgstr "Audio non compressé"
+msgstr "YUV non compressé"
 
-#, c-format
+#, fuzzy, c-format
 msgid "Raw %d-bit %s audio"
-msgstr "Audio brut %2$s %1$d bits"
+msgstr "Audio PCM brut %d bits"
 
 msgid "Audio CD source"
 msgstr "Source CD audio"
@@ -332,7 +332,7 @@ msgstr "Multiplexeur %s"
 
 #, c-format
 msgid "%s encoder"
-msgstr "Encodeur %s"
+msgstr "Codeur %s"
 
 #, c-format
 msgid "GStreamer element %s"
@@ -342,7 +342,7 @@ msgid "Unknown source element"
 msgstr "Élément source inconnu"
 
 msgid "Unknown sink element"
-msgstr "Élément d’entrée inconnu"
+msgstr "Élément d'entrée inconnu"
 
 msgid "Unknown element"
 msgstr "Élément inconnu"
@@ -357,7 +357,7 @@ msgid "Plugin or element of unknown type"
 msgstr "Greffon ou élément de type inconnu"
 
 msgid "Failed to read tag: not enough data"
-msgstr "Échec de lecture de l’étiquette : données insuffisantes"
+msgstr "Échec de lecture de l'étiquette : données insuffisantes"
 
 msgid "track ID"
 msgstr "identifiant de piste"
@@ -366,22 +366,22 @@ msgid "MusicBrainz track ID"
 msgstr "identifiant de piste MusicBrainz"
 
 msgid "artist ID"
-msgstr "identifiant d’artiste"
+msgstr "identifiant d'artiste"
 
 msgid "MusicBrainz artist ID"
-msgstr "identifiant d’artiste MusicBrainz"
+msgstr "identifiant d'artiste MusicBrainz"
 
 msgid "album ID"
-msgstr "identifiant d’album"
+msgstr "identifiant d'album"
 
 msgid "MusicBrainz album ID"
-msgstr "identifiant d’album MusicBrainz"
+msgstr "identifiant d'album MusicBrainz"
 
 msgid "album artist ID"
-msgstr "identifiant d’artiste de l’album"
+msgstr "identifiant d'artiste de l'album"
 
 msgid "MusicBrainz album artist ID"
-msgstr "identifiant d’artiste de l’album MusicBrainz"
+msgstr "identifiant d'artiste de l'album MusicBrainz"
 
 msgid "track TRM ID"
 msgstr "identifiant TRM de piste"
@@ -390,88 +390,80 @@ msgid "MusicBrainz TRM ID"
 msgstr "identifiant TRM MusicBrainz"
 
 msgid "capturing shutter speed"
-msgstr "vitesse d’obturation de la capture"
+msgstr "vitesse d'obturation de la capture"
 
 msgid "Shutter speed used when capturing an image, in seconds"
-msgstr "Vitesse d’obturation utilisée lors de la capture de l’image (en s)"
+msgstr ""
+"Vitesse d'obturation utilisée lors de la capture de l'image, en secondes"
 
 # http://www.blog-couleur.com/?Qu-est-ce-que-l-ouverture-en
 msgid "capturing focal ratio"
-msgstr "Focal de capture"
+msgstr "ouverture absolue de la capture"
 
 msgid "Focal ratio (f-number) used when capturing the image"
-msgstr "Focal (nombre décimal) utilisée lors de la capture de l’image"
+msgstr "Ouverture absolue (nombre f) utilisée lors de la capture de l'image"
 
 msgid "capturing focal length"
 msgstr "distance focale de la capture"
 
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr ""
-"Distance focale de l’optique utilisée pour la capture de l’image (en mm)"
-
-msgid "capturing 35 mm equivalent focal length"
-msgstr "distance focale de la capture équivalente à 35 mm"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"Distance focale de l’optique équivalente à 35 mm, utilisée pour la capture "
-"de l’image (en mm)"
+"Distance focale de l'optique utilisée pour la capture de l'image, en mm"
 
 msgid "capturing digital zoom ratio"
 msgstr "valeur du zoom numérique de la capture"
 
 msgid "Digital zoom ratio used when capturing an image"
-msgstr "Valeur du zoom numérique utilisé lors de la capture de l’image"
+msgstr "Valeur du zoom numérique utilisé lors de la capture de l'image"
 
 msgid "capturing iso speed"
-msgstr "sensibilité ISO de la capture"
+msgstr "sensibilité iso de la capture"
 
 msgid "The ISO speed used when capturing an image"
-msgstr "La sensibilité ISO utilisée lors de la capture de l’image"
+msgstr "La sensibilité ISO utilisée lors de la capture de l'image"
 
 msgid "capturing exposure program"
-msgstr "programme d’exposition de la capture"
+msgstr "programme d'exposition de la capture"
 
 msgid "The exposure program used when capturing an image"
-msgstr "Le programme d’exposition utilisé lors de la capture de l’image"
+msgstr "Le programme d'exposition utilisé lors de la capture de l'image"
 
 msgid "capturing exposure mode"
-msgstr "mode d’exposition de la capture"
+msgstr "mode d'exposition de la capture"
 
 msgid "The exposure mode used when capturing an image"
-msgstr "Le mode d'exposition utilisé lors de la capture de l’image"
+msgstr "Le mode d'exposition utilisé lors de la capture de l'image"
 
 msgid "capturing exposure compensation"
-msgstr "compensation d’exposition de la capture"
+msgstr "compensation d'exposition de la capture"
 
 msgid "The exposure compensation used when capturing an image"
-msgstr "La compensation d'exposition utilisée lors de la capture de l’image"
+msgstr "La compensation d'exposition utilisée lors de la capture de l'image"
 
 msgid "capturing scene capture type"
 msgstr "type de mode scène de la capture"
 
 msgid "The scene capture mode used when capturing an image"
-msgstr "Le mode scène utilisé lors de la capture de l’image"
+msgstr "Le mode scène utilisé lors de la capture de l'image"
 
 msgid "capturing gain adjustment"
-msgstr "ajustement du gain de la capture"
+msgstr "ajustement de gain de la capture"
 
 msgid "The overall gain adjustment applied on an image"
-msgstr "L'ajustement général du gain appliqué à une image"
+msgstr "L'ajustement général de gain appliqué à une image"
 
 msgid "capturing white balance"
 msgstr "balance des blancs de la capture"
 
 msgid "The white balance mode set when capturing an image"
-msgstr "Le mode de balance des blancs défini lors de la capture d’une image"
+msgstr "Le mode de balance des blancs défini lors de la capture d'une image"
 
 msgid "capturing contrast"
 msgstr "contraste de la capture"
 
 msgid "The direction of contrast processing applied when capturing an image"
 msgstr ""
-"La direction du traitement de contraste appliqué lors de la capture d’une "
+"La direction du traitement de contraste appliqué lors de la capture d'une "
 "image"
 
 msgid "capturing saturation"
@@ -479,7 +471,7 @@ msgstr "saturation de la capture"
 
 msgid "The direction of saturation processing applied when capturing an image"
 msgstr ""
-"La direction du traitement de saturation appliqué lors de la capture d’une "
+"La direction du traitement de saturation appliqué lors de la capture d'une "
 "image"
 
 msgid "capturing sharpness"
@@ -487,7 +479,7 @@ msgstr "netteté de la capture"
 
 msgid "The direction of sharpness processing applied when capturing an image"
 msgstr ""
-"La direction du traitement de netteté appliqué lors de la capture d’une image"
+"La direction du traitement de netteté appliqué lors de la capture d'une image"
 
 msgid "capturing flash fired"
 msgstr "flash utilisé pour la capture"
@@ -499,22 +491,22 @@ msgid "capturing flash mode"
 msgstr "mode de flash de la capture"
 
 msgid "The selected flash mode while capturing an image"
-msgstr "Le mode de flash sélectionné lors de la capture d’une image"
+msgstr "Le mode de flash sélectionné lors de la capture d'une image"
 
 msgid "capturing metering mode"
-msgstr "mode de mesure de la capture"
+msgstr "mode de msure de la capture"
 
 msgid ""
 "The metering mode used while determining exposure for capturing an image"
 msgstr ""
-"Le mode de mesure utilisé lors de l’évaluation de l’exposition pour la "
-"capture d’une image"
+"Le mode de mesure utilisé lors de l'évaluation de l'exposition pour la "
+"capture d'une image"
 
 msgid "capturing source"
 msgstr "source de capture"
 
 msgid "The source or type of device used for the capture"
-msgstr "La source ou le type d’appareil utilisé pour la capture"
+msgstr "La source ou le type d'appareil utilisé pour la capture"
 
 msgid "image horizontal ppi"
 msgstr "ppp horizontal de l'image"
@@ -533,166 +525,194 @@ msgstr ""
 "par pouce"
 
 msgid "ID3v2 frame"
-msgstr "Frame ID3v2"
+msgstr ""
 
 msgid "unparsed id3v2 tag frame"
-msgstr "frame tag id3v2 non analysé"
+msgstr ""
 
 msgid "musical-key"
-msgstr "Clef-musicale"
+msgstr ""
 
 msgid "Initial key in which the sound starts"
-msgstr "Clef initiale dans laquelle démarre le son"
+msgstr ""
 
 msgid "Print version information and exit"
-msgstr "Affiche la version et quit"
+msgstr ""
 
 msgid ""
 "Don't exit after showing the initial device list, but wait for devices to "
 "added/removed."
 msgstr ""
-"Ne pas quitter après l’affichage de la liste initiale des périphèriques, "
-"mais attendre l’ajout ou la suppression de périphèriques."
-
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Volume : %.0f%%"
 
 msgid "Buffering..."
-msgstr "Mise en cache…"
+msgstr ""
 
 msgid "Clock lost, selecting a new one\n"
-msgstr "Horloge perdu, sélection d’une nouvelle\n"
-
-msgid "Reached end of play list."
-msgstr "Liste de lecture terminée."
-
-msgid "Paused"
-msgstr "En pause"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Lecture en cours de %s\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Fin de piste, préparation du titre suivant : %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Vitesse de lecture : %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Impossible de modifier la vitesse de lecture à %.2f"
-
-msgid "space"
-msgstr "espace"
-
-msgid "pause/unpause"
-msgstr "pause / lecture"
-
-msgid "q or ESC"
-msgstr "q ou ECHAP"
-
-msgid "quit"
-msgstr "quitter"
-
-msgid "> or n"
-msgstr "> ou n"
-
-msgid "play next"
-msgstr "lire la suivante"
-
-msgid "< or b"
-msgstr "< ou b"
-
-msgid "play previous"
-msgstr "lire la précédente"
-
-msgid "seek forward"
-msgstr "chercher en avant"
-
-msgid "seek backward"
-msgstr "chercher en arrière"
-
-msgid "volume up"
-msgstr "augmenter le volume"
-
-msgid "volume down"
-msgstr "baisser le volume"
-
-msgid "increase playback rate"
-msgstr "augmenter la vitesse de lecture"
-
-msgid "decrease playback rate"
-msgstr "baisser la vitesse de lecture"
-
-msgid "change playback direction"
-msgstr "modifier le sens de lecture"
-
-msgid "enable/disable trick modes"
-msgstr "activer / désactiver les astuces"
-
-msgid "change audio track"
-msgstr "modifier la piste audio"
-
-msgid "change video track"
-msgstr "modifier la piste vidéo"
-
-msgid "change subtitle track"
-msgstr "modifier la piste de sous-titre"
-
-msgid "seek to beginning"
-msgstr "chercher depuis le début"
-
-msgid "show keyboard shortcuts"
-msgstr "afficher les raccourcis clavier"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Mode interactif — commandes clavier :"
-
-msgid "Output status information and property notifications"
-msgstr "Afficher des informations sur l’état et les notifications de propriété"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
 msgstr ""
-"Contrôler le comportement de lecture en modifiant la pripriété du "
-"« drapeau » playbin"
 
 msgid "Video sink to use (default is autovideosink)"
-msgstr "Récepteur vidéo à utiliser (autovideosink par défaut)"
+msgstr ""
 
 msgid "Audio sink to use (default is autoaudiosink)"
-msgstr "Récepteur audio à utiliser (autoaudiosink par défaut)"
+msgstr ""
 
 msgid "Enable gapless playback"
-msgstr "Activer la lecture sans blanc"
+msgstr ""
 
 msgid "Shuffle playlist"
-msgstr "Mélanger les morceaux"
+msgstr ""
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Désactiver les commandes interactives au clavier"
+msgid "Interactive control via keyboard"
+msgstr ""
 
 msgid "Volume"
-msgstr "Volume"
+msgstr ""
 
 msgid "Playlist file containing input media files"
-msgstr "Fichier de lecture contenant des fichiers de media d’entrée"
-
-msgid "Do not print any output (apart from errors)"
-msgstr "Ne pas afficher de message en sortie (sauf les erreurs)"
+msgstr ""
 
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
-msgstr "Usage : %s FICHIER1|URI1 [FICHIER2|URI2] [FICHIER3|URI3] …"
+msgstr ""
 
 msgid "You must provide at least one filename or URI to play."
-msgstr "Vous devez fournir au moins un nom de fichier ou une URI à lire."
+msgstr ""
 
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Pressez k pour voir la liste des raccourcis clavier.\n"
+#, fuzzy
+#~ msgid "Uncompressed %s YUV %s"
+#~ msgstr "YUV non compressé"
 
-#~ msgid "Internal data stream error."
-#~ msgstr "Erreur du flux de données interne."
+#~ msgid "Master"
+#~ msgstr "Volume général"
+
+#~ msgid "Bass"
+#~ msgstr "Basses"
+
+#~ msgid "Treble"
+#~ msgstr "Aiguës"
+
+#~ msgid "PCM"
+#~ msgstr "PCM"
+
+#~ msgid "Synth"
+#~ msgstr "Synth"
+
+#~ msgid "Line-in"
+#~ msgstr "Entrée ligne"
+
+#~ msgid "CD"
+#~ msgstr "CD"
+
+#~ msgid "Microphone"
+#~ msgstr "Micro"
+
+#~ msgid "PC Speaker"
+#~ msgstr "Haut-parleur PC"
+
+#~ msgid "Playback"
+#~ msgstr "Lecture"
+
+#~ msgid "Capture"
+#~ msgstr "Enregistrement"
+
+#~ msgid "Connection to %s:%d refused."
+#~ msgstr "Connexion refusée vers %s:%d."
+
+#~ msgid "Uncompressed planar YVU 4:2:0"
+#~ msgstr "YVU planaire 4:2:0 non compressé"
+
+#~ msgid "Uncompressed packed YUV 4:1:0"
+#~ msgstr "YUV empaqueté 4:1:0 non compressé"
+
+#~ msgid "Uncompressed packed YVU 4:1:0"
+#~ msgstr "YVU empaqueté 4:1:0 non compressé"
+
+#~ msgid "Uncompressed packed YUV 4:1:1"
+#~ msgstr "YUV empaqueté 4:1:1 non compressé"
+
+#~ msgid "Uncompressed packed YUV 4:4:4"
+#~ msgstr "YUV empaqueté 4:4:4 non compressé"
+
+#~ msgid "Uncompressed planar YUV 4:2:2"
+#~ msgstr "YUV planaire 4:2:2 non compressé"
+
+#~ msgid "Uncompressed planar YUV 4:1:1"
+#~ msgstr "YUV planaire 4:1:1 non compressé"
+
+#~ msgid "Uncompressed black and white Y-plane"
+#~ msgstr "Plan Y noir et blanc non compressé"
+
+#~ msgid "Raw PCM audio"
+#~ msgstr "Audio PCM brut"
+
+#~ msgid "Raw %d-bit floating-point audio"
+#~ msgstr "Audio brut virgule flottante %d bits"
+
+#~ msgid "Raw floating-point audio"
+#~ msgstr "Audio brut virgule flottante"
+
+#~ msgid "Could not open vfs file \"%s\" for writing: %s."
+#~ msgstr "Impossible d'ouvrir le fichier vfs « %s » en écriture : %s."
+
+#~ msgid "No filename given"
+#~ msgstr "Aucun nom de fichier indiqué"
+
+#~ msgid "Could not close vfs file \"%s\"."
+#~ msgstr "Impossible de fermer le fichier vfs « %s »."
+
+#~ msgid "Error while writing to file \"%s\"."
+#~ msgstr "Erreur lors de l'écriture dans le fichier « %s »."
+
+#~ msgid "Invalid subtitle URI \"%s\", subtitles disabled."
+#~ msgstr ""
+#~ "URI de sous-titres « %s » non valide, les sous-titres sont désactivés."
+
+#~ msgid "RTSP streams cannot be played yet."
+#~ msgstr "Il n'est pas encore possible de lire les flux RTSP."
+
+#~ msgid ""
+#~ "Only a subtitle stream was detected. Either you are loading a subtitle "
+#~ "file or some other type of text file, or the media file was not "
+#~ "recognized."
+#~ msgstr ""
+#~ "Seul un flux de sous-titres a été détecté. Soit vous essayez d'ouvrir un "
+#~ "fichier de sous-titres ou un autre type de fichier texte, soit le fichier "
+#~ "multimédia n'a pas été reconnu."
+
+#~ msgid ""
+#~ "You do not have a decoder installed to handle this file. You might need "
+#~ "to install the necessary plugins."
+#~ msgstr ""
+#~ "Aucun décodeur n'est installé pour gérer ce fichier. Vous devriez "
+#~ "probablement installer des greffons supplémentaires."
+
+#~ msgid "This is not a media file"
+#~ msgstr "Ceci n'est pas un fichier multimédia"
+
+#~ msgid "A subtitle stream was detected, but no video stream."
+#~ msgstr "Un flux de sous-titres a été détecté, mais pas de flux vidéo."
+
+#~ msgid "Both autovideosink and xvimagesink elements are missing."
+#~ msgstr "Les éléments autovideosink et xvimagesink sont tous deux manquants."
+
+#~ msgid "Both autoaudiosink and alsasink elements are missing."
+#~ msgstr "Les éléments autoaudiosink et alsasink sont tous deux manquants."
+
+#~ msgid "No device specified."
+#~ msgstr "Aucun périphérique indiqué."
+
+#~ msgid "Device \"%s\" does not exist."
+#~ msgstr "Le périphérique « %s » n'existe pas."
+
+#~ msgid "Device \"%s\" is already being used."
+#~ msgstr "Le périphérique « %s » est déjà en cours d'utilisation."
+
+#~ msgid "Could not open device \"%s\" for reading and writing."
+#~ msgstr "Impossible d'ouvrir le périphérique « %s » en lecture et écriture."
+
+#~ msgid "Error while sending gdp header data to \"%s:%d\"."
+#~ msgstr "Erreur lors de l'envoi de données d'en-tête gdp vers « %s:%d »."
+
+#~ msgid "Error while sending gdp payload data to \"%s:%d\"."
+#~ msgstr ""
+#~ "Erreur lors de l'envoi de données de charge utile gdp vers « %s:%d »."

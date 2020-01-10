@@ -2,13 +2,13 @@
 # Copyright (C) 2014 Free Software Foundation, Inc.
 # This file is distributed under the same license as the gst-plugins-base package.
 # Danilo Segan <dsegan@gmx.net>, 2004.
-# Мирослав Николић <miroslavnikolic@rocketmail.com>, 2011—2016.
+# Мирослав Николић <miroslavnikolic@rocketmail.com>, 2011—2014.
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base-1.10.0\n"
+"Project-Id-Version: gst-plugins-base-1.4.1\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-12-04 14:32+0200\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-09-13 10:45+0200\n"
 "Last-Translator: Мирослав Николић <miroslavnikolic@rocketmail.com>\n"
 "Language-Team: Serbian <(nothing)>\n"
 "Language: sr\n"
@@ -17,7 +17,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
 "%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Не могу да отворим уређај ради пуштања у моно режиму."
@@ -74,9 +73,16 @@ msgstr "Не могу да премотам ЦД."
 msgid "Could not read CD."
 msgstr "Не могу да читам ЦД."
 
+msgid "Internal data stream error."
+msgstr "Унутрашња грешка тока података."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr "Недостаје елемент „%s“ — проверите вашу инсталацију Гстримера."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr "За пуштање овог тока потребан је прикључак „%s“, али није инсталиран."
 
 msgid "Could not determine type of stream"
 msgstr "Не могу да утврдим врсту тока"
@@ -85,13 +91,7 @@ msgid "This appears to be a text file"
 msgstr "Изгледа да је ово текстуална датотека"
 
 msgid "Could not create \"uridecodebin\" element."
-msgstr "Не могу да направим „uridecodebin“ елемент."
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Не могу да направим „decodebin3“ елемент."
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Не могу да направим „urisourcebin“ елемент."
+msgstr "Не могу да направим „уридекодебин“ елемент."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -225,9 +225,6 @@ msgstr "ТМПлејер запис превода"
 
 msgid "Kate subtitle format"
 msgstr "Кејт запис превода"
-
-msgid "WebVTT subtitle format"
-msgstr "ВебВТТ запис превода"
 
 msgid "Uncompressed video"
 msgstr "Несажети снимак"
@@ -395,15 +392,6 @@ msgstr "жижна даљина снимања"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Жижна даљина објектива коришћеног за снимање слика, у мииметрима"
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr "еквивалентна жижна даљина снимања 35 mm"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"Еквивалентна 35 mm жижна даљина објектива коришћеног за снимање слика, у "
-"мииметрима"
-
 msgid "capturing digital zoom ratio"
 msgstr "однос дигиталног зума снимања"
 
@@ -529,109 +517,11 @@ msgstr ""
 "Не излази након показивања почетног списка уређаја, већ чека да уређаји буду "
 "додати/уклоњени."
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Јачина звука: %.0f%%"
-
 msgid "Buffering..."
 msgstr "Смештам у међумеморију..."
 
 msgid "Clock lost, selecting a new one\n"
 msgstr "Сат је изгубљен, бирам нови\n"
-
-msgid "Reached end of play list."
-msgstr "Стигох до краја списка нумера."
-
-msgid "Paused"
-msgstr "Паузирано"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Сада пуштам „%s“\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Ускоро завршавам, припремам следећу нумеру: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Проток пуштања: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Не могу да променим проток пуштања на %.2f"
-
-msgid "space"
-msgstr "размак"
-
-msgid "pause/unpause"
-msgstr "паузира/отпаузира"
-
-msgid "q or ESC"
-msgstr "ку или ЕСК"
-
-msgid "quit"
-msgstr "излази"
-
-msgid "> or n"
-msgstr "> или н"
-
-msgid "play next"
-msgstr "пушта следеће"
-
-msgid "< or b"
-msgstr "< или б"
-
-msgid "play previous"
-msgstr "пушта претходно"
-
-msgid "seek forward"
-msgstr "премотава унапред"
-
-msgid "seek backward"
-msgstr "премотава уназад"
-
-msgid "volume up"
-msgstr "појачава јачину звука"
-
-msgid "volume down"
-msgstr "смањује јачину звука"
-
-msgid "increase playback rate"
-msgstr "повећава проток пуштања"
-
-msgid "decrease playback rate"
-msgstr "смањује проток пуштања"
-
-msgid "change playback direction"
-msgstr "мења смер пуштања"
-
-msgid "enable/disable trick modes"
-msgstr "укључује/искључује трик режиме"
-
-msgid "change audio track"
-msgstr "мења звучну нумеру"
-
-msgid "change video track"
-msgstr "мења видео нумеру"
-
-msgid "change subtitle track"
-msgstr "мења запис превода"
-
-msgid "seek to beginning"
-msgstr "премотава на почетак"
-
-msgid "show keyboard shortcuts"
-msgstr "приказује пречице тастатуре"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Међудејствени режим — управљање тастатуром:"
-
-msgid "Output status information and property notifications"
-msgstr "Исписује податке о стању и обавештења о власништву"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
-msgstr "Управља понашањем пуштања подешавајући „flags“ својство плејбина"
 
 msgid "Video sink to use (default is autovideosink)"
 msgstr "Усаглашавање снимка за коришћење (основно је „autovideosink“)"
@@ -645,17 +535,14 @@ msgstr "Укључује пуштање без застоја"
 msgid "Shuffle playlist"
 msgstr "Меша списак нумера"
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Искључује међудејствено управљање путем тастатуре"
+msgid "Interactive control via keyboard"
+msgstr "Међудејствено управљање путем тастатуре"
 
 msgid "Volume"
 msgstr "Јачина звука"
 
 msgid "Playlist file containing input media files"
 msgstr "Датотека списка нумера садржи датотеке улазних медија"
-
-msgid "Do not print any output (apart from errors)"
-msgstr "Не исписује никакав излаз (осим грешака)"
 
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
@@ -665,13 +552,3 @@ msgstr ""
 msgid "You must provide at least one filename or URI to play."
 msgstr ""
 "Морате да доставите барем један назив датотеке или путању да бисте пустили."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Притисните „k“ да видите списак пречица тастатуре.\n"
-
-#~ msgid "Internal data stream error."
-#~ msgstr "Унутрашња грешка тока података."
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr ""
-#~ "За пуштање овог тока потребан је прикључак „%s“, али није инсталиран."

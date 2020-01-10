@@ -2,23 +2,22 @@
 # This file is put in the public domain.
 #
 # Kjartan Maraas <kmaraas@gnome.org>, 2004-2010.
-# Johnny A. Solbu <johnny@solbu.net>, 2012-2017
+# Johnny A. Solbu <johnny@solbu.net>, 2012,
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.10.0\n"
+"Project-Id-Version: gst-plugins-base 1.4.0\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2017-01-05 01:29+0100\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-07-22 12:38+0100\n"
 "Last-Translator: Johnny A. Solbu <johnny@solbu.net>\n"
 "Language-Team: Norwegian Bokmaal <i18n-nb@lister.ping.uio.no>\n"
 "Language: nb_NO\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 1.8.7.1\n"
+"X-Generator: Poedit 1.5.4\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Kunne ikke åpne enheten for avspilling i mono-modus."
@@ -74,9 +73,18 @@ msgstr "Kunne ikke søke på CD."
 msgid "Could not read CD."
 msgstr "Kunne ikke lese CD."
 
+msgid "Internal data stream error."
+msgstr "Intern feil i datastrøm."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr "Mangler elementet «%s» - kontroller GStreamer-installasjonen."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"Et %s-tillegg kreves for å spille av denne strømmen, men det er ikke "
+"installert."
 
 msgid "Could not determine type of stream"
 msgstr "Kunne ikke bestemme type strøm."
@@ -86,12 +94,6 @@ msgstr "Dette ser ut som en tekstfil"
 
 msgid "Could not create \"uridecodebin\" element."
 msgstr "Kunne ikke opprette elementet «uridecodebin»"
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Kunne ikke opprette elementet «decodebin3»"
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Kunne ikke opprette elementet «urisourcebin»"
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -225,9 +227,6 @@ msgstr "TMPlayer undertekstformat"
 
 msgid "Kate subtitle format"
 msgstr "Kate undertekstformat"
-
-msgid "WebVTT subtitle format"
-msgstr "WebVTT undertekstformat"
 
 msgid "Uncompressed video"
 msgstr "Ukomprimert video"
@@ -395,14 +394,6 @@ msgstr "opptaksbrennvidde"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Brennvidden til objektivet som brukes når du tar bildet, i mm"
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr "35 mm ekvivalent opptaksbrennvidde"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"35 mm ekvivalent brennvidde til objektivet som brukes når du tar bildet, i mm"
-
 msgid "capturing digital zoom ratio"
 msgstr "fanger digitalt zoomforhold"
 
@@ -529,109 +520,11 @@ msgstr ""
 "Ikke avslutt etter å ha vist den første enheteslisten, men vent på at "
 "enheter blir lagt til/fjernet."
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Volum: %.0f%%"
-
 msgid "Buffering..."
 msgstr "Bufrer ..."
 
 msgid "Clock lost, selecting a new one\n"
 msgstr "Klokke tapt, velger en ny\n"
-
-msgid "Reached end of play list."
-msgstr "Nådde slutten av spillelisten."
-
-msgid "Paused"
-msgstr "Pauset"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Spiller nå %s\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "I ferd med å fullføre, forbereder neste tittel: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Avspillingshastighet: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Kunne ikke endre avspillingshastigheten til %.2f"
-
-msgid "space"
-msgstr "avstand"
-
-msgid "pause/unpause"
-msgstr "pause/opphev pause"
-
-msgid "q or ESC"
-msgstr "q eller ESC"
-
-msgid "quit"
-msgstr "Avslutt"
-
-msgid "> or n"
-msgstr "> eller n"
-
-msgid "play next"
-msgstr "spill neste"
-
-msgid "< or b"
-msgstr "< eller b"
-
-msgid "play previous"
-msgstr "spill forige"
-
-msgid "seek forward"
-msgstr "søk forover"
-
-msgid "seek backward"
-msgstr "søk bakover"
-
-msgid "volume up"
-msgstr "Volum opp"
-
-msgid "volume down"
-msgstr "volum opp"
-
-msgid "increase playback rate"
-msgstr "øk avspillingshastigheten"
-
-msgid "decrease playback rate"
-msgstr "reduser avspillingshastigheten"
-
-msgid "change playback direction"
-msgstr "endre avspillingsretningen"
-
-msgid "enable/disable trick modes"
-msgstr "aktivere/deaktivere trikse-moduser\t"
-
-msgid "change audio track"
-msgstr "endre lydspor"
-
-msgid "change video track"
-msgstr "endre videospor"
-
-msgid "change subtitle track"
-msgstr "endre undertekstspor"
-
-msgid "seek to beginning"
-msgstr "Søk til begynnelsen"
-
-msgid "show keyboard shortcuts"
-msgstr "vis hurtigtaster"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Interaktiv modus - tastaturkontroller:"
-
-msgid "Output status information and property notifications"
-msgstr "Utdata-statusinformasjon og egenskapsvarslinger"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
-msgstr "Kontroller avspillingsoppførsel ved å sette playbin «flagg»-egenskap"
 
 msgid "Video sink to use (default is autovideosink)"
 msgstr "Video-sink som skal brukes (standard er autovideosink)"
@@ -645,8 +538,8 @@ msgstr "Aktiver sømløs avspilling"
 msgid "Shuffle playlist"
 msgstr "Stokke spilleliste"
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Deaktiver interaktiv kontroll via tastaturet"
+msgid "Interactive control via keyboard"
+msgstr "Interaktiv kontroll via tastatur"
 
 msgid "Volume"
 msgstr "Volum"
@@ -654,26 +547,12 @@ msgstr "Volum"
 msgid "Playlist file containing input media files"
 msgstr "Spillelistefil som inneholder inngangsmediefiler"
 
-msgid "Do not print any output (apart from errors)"
-msgstr "Ikke skriv noe utdata (bortsett fra feil)"
-
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
 msgstr "Bruk: %s FIL1|URI1 [FILE|URI2] [FILE|URI3] ..."
 
 msgid "You must provide at least one filename or URI to play."
 msgstr "Du må ha med minst ett filnavn eller nettadresse å spille."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Trykk «k» for å se en liste over hurtigtaster.\n"
-
-#~ msgid "Internal data stream error."
-#~ msgstr "Intern feil i datastrøm."
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr ""
-#~ "Et %s-tillegg kreves for å spille av denne strømmen, men det er ikke "
-#~ "installert."
 
 #~ msgid "Uncompressed %s YUV %s"
 #~ msgstr "Ukomprimert %s YUV %s"

@@ -148,19 +148,16 @@ gst_ogg_parse_new_stream (GstOggParse * parser, ogg_page * page)
   if (ogg_stream_init (&stream->stream, serialno) != 0) {
     GST_ERROR ("Could not initialize ogg_stream struct for serial %08x.",
         serialno);
-    goto failure;
+    return NULL;
   }
 
-  if (ogg_stream_pagein (&stream->stream, page) != 0)
-    goto failure;
+  /* FIXME check return */
+  ogg_stream_pagein (&stream->stream, page);
 
+  /* FIXME check return */
   ret = ogg_stream_packetout (&stream->stream, &packet);
   if (ret == 1) {
-    if (!gst_ogg_stream_setup_map (stream, &packet)) {
-      GST_ERROR ("Could not setup map for ogg packet.");
-      goto failure;
-    }
-
+    gst_ogg_stream_setup_map (stream, &packet);
     if (stream->is_video) {
       parser->video_stream = stream;
     }
@@ -169,10 +166,6 @@ gst_ogg_parse_new_stream (GstOggParse * parser, ogg_page * page)
   parser->oggstreams = g_slist_append (parser->oggstreams, stream);
 
   return stream;
-
-failure:
-  free_stream (stream);
-  return NULL;
 }
 
 static GstOggStream *
@@ -232,10 +225,10 @@ gst_ogg_parse_base_init (gpointer g_class)
       "parse ogg streams into pages (info about ogg: http://xiph.org)",
       "Michael Smith <msmith@fluendo.com>");
 
-  gst_element_class_add_static_pad_template (element_class,
-      &ogg_parse_sink_template_factory);
-  gst_element_class_add_static_pad_template (element_class,
-      &ogg_parse_src_template_factory);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&ogg_parse_sink_template_factory));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&ogg_parse_src_template_factory));
 }
 
 static void
@@ -484,10 +477,6 @@ gst_ogg_parse_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
         }
 
         stream = gst_ogg_parse_new_stream (ogg, &page);
-        if (!stream) {
-          GST_LOG_OBJECT (ogg, "Incorrect page");
-          goto failure;
-        }
 
         ogg->last_page_not_bos = FALSE;
 

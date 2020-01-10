@@ -103,7 +103,6 @@
 #endif
 
 #include <gst/gst-i18n-plugin.h>
-#include <gst/net/gstnetcontrolmessagemeta.h>
 
 #include <string.h>
 
@@ -136,14 +135,10 @@ enum
   LAST_SIGNAL
 };
 
-#define DEFAULT_SEND_DISPATCHED FALSE
-#define DEFAULT_SEND_MESSAGES   FALSE
-
 enum
 {
   PROP_0,
-  PROP_SEND_DISPATCHED,
-  PROP_SEND_MESSAGES,
+
   PROP_LAST
 };
 
@@ -185,17 +180,12 @@ static void gst_multi_socket_sink_hash_adding (GstMultiHandleSink * mhsink,
     GstMultiHandleClient * mhclient);
 static void gst_multi_socket_sink_hash_removing (GstMultiHandleSink * mhsink,
     GstMultiHandleClient * mhclient);
-static void gst_multi_socket_sink_stop_sending (GstMultiSocketSink * sink,
-    GstSocketClient * client);
 
 static gboolean gst_multi_socket_sink_socket_condition (GstMultiSinkHandle
     handle, GIOCondition condition, GstMultiSocketSink * sink);
 
 static gboolean gst_multi_socket_sink_unlock (GstBaseSink * bsink);
 static gboolean gst_multi_socket_sink_unlock_stop (GstBaseSink * bsink);
-
-static gboolean gst_multi_socket_sink_propose_allocation (GstBaseSink * bsink,
-    GstQuery * query);
 
 static void gst_multi_socket_sink_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
@@ -224,41 +214,6 @@ gst_multi_socket_sink_class_init (GstMultiSocketSinkClass * klass)
   gobject_class->set_property = gst_multi_socket_sink_set_property;
   gobject_class->get_property = gst_multi_socket_sink_get_property;
   gobject_class->finalize = gst_multi_socket_sink_finalize;
-
-  /**
-   * GstMultiSocketSink:send-dispatched:
-   *
-   * Sends a GstNetworkMessageDispatched event upstream whenever a buffer
-   * is sent to a client.
-   * The event is a CUSTOM event name GstNetworkMessageDispatched and
-   * contains:
-   *
-   *   "object"  G_TYPE_OBJECT     : the object identifying the client
-   *   "buffer"  GST_TYPE_BUFFER   : the buffer sent to the client
-   *
-   * Since: 1.8.0
-   */
-  g_object_class_install_property (gobject_class, PROP_SEND_DISPATCHED,
-      g_param_spec_boolean ("send-dispatched", "Send Dispatched",
-          "If GstNetworkMessageDispatched events should be pushed",
-          DEFAULT_SEND_DISPATCHED, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-  /**
-   * GstMultiSocketSink:send-messages:
-   *
-   * Sends a GstNetworkMessage event upstream whenever a buffer
-   * is received from a client.
-   * The event is a CUSTOM event name GstNetworkMessage and contains:
-   *
-   *   "object"  G_TYPE_OBJECT     : the object identifying the client
-   *   "buffer"  GST_TYPE_BUFFER   : the buffer with data received from the
-   *                                 client
-   *
-   * Since: 1.8.0
-   */
-  g_object_class_install_property (gobject_class, PROP_SEND_MESSAGES,
-      g_param_spec_boolean ("send-messages", "Send Messages",
-          "If GstNetworkMessage events should be pushed", DEFAULT_SEND_MESSAGES,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   /**
    * GstMultiSocketSink::add:
@@ -370,7 +325,7 @@ gst_multi_socket_sink_class_init (GstMultiSocketSinkClass * klass)
   gst_multi_socket_sink_signals[SIGNAL_CLIENT_REMOVED] =
       g_signal_new ("client-removed", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, g_cclosure_marshal_generic,
-      G_TYPE_NONE, 2, G_TYPE_SOCKET, GST_TYPE_CLIENT_STATUS);
+      G_TYPE_NONE, 2, G_TYPE_INT, GST_TYPE_CLIENT_STATUS);
   /**
    * GstMultiSocketSink::client-socket-removed:
    * @gstmultisocketsink: the multisocketsink element that emitted this signal
@@ -399,8 +354,6 @@ gst_multi_socket_sink_class_init (GstMultiSocketSinkClass * klass)
   gstbasesink_class->unlock = GST_DEBUG_FUNCPTR (gst_multi_socket_sink_unlock);
   gstbasesink_class->unlock_stop =
       GST_DEBUG_FUNCPTR (gst_multi_socket_sink_unlock_stop);
-  gstbasesink_class->propose_allocation =
-      GST_DEBUG_FUNCPTR (gst_multi_socket_sink_propose_allocation);
 
   klass->add = GST_DEBUG_FUNCPTR (gst_multi_socket_sink_add);
   klass->add_full = GST_DEBUG_FUNCPTR (gst_multi_socket_sink_add_full);
@@ -448,8 +401,6 @@ gst_multi_socket_sink_init (GstMultiSocketSink * this)
   mhsink->handle_hash = g_hash_table_new (g_direct_hash, g_int_equal);
 
   this->cancellable = g_cancellable_new ();
-  this->send_dispatched = DEFAULT_SEND_DISPATCHED;
-  this->send_messages = DEFAULT_SEND_MESSAGES;
 }
 
 static void
@@ -603,197 +554,50 @@ static gboolean
 gst_multi_socket_sink_handle_client_read (GstMultiSocketSink * sink,
     GstSocketClient * client)
 {
-  gboolean ret, do_event;
-  gchar dummy[256], *mem, *omem;
+  gboolean ret;
+  gchar dummy[256];
   gssize nread;
   GError *err = NULL;
   gboolean first = TRUE;
   GstMultiHandleClient *mhclient = (GstMultiHandleClient *) client;
-  gssize navail, maxmem;
 
   GST_DEBUG_OBJECT (sink, "%s select reports client read", mhclient->debug);
 
   ret = TRUE;
 
-  navail = g_socket_get_available_bytes (mhclient->handle.socket);
-  if (navail < 0)
-    return TRUE;
-
-  /* only collect the data in a buffer when we need to send it with an event */
-  do_event = sink->send_messages && navail > 0;
-  if (do_event) {
-    omem = mem = g_malloc (navail);
-    maxmem = navail;
-  } else {
-    mem = dummy;
-    maxmem = sizeof (dummy);
-  }
-
   /* just Read 'n' Drop, could also just drop the client as it's not supposed
    * to write to us except for closing the socket, I guess it's because we
    * like to listen to our customers. */
   do {
+    gssize navail;
+
     GST_DEBUG_OBJECT (sink, "%s client wants us to read", mhclient->debug);
 
-    nread =
-        g_socket_receive (mhclient->handle.socket, mem, MIN (navail,
-            maxmem), sink->cancellable, &err);
+    navail = g_socket_get_available_bytes (mhclient->handle.socket);
+    if (navail < 0)
+      break;
 
+    nread =
+        g_socket_receive (mhclient->handle.socket, dummy, MIN (navail,
+            sizeof (dummy)), sink->cancellable, &err);
     if (first && nread == 0) {
       /* client sent close, so remove it */
       GST_DEBUG_OBJECT (sink, "%s client asked for close, removing",
           mhclient->debug);
       mhclient->status = GST_CLIENT_STATUS_CLOSED;
       ret = FALSE;
-      break;
     } else if (nread < 0) {
-      if (err->code == G_IO_ERROR_WOULD_BLOCK)
-        break;
-
       GST_WARNING_OBJECT (sink, "%s could not read: %s",
           mhclient->debug, err->message);
       mhclient->status = GST_CLIENT_STATUS_ERROR;
       ret = FALSE;
       break;
     }
-    navail -= nread;
-    if (do_event)
-      mem += nread;
     first = FALSE;
-  } while (navail > 0);
+  } while (nread > 0);
   g_clear_error (&err);
 
-  if (do_event) {
-    if (ret) {
-      GstBuffer *buf;
-      GstEvent *ev;
-
-      buf = gst_buffer_new_wrapped (omem, maxmem);
-      ev = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM,
-          gst_structure_new ("GstNetworkMessage",
-              "object", G_TYPE_OBJECT, mhclient->handle.socket,
-              "buffer", GST_TYPE_BUFFER, buf, NULL));
-      gst_buffer_unref (buf);
-
-      gst_pad_push_event (GST_BASE_SINK_PAD (sink), ev);
-    } else
-      g_free (omem);
-  }
   return ret;
-}
-
-/**
- * map_memory_output_vector_n:
- * @buf: The #GstBuffer that should be mapped
- * @offset: Offset into the buffer that should be mapped
- * @vectors: (out,array length=num_vectors): an array of #GOutputVector structs to write into
- * @mapinfo: (out,array length=num_vectors): an array of #GstMapInfo structs to write into
- * @num_vectors: the number of elements in @vectors to prevent buffer overruns
- *
- * Maps a buffer into memory, populating a #GOutputVector to use scatter-gather
- * I/O to send the data over a socket.  The whole buffer won't be mapped into
- * memory if it consists of more than @num_vectors #GstMemory s.
- *
- * Use #unmap_n_memorys after you are
- * finished with the mappings.
- *
- * Returns: The number of GstMemorys mapped
- */
-static int
-map_n_memory_output_vector (GstBuffer * buf, size_t offset,
-    GOutputVector * vectors, GstMapInfo * mapinfo, int num_vectors)
-{
-  guint mem_idx, mem_len;
-  gsize mem_skip;
-  size_t maxsize;
-  int i;
-
-  g_return_val_if_fail (num_vectors > 0, 0);
-  memset (vectors, 0, sizeof (GOutputVector) * num_vectors);
-
-  maxsize = gst_buffer_get_size (buf) - offset;
-  if (!gst_buffer_find_memory (buf, offset, maxsize, &mem_idx, &mem_len,
-          &mem_skip))
-    g_error ("Unable to map memory at offset %" G_GSIZE_FORMAT ", buffer "
-        "length is %" G_GSIZE_FORMAT, offset, gst_buffer_get_size (buf));
-
-  for (i = 0; i < mem_len && i < num_vectors; i++) {
-    GstMapInfo map = { 0 };
-    GstMemory *mem = gst_buffer_peek_memory (buf, mem_idx + i);
-    if (!gst_memory_map (mem, &map, GST_MAP_READ))
-      g_error ("Unable to map memory %p.  This should never happen.", mem);
-
-    if (i == 0) {
-      vectors[i].buffer = map.data + mem_skip;
-      vectors[i].size = map.size - mem_skip;
-    } else {
-      vectors[i].buffer = map.data;
-      vectors[i].size = map.size;
-    }
-    mapinfo[i] = map;
-  }
-  return i;
-}
-
-/**
- * map_n_memory_output_vector:
- * @buf: The #GstBuffer that should be mapped
- * @offset: Offset into the buffer that should be mapped
- * @vectors: (out,array length=num_vectors): an array of #GOutputVector structs to write into
- * @num_vectors: the number of elements in @vectors to prevent buffer overruns
- *
- * Returns: The number of GstMemorys mapped
- */
-static void
-unmap_n_memorys (GstMapInfo * mapinfo, int num_mappings)
-{
-  int i;
-  g_return_if_fail (num_mappings > 0);
-
-  for (i = 0; i < num_mappings; i++)
-    gst_memory_unmap (mapinfo[i].memory, &mapinfo[i]);
-}
-
-static gsize
-gst_buffer_get_cmsg_list (GstBuffer * buf, GSocketControlMessage ** msgs,
-    gsize msg_space)
-{
-  gpointer iter_state = NULL;
-  GstMeta *meta;
-  gsize msg_count = 0;
-
-  while ((meta = gst_buffer_iterate_meta (buf, &iter_state)) != NULL
-      && msg_count < msg_space) {
-    if (meta->info->api == GST_NET_CONTROL_MESSAGE_META_API_TYPE)
-      msgs[msg_count++] = ((GstNetControlMessageMeta *) meta)->message;
-  }
-
-  return msg_count;
-}
-
-#define CMSG_MAX 255
-
-static gssize
-gst_multi_socket_sink_write (GstMultiSocketSink * sink,
-    GSocket * sock, GstBuffer * buffer, gsize bufoffset,
-    GCancellable * cancellable, GError ** err)
-{
-  GstMapInfo maps[8];
-  GOutputVector vec[8];
-  guint mems_mapped;
-  gssize wrote;
-  GSocketControlMessage *cmsgs[CMSG_MAX];
-  gsize msg_count;
-
-  mems_mapped = map_n_memory_output_vector (buffer, bufoffset, vec, maps, 8);
-
-  msg_count = gst_buffer_get_cmsg_list (buffer, cmsgs, CMSG_MAX);
-
-  wrote =
-      g_socket_send_message (sock, NULL, vec, mems_mapped, cmsgs, msg_count, 0,
-      cancellable, err);
-  unmap_n_memorys (maps, mems_mapped);
-  return wrote;
 }
 
 /* Handle a write on a client,
@@ -840,12 +644,19 @@ gst_multi_socket_sink_handle_client_write (GstMultiSocketSink * sink,
 
   more = TRUE;
   do {
+    gint maxsize;
+
     if (!mhclient->sending) {
       /* client is not working on a buffer */
       if (mhclient->bufpos == -1) {
         /* client is too fast, remove from write queue until new buffer is
          * available */
-        gst_multi_socket_sink_stop_sending (sink, client);
+        /* FIXME: specific */
+        if (client->source) {
+          g_source_destroy (client->source);
+          g_source_unref (client->source);
+          client->source = NULL;
+        }
 
         /* if we flushed out all of the client buffers, we can stop */
         if (mhclient->flushcount == 0)
@@ -869,7 +680,13 @@ gst_multi_socket_sink_handle_client_write (GstMultiSocketSink * sink,
             mhclient->bufpos = position;
           } else {
             /* cannot send data to this client yet */
-            gst_multi_socket_sink_stop_sending (sink, client);
+            /* FIXME: specific */
+            if (client->source) {
+              g_source_destroy (client->source);
+              g_source_unref (client->source);
+              client->source = NULL;
+            }
+
             return TRUE;
           }
         }
@@ -908,12 +725,22 @@ gst_multi_socket_sink_handle_client_write (GstMultiSocketSink * sink,
     if (mhclient->sending) {
       gssize wrote;
       GstBuffer *head;
+      GstMapInfo map;
 
       /* pick first buffer from list */
       head = GST_BUFFER (mhclient->sending->data);
 
-      wrote = gst_multi_socket_sink_write (sink, mhclient->handle.socket, head,
-          mhclient->bufoffset, sink->cancellable, &err);
+      gst_buffer_map (head, &map, GST_MAP_READ);
+      maxsize = map.size - mhclient->bufoffset;
+
+      /* FIXME: specific */
+      /* try to write the complete buffer */
+
+      wrote =
+          g_socket_send (mhclient->handle.socket,
+          (gchar *) map.data + mhclient->bufoffset, maxsize, sink->cancellable,
+          &err);
+      gst_buffer_unmap (head, &map);
 
       if (wrote < 0) {
         /* hmm error.. */
@@ -924,25 +751,17 @@ gst_multi_socket_sink_handle_client_write (GstMultiSocketSink * sink,
           GST_LOG_OBJECT (sink, "write would block %p",
               mhclient->handle.socket);
           more = FALSE;
-          g_clear_error (&err);
         } else {
           goto write_error;
         }
       } else {
-        if (wrote < (gst_buffer_get_size (head) - mhclient->bufoffset)) {
+        if (wrote < maxsize) {
           /* partial write, try again now */
           GST_LOG_OBJECT (sink,
               "partial write on %p of %" G_GSSIZE_FORMAT " bytes",
               mhclient->handle.socket, wrote);
           mhclient->bufoffset += wrote;
         } else {
-          if (sink->send_dispatched) {
-            gst_pad_push_event (GST_BASE_SINK_PAD (mhsink),
-                gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM,
-                    gst_structure_new ("GstNetworkMessageDispatched",
-                        "object", G_TYPE_OBJECT, mhclient->handle.socket,
-                        "buffer", GST_TYPE_BUFFER, head, NULL)));
-          }
           /* complete buffer was written, we can proceed to the next one */
           mhclient->sending = g_slist_remove (mhclient->sending, head);
           gst_buffer_unref (head);
@@ -986,58 +805,37 @@ write_error:
 }
 
 static void
-ensure_condition (GstMultiSocketSink * sink, GstSocketClient * client,
-    GIOCondition condition)
-{
-  GstMultiHandleClient *mhclient = (GstMultiHandleClient *) client;
-
-  if (client->condition == condition)
-    return;
-
-  if (client->source) {
-    g_source_destroy (client->source);
-    g_source_unref (client->source);
-  }
-  if (condition && sink->main_context) {
-    client->source = g_socket_create_source (mhclient->handle.socket,
-        condition, sink->cancellable);
-    g_source_set_callback (client->source,
-        (GSourceFunc) gst_multi_socket_sink_socket_condition,
-        gst_object_ref (sink), (GDestroyNotify) gst_object_unref);
-    g_source_attach (client->source, sink->main_context);
-  } else {
-    client->source = NULL;
-    condition = 0;
-  }
-  client->condition = condition;
-}
-
-static void
 gst_multi_socket_sink_hash_adding (GstMultiHandleSink * mhsink,
     GstMultiHandleClient * mhclient)
 {
   GstMultiSocketSink *sink = GST_MULTI_SOCKET_SINK (mhsink);
   GstSocketClient *client = (GstSocketClient *) (mhclient);
 
-  ensure_condition (sink, client,
-      G_IO_IN | G_IO_OUT | G_IO_PRI | G_IO_ERR | G_IO_HUP);
+  if (!sink->main_context)
+    return;
+
+  if (!client->source) {
+    client->source =
+        g_socket_create_source (mhclient->handle.socket,
+        G_IO_IN | G_IO_OUT | G_IO_PRI | G_IO_ERR | G_IO_HUP, sink->cancellable);
+    g_source_set_callback (client->source,
+        (GSourceFunc) gst_multi_socket_sink_socket_condition,
+        gst_object_ref (sink), (GDestroyNotify) gst_object_unref);
+    g_source_attach (client->source, sink->main_context);
+  }
 }
 
 static void
 gst_multi_socket_sink_hash_removing (GstMultiHandleSink * mhsink,
     GstMultiHandleClient * mhclient)
 {
-  GstMultiSocketSink *sink = GST_MULTI_SOCKET_SINK (mhsink);
   GstSocketClient *client = (GstSocketClient *) (mhclient);
 
-  ensure_condition (sink, client, 0);
-}
-
-static void
-gst_multi_socket_sink_stop_sending (GstMultiSocketSink * sink,
-    GstSocketClient * client)
-{
-  ensure_condition (sink, client, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
+  if (client->source) {
+    g_source_destroy (client->source);
+    g_source_unref (client->source);
+    client->source = NULL;
+  }
 }
 
 /* Handle the clients. This is called when a socket becomes ready
@@ -1085,16 +883,14 @@ gst_multi_socket_sink_socket_condition (GstMultiSinkHandle handle,
     gst_multi_handle_sink_remove_client_link (mhsink, clink);
     ret = FALSE;
     goto done;
-  }
-  if ((condition & G_IO_IN) || (condition & G_IO_PRI)) {
+  } else if ((condition & G_IO_IN) || (condition & G_IO_PRI)) {
     /* handle client read */
     if (!gst_multi_socket_sink_handle_client_read (sink, client)) {
       gst_multi_handle_sink_remove_client_link (mhsink, clink);
       ret = FALSE;
       goto done;
     }
-  }
-  if ((condition & G_IO_OUT)) {
+  } else if ((condition & G_IO_OUT)) {
     /* handle client write */
     if (!gst_multi_socket_sink_handle_client_write (sink, client)) {
       gst_multi_handle_sink_remove_client_link (mhsink, clink);
@@ -1175,15 +971,8 @@ static void
 gst_multi_socket_sink_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstMultiSocketSink *sink = GST_MULTI_SOCKET_SINK (object);
-
   switch (prop_id) {
-    case PROP_SEND_DISPATCHED:
-      sink->send_dispatched = g_value_get_boolean (value);
-      break;
-    case PROP_SEND_MESSAGES:
-      sink->send_messages = g_value_get_boolean (value);
-      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -1194,15 +983,7 @@ static void
 gst_multi_socket_sink_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstMultiSocketSink *sink = GST_MULTI_SOCKET_SINK (object);
-
   switch (prop_id) {
-    case PROP_SEND_DISPATCHED:
-      g_value_set_boolean (value, sink->send_dispatched);
-      break;
-    case PROP_SEND_MESSAGES:
-      g_value_set_boolean (value, sink->send_messages);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -1288,18 +1069,7 @@ gst_multi_socket_sink_unlock_stop (GstBaseSink * bsink)
   sink = GST_MULTI_SOCKET_SINK (bsink);
 
   GST_DEBUG_OBJECT (sink, "unset flushing");
-  g_object_unref (sink->cancellable);
-  sink->cancellable = g_cancellable_new ();
-
-  return TRUE;
-}
-
-static gboolean
-gst_multi_socket_sink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
-{
-  /* we support some meta */
-  gst_query_add_allocation_meta (query, GST_NET_CONTROL_MESSAGE_META_API_TYPE,
-      NULL);
+  g_cancellable_reset (sink->cancellable);
 
   return TRUE;
 }

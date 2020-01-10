@@ -42,36 +42,11 @@ typedef struct
 
 static gboolean bus_msg_handler (GstBus * bus, GstMessage * msg, gpointer data);
 
-static gboolean
-print_structure_field (GQuark field_id, const GValue * value,
-    gpointer user_data)
-{
-  gchar *val;
-
-  if (G_VALUE_HOLDS_UINT (value)) {
-    val = g_strdup_printf ("%u (0x%08x)", g_value_get_uint (value),
-        g_value_get_uint (value));
-  } else {
-    val = gst_value_serialize (value);
-  }
-
-  if (val != NULL)
-    g_print ("\n\t\t%s = %s", g_quark_to_string (field_id), val);
-  else
-    g_print ("\n\t\t%s - could not serialise field of type %s",
-        g_quark_to_string (field_id), G_VALUE_TYPE_NAME (value));
-
-  g_free (val);
-
-  return TRUE;
-}
-
 static void
 device_added (GstDevice * device)
 {
-  gchar *device_class, *str, *name;
+  gchar *device_class, *caps_str, *name;
   GstCaps *caps;
-  GstStructure *props;
   guint i, size = 0;
 
   caps = gst_device_get_caps (device);
@@ -80,23 +55,17 @@ device_added (GstDevice * device)
 
   name = gst_device_get_display_name (device);
   device_class = gst_device_get_device_class (device);
-  props = gst_device_get_properties (device);
 
   g_print ("\nDevice found:\n\n");
   g_print ("\tname  : %s\n", name);
   g_print ("\tclass : %s\n", device_class);
   for (i = 0; i < size; ++i) {
     GstStructure *s = gst_caps_get_structure (caps, i);
-    str = gst_structure_to_string (s);
-    g_print ("\t%s %s\n", (i == 0) ? "caps  :" : "       ", str);
-    g_free (str);
+    caps_str = gst_structure_to_string (s);
+    g_print ("\t%s %s\n", (i == 0) ? "caps  :" : "       ", caps_str);
+    g_free (caps_str);
   }
-  if (props) {
-    g_print ("\tproperties:");
-    gst_structure_foreach (props, print_structure_field, NULL);
-    gst_structure_free (props);
-    g_print ("\n");
-  }
+
   g_print ("\n");
 
   g_free (name);
@@ -128,12 +97,10 @@ bus_msg_handler (GstBus * bus, GstMessage * msg, gpointer user_data)
     case GST_MESSAGE_DEVICE_ADDED:
       gst_message_parse_device_added (msg, &device);
       device_added (device);
-      gst_object_unref (device);
       break;
     case GST_MESSAGE_DEVICE_REMOVED:
       gst_message_parse_device_removed (msg, &device);
       device_removed (device);
-      gst_object_unref (device);
       break;
     default:
       g_print ("%s message\n", GST_MESSAGE_TYPE_NAME (msg));
@@ -181,8 +148,6 @@ main (int argc, char **argv)
   g_option_context_add_group (ctx, gst_init_get_option_group ());
   if (!g_option_context_parse (ctx, &argc, &argv, &err)) {
     g_print ("Error initializing: %s\n", GST_STR_NULL (err->message));
-    g_option_context_free (ctx);
-    g_clear_error (&err);
     return 1;
   }
   g_option_context_free (ctx);
@@ -227,16 +192,13 @@ main (int argc, char **argv)
       g_strfreev (filters);
     }
   }
-  g_strfreev (args);
 
   g_print ("Probing devices...\n\n");
 
   timer = g_timer_new ();
 
-  if (!gst_device_monitor_start (app.monitor)) {
-    g_printerr ("Failed to start device monitor!\n");
-    return -1;
-  }
+  if (!gst_device_monitor_start (app.monitor))
+    g_error ("Failed to start device monitor!");
 
   GST_INFO ("Took %.2f seconds", g_timer_elapsed (timer, NULL));
 
@@ -247,7 +209,7 @@ main (int argc, char **argv)
 
       device_added (device);
       gst_object_unref (device);
-      devices = g_list_delete_link (devices, devices);
+      devices = g_list_remove_link (devices, devices);
     }
   } else {
     g_print ("No devices found!\n");

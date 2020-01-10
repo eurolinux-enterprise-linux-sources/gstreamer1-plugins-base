@@ -218,20 +218,12 @@ gst_audio_ring_buffer_parse_caps (GstAudioRingBufferSpec * spec, GstCaps * caps)
             gst_structure_get_int (structure, "channels", &info.channels)))
       goto parse_error;
 
-    if (!(gst_audio_channel_positions_from_mask (info.channels, 0,
-                info.position)))
-      goto parse_error;
-
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_A_LAW;
     info.bpf = info.channels;
   } else if (g_str_equal (mimetype, "audio/x-mulaw")) {
     /* extract the needed information from the cap */
     if (!(gst_structure_get_int (structure, "rate", &info.rate) &&
             gst_structure_get_int (structure, "channels", &info.channels)))
-      goto parse_error;
-
-    if (!(gst_audio_channel_positions_from_mask (info.channels, 0,
-                info.position)))
       goto parse_error;
 
     spec->type = GST_AUDIO_RING_BUFFER_FORMAT_TYPE_MU_LAW;
@@ -683,7 +675,7 @@ gst_audio_ring_buffer_release (GstAudioRingBuffer * buf)
   buf->acquired = FALSE;
 
   /* if this fails, something is wrong in this file */
-  g_assert (buf->open);
+  g_assert (buf->open == TRUE);
 
   rclass = GST_AUDIO_RING_BUFFER_GET_CLASS (buf);
   if (G_LIKELY (rclass->release))
@@ -918,7 +910,7 @@ gst_audio_ring_buffer_start (GstAudioRingBuffer * buf)
   if (G_UNLIKELY (!buf->acquired))
     goto not_acquired;
 
-  if (G_UNLIKELY (!g_atomic_int_get (&buf->may_start)))
+  if (G_UNLIKELY (g_atomic_int_get (&buf->may_start) == FALSE))
     goto may_not_start;
 
   /* if stopped, set to started */
@@ -1285,7 +1277,7 @@ wait_segment (GstAudioRingBuffer * buf)
   if (G_UNLIKELY (g_atomic_int_get (&buf->state) !=
           GST_AUDIO_RING_BUFFER_STATE_STARTED)) {
     /* see if we are allowed to start it */
-    if (G_UNLIKELY (!g_atomic_int_get (&buf->may_start)))
+    if (G_UNLIKELY (g_atomic_int_get (&buf->may_start) == FALSE))
       goto no_start;
 
     GST_DEBUG_OBJECT (buf, "start!");
@@ -1733,8 +1725,8 @@ gst_audio_ring_buffer_read (GstAudioRingBuffer * buf, guint64 sample,
        * reading) */
       diff = segdone - readseg;
 
-      GST_DEBUG_OBJECT
-          (buf, "pointer at %d, sample %" G_GUINT64_FORMAT
+      GST_DEBUG
+          ("pointer at %d, sample %" G_GUINT64_FORMAT
           ", read from %d-%d, to_read %d, diff %d, segtotal %d, segsize %d",
           segdone, sample, readseg, sampleoff, to_read, diff, segtotal,
           segsize);
@@ -1846,7 +1838,7 @@ gst_audio_ring_buffer_prepare_read (GstAudioRingBuffer * buf, gint * segment,
   *len = buf->spec.segsize;
   *readptr = data + *segment * *len;
 
-  GST_LOG_OBJECT (buf, "prepare read from segment %d (real %d) @%p",
+  GST_LOG ("prepare read from segment %d (real %d) @%p",
       *segment, segdone, *readptr);
 
   /* callback to fill the memory with data, for pull based
@@ -1916,7 +1908,7 @@ gst_audio_ring_buffer_clear (GstAudioRingBuffer * buf, gint segment)
   data = buf->memory;
   data += segment * buf->spec.segsize;
 
-  GST_LOG_OBJECT (buf, "clear segment %d @%p", segment, data);
+  GST_LOG ("clear segment %d @%p", segment, data);
 
   memcpy (data, buf->empty_seg, buf->spec.segsize);
 }
@@ -1938,23 +1930,6 @@ gst_audio_ring_buffer_may_start (GstAudioRingBuffer * buf, gboolean allowed)
 
   GST_LOG_OBJECT (buf, "may start: %d", allowed);
   g_atomic_int_set (&buf->may_start, allowed);
-}
-
-/* GST_AUDIO_CHANNEL_POSITION_NONE is used for position-less
- * mutually exclusive channels. In this case we should not attempt
- * to do any reordering.
- */
-static gboolean
-position_less_channels (const GstAudioChannelPosition * pos, guint channels)
-{
-  guint i;
-
-  for (i = 0; i < channels; i++) {
-    if (pos[i] != GST_AUDIO_CHANNEL_POSITION_NONE)
-      return FALSE;
-  }
-
-  return TRUE;
 }
 
 /**
@@ -1982,11 +1957,6 @@ gst_audio_ring_buffer_set_channel_positions (GstAudioRingBuffer * buf,
   if (memcmp (position, to, channels * sizeof (to[0])) == 0)
     return;
 
-  if (position_less_channels (position, channels)) {
-    GST_LOG_OBJECT (buf, "position-less channels, no need to reorder");
-    return;
-  }
-
   buf->need_reorder = FALSE;
   if (!gst_audio_get_channel_reorder_map (channels, position, to,
           buf->channel_reorder_map))
@@ -1994,19 +1964,6 @@ gst_audio_ring_buffer_set_channel_positions (GstAudioRingBuffer * buf,
 
   for (i = 0; i < channels; i++) {
     if (buf->channel_reorder_map[i] != i) {
-#ifndef GST_DISABLE_GST_DEBUG
-      {
-        gchar *tmp1, *tmp2;
-
-        tmp1 = gst_audio_channel_positions_to_string (position, channels);
-        tmp2 = gst_audio_channel_positions_to_string (to, channels);
-        GST_LOG_OBJECT (buf, "may have to reorder channels: %s -> %s", tmp1,
-            tmp2);
-        g_free (tmp1);
-        g_free (tmp2);
-      }
-#endif /* GST_DISABLE_GST_DEBUG */
-
       buf->need_reorder = TRUE;
       break;
     }

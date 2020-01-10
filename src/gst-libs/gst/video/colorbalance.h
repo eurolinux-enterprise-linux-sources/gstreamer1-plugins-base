@@ -60,7 +60,7 @@ typedef enum
 /**
  * GstColorBalanceInterface:
  * @iface: the parent interface
- * @get_balance_type: implementation type
+ * @balance_type: implementation type
  * @list_channels: list handled channels
  * @set_value: set a channel value
  * @get_value: get a channel value

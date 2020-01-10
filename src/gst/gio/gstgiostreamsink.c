@@ -33,8 +33,8 @@
  * The following example writes the received data to a #GMemoryOutputStream.
  * |[
 
-#include <gst/gst.h>
-#include <gio/gio.h>
+#include &lt;gst/gst.h&gt;
+#include &lt;gio/gio.h&gt;
 
 ...
 

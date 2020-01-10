@@ -195,8 +195,6 @@ gst_tag_list_from_id3v2_tag (GstBuffer * buffer)
   guint8 flags;
   guint16 version;
 
-  gst_tag_register_musicbrainz_tags ();
-
   read_size = gst_tag_get_id3v2_tag_size (buffer);
 
   /* Ignore tag if it has no frames attached, but skip the header then */
@@ -236,16 +234,10 @@ gst_tag_list_from_id3v2_tag (GstBuffer * buffer)
   work.hdr.size = read_size;
   work.hdr.flags = flags;
   work.hdr.frame_data = info.data + ID3V2_HDR_SIZE;
-
-  if (flags & ID3V2_HDR_FLAG_FOOTER) {
-    if (read_size < ID3V2_HDR_SIZE + 10)
-      goto not_enough_data;     /* Invalid frame size */
+  if (flags & ID3V2_HDR_FLAG_FOOTER)
     work.hdr.frame_data_size = read_size - ID3V2_HDR_SIZE - 10;
-  } else {
-    if (read_size < ID3V2_HDR_SIZE)
-      goto not_enough_data;     /* Invalid frame size */
+  else
     work.hdr.frame_data_size = read_size - ID3V2_HDR_SIZE;
-  }
 
   /* in v2.3 the frame sizes are not syncsafe, so the entire tag had to be
    * unsynced. In v2.4 the frame sizes are syncsafe so it's just the frame

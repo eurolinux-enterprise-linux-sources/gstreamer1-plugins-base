@@ -37,7 +37,6 @@ gen_video_element (void)
   element = gst_bin_new ("vbin");
   conv = gst_element_factory_make ("videoconvert", "conv");
   sink = gst_element_factory_make (DEFAULT_VIDEOSINK, "sink");
-  g_assert (sink);
 
   gst_bin_add (GST_BIN (element), conv);
   gst_bin_add (GST_BIN (element), sink);
@@ -61,7 +60,6 @@ gen_audio_element (void)
   element = gst_bin_new ("abin");
   conv = gst_element_factory_make ("audioconvert", "conv");
   sink = gst_element_factory_make (DEFAULT_AUDIOSINK, "sink");
-  g_assert (sink);
 
   gst_bin_add (GST_BIN (element), conv);
   gst_bin_add (GST_BIN (element), sink);
@@ -75,7 +73,7 @@ gen_audio_element (void)
 }
 
 static void
-pad_added_cb (GstElement * decodebin, GstPad * pad, gpointer data)
+cb_newpad (GstElement * decodebin, GstPad * pad, gboolean last, gpointer data)
 {
   GstCaps *caps;
   GstStructure *str;
@@ -139,18 +137,11 @@ link_failed:
   }
 }
 
-static void
-error_eos_cb (GstBus * bus, GstMessage * msg, GMainLoop * main_loop)
-{
-  g_main_loop_quit (main_loop);
-}
-
 gint
 main (gint argc, gchar * argv[])
 {
   GstElement *pipeline, *filesrc, *decodebin;
   GstStateChangeReturn res;
-  GstBus *bus;
 
   gst_init (&argc, &argv);
 
@@ -161,15 +152,8 @@ main (gint argc, gchar * argv[])
   decodebin = gst_element_factory_make ("decodebin", "decodebin");
   g_assert (decodebin);
 
-  loop = g_main_loop_new (NULL, TRUE);
-  bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
-  gst_bus_add_signal_watch (bus);
-
-  g_signal_connect (bus, "message::eos", G_CALLBACK (error_eos_cb), loop);
-  g_signal_connect (bus, "message::error", G_CALLBACK (error_eos_cb), loop);
-
-  g_signal_connect (G_OBJECT (decodebin), "pad-added",
-      G_CALLBACK (pad_added_cb), pipeline);
+  g_signal_connect (G_OBJECT (decodebin), "new-decoded-pad",
+      G_CALLBACK (cb_newpad), pipeline);
 
   gst_bin_add_many (GST_BIN (pipeline), filesrc, decodebin, NULL);
   gst_element_link (filesrc, decodebin);
@@ -178,12 +162,7 @@ main (gint argc, gchar * argv[])
     g_print ("usage: %s <uri>\n", argv[0]);
     exit (-1);
   }
-
-  if (!g_str_has_prefix (argv[1], "file://")) {
-    g_object_set (G_OBJECT (filesrc), "location", argv[1], NULL);
-  } else {
-    g_object_set (G_OBJECT (filesrc), "location", argv[1] + 7, NULL);
-  }
+  g_object_set (G_OBJECT (filesrc), "location", argv[1], NULL);
 
   /* set to paused, decodebin will autoplug and signal new_pad callbacks */
   res = gst_element_set_state (pipeline, GST_STATE_PAUSED);
@@ -207,6 +186,7 @@ main (gint argc, gchar * argv[])
   }
 
   /* go in the mainloop now */
+  loop = g_main_loop_new (NULL, TRUE);
   g_main_loop_run (loop);
 
   return 0;

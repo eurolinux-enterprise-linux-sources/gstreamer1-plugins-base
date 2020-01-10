@@ -29,8 +29,8 @@
  * <refsect2>
  * <title>Examples</title>
  * |[
- * gst-launch-1.0 -v filesrc location=test.mkv ! matroskademux name=demux ! video/x-h264 ! queue ! decodebin ! subtitleoverlay name=overlay ! videoconvert ! autovideosink  demux. ! subpicture/x-dvd ! queue ! overlay.
- * ]| This will play back the given Matroska file with h264 video and dvd subpicture style subtitles.
+ * gst-launch -v filesrc location=test.mkv ! matroskademux name=demux ! "video/x-h264" ! queue2 ! decodebin ! subtitleoverlay name=overlay ! videoconvert ! autovideosink  demux. ! "subpicture/x-dvd" ! queue2 ! overlay.
+ * ]| This will play back the given Matroska file with h264 video and subpicture subtitles.
  * </refsect2>
  */
 
@@ -157,20 +157,6 @@ unblock_subtitle (GstSubtitleOverlay * self)
   }
 }
 
-static gboolean
-pad_supports_caps (GstPad * pad, GstCaps * caps)
-{
-  GstCaps *pad_caps;
-  gboolean ret = FALSE;
-
-  pad_caps = gst_pad_query_caps (pad, NULL);
-  if (gst_caps_is_subset (caps, pad_caps))
-    ret = TRUE;
-  gst_caps_unref (pad_caps);
-
-  return ret;
-}
-
 static void
 gst_subtitle_overlay_finalize (GObject * object)
 {
@@ -253,7 +239,7 @@ _is_video_pad (GstPad * pad, gboolean * hw_accelerated)
     caps = gst_pad_query_caps (pad, NULL);
   }
 
-  for (i = 0; i < gst_caps_get_size (caps) && !ret; i++) {
+  for (i = 0; i < gst_caps_get_size (caps) && ret == FALSE; i++) {
     name = gst_structure_get_name (gst_caps_get_structure (caps, i));
     if (g_str_equal (name, "video/x-raw")) {
       ret = TRUE;
@@ -429,10 +415,6 @@ gst_subtitle_overlay_create_factory_caps (void)
     if (_factory_caps)
       gst_caps_unref (_factory_caps);
     _factory_caps = gst_caps_new_empty ();
-
-    /* The caps is cached */
-    GST_MINI_OBJECT_FLAG_SET (_factory_caps,
-        GST_MINI_OBJECT_FLAG_MAY_BE_LEAKED);
 
     factories = gst_registry_feature_filter (registry,
         (GstPluginFeatureFilter) _factory_filter, FALSE, &_factory_caps);
@@ -931,8 +913,6 @@ _link_renderer (GstSubtitleOverlay * self, GstElement * renderer,
     sink = _get_video_pad (renderer);
     if (G_UNLIKELY (!sink)) {
       GST_WARNING_OBJECT (self, "Can't get video sink from renderer");
-      if (video_caps)
-        gst_caps_unref (video_caps);
       return FALSE;
     }
     allowed_caps = gst_pad_query_caps (sink, NULL);
@@ -1024,17 +1004,10 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   GstCaps *subcaps;
   GList *l, *factories = NULL;
 
-  if (GST_IS_EVENT (info->data)) {
-    if (!GST_EVENT_IS_SERIALIZED (info->data)) {
-      GST_DEBUG_OBJECT (pad, "Letting non-serialized event %s pass",
-          GST_EVENT_TYPE_NAME (info->data));
-      return GST_PAD_PROBE_PASS;
-    }
-    if (GST_EVENT_TYPE (info->data) == GST_EVENT_STREAM_START) {
-      GST_DEBUG_OBJECT (pad, "Letting event %s pass",
-          GST_EVENT_TYPE_NAME (info->data));
-      return GST_PAD_PROBE_PASS;
-    }
+  if (GST_IS_EVENT (info->data) && !GST_EVENT_IS_SERIALIZED (info->data)) {
+    GST_DEBUG_OBJECT (pad, "Letting non-serialized event %s pass",
+        GST_EVENT_TYPE_NAME (info->data));
+    return GST_PAD_PROBE_PASS;
   }
 
   GST_DEBUG_OBJECT (pad, "Pad blocked");
@@ -1072,7 +1045,7 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 
   /* If there are no subcaps but the subtitle sink is blocked upstream
    * must behave wrong as there are no fixed caps set for the first
-   * buffer or in-order event after stream-start */
+   * buffer or in-order event */
   if (G_UNLIKELY (!subcaps && self->subtitle_sink_blocked)) {
     GST_ELEMENT_WARNING (self, CORE, NEGOTIATION, (NULL),
         ("Subtitle sink is blocked but we have no subtitle caps"));
@@ -1090,7 +1063,7 @@ _pad_blocked_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
     GstPad *target =
         gst_ghost_pad_get_target (GST_GHOST_PAD_CAST (self->subtitle_sinkpad));
 
-    if (target && pad_supports_caps (target, subcaps)) {
+    if (target && gst_pad_query_accept_caps (target, subcaps)) {
       GST_DEBUG_OBJECT (pad, "Target accepts caps");
 
       gst_object_unref (target);
@@ -1360,11 +1333,8 @@ gst_subtitle_overlay_change_state (GstElement * element,
 
     bret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
     GST_DEBUG_OBJECT (self, "Base class state changed returned: %d", bret);
-    if (G_UNLIKELY (bret == GST_STATE_CHANGE_FAILURE)) {
-      do_async_done (self);
+    if (G_UNLIKELY (bret == GST_STATE_CHANGE_FAILURE))
       return ret;
-    }
-
     else if (bret == GST_STATE_CHANGE_ASYNC)
       ret = bret;
     else if (G_UNLIKELY (bret == GST_STATE_CHANGE_NO_PREROLL)) {
@@ -1435,11 +1405,11 @@ gst_subtitle_overlay_handle_message (GstBin * bin, GstMessage * message)
      * warnings and switch to passthrough mode */
     if (src && (
             (self->overlay
-                && gst_object_has_as_ancestor (src,
+                && gst_object_has_ancestor (src,
                     GST_OBJECT_CAST (self->overlay))) || (self->parser
-                && gst_object_has_as_ancestor (src,
+                && gst_object_has_ancestor (src,
                     GST_OBJECT_CAST (self->parser))) || (self->renderer
-                && gst_object_has_as_ancestor (src,
+                && gst_object_has_ancestor (src,
                     GST_OBJECT_CAST (self->renderer))))) {
       GError *err = NULL;
       gchar *debug = NULL;
@@ -1588,12 +1558,13 @@ gst_subtitle_overlay_class_init (GstSubtitleOverlayClass * klass)
           "ISO-8859-15 will be assumed.", NULL,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
-  gst_element_class_add_static_pad_template (element_class, &srctemplate);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&srctemplate));
 
-  gst_element_class_add_static_pad_template (element_class,
-      &video_sinktemplate);
-  gst_element_class_add_static_pad_template (element_class,
-      &subtitle_sinktemplate);
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&video_sinktemplate));
+  gst_element_class_add_pad_template (element_class,
+      gst_static_pad_template_get (&subtitle_sinktemplate));
 
   gst_element_class_set_static_metadata (element_class, "Subtitle Overlay",
       "Video/Overlay/Subtitle",
@@ -1699,7 +1670,7 @@ gst_subtitle_overlay_video_sink_setcaps (GstSubtitleOverlay * self,
 
   GST_SUBTITLE_OVERLAY_LOCK (self);
 
-  if (!target || !pad_supports_caps (target, caps)) {
+  if (!target || !gst_pad_query_accept_caps (target, caps)) {
     GST_DEBUG_OBJECT (target, "Target did not accept caps -- reconfiguring");
 
     block_subtitle (self);
@@ -1807,15 +1778,12 @@ gst_subtitle_overlay_subtitle_sink_chain (GstPad * pad, GstObject * parent,
 static GstCaps *
 gst_subtitle_overlay_subtitle_sink_getcaps (GstPad * pad, GstCaps * filter)
 {
-  GstCaps *ret, *subcaps;
+  GstCaps *ret;
 
-  subcaps = gst_subtitle_overlay_create_factory_caps ();
-  if (filter) {
-    ret = gst_caps_intersect_full (filter, subcaps, GST_CAPS_INTERSECT_FIRST);
-    gst_caps_unref (subcaps);
-  } else {
-    ret = subcaps;
-  }
+  if (filter)
+    ret = gst_caps_ref (filter);
+  else
+    ret = gst_caps_new_any ();
 
   return ret;
 }
@@ -1825,7 +1793,7 @@ gst_subtitle_overlay_subtitle_sink_setcaps (GstSubtitleOverlay * self,
     GstCaps * caps)
 {
   gboolean ret = TRUE;
-  GstPad *target = NULL;
+  GstPad *target = NULL;;
 
   GST_DEBUG_OBJECT (self, "Setting caps: %" GST_PTR_FORMAT, caps);
 
@@ -1835,7 +1803,7 @@ gst_subtitle_overlay_subtitle_sink_setcaps (GstSubtitleOverlay * self,
   GST_SUBTITLE_OVERLAY_LOCK (self);
   gst_caps_replace (&self->subcaps, caps);
 
-  if (target && pad_supports_caps (target, caps)) {
+  if (target && gst_pad_query_accept_caps (target, caps)) {
     GST_DEBUG_OBJECT (self, "Target accepts caps");
     GST_SUBTITLE_OVERLAY_UNLOCK (self);
     goto out;

@@ -51,9 +51,18 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   fi
 
   AC_ARG_ENABLE(glib-asserts,
-    AS_HELP_STRING([--enable-glib-asserts[=@<:@no/yes@:>@]],
+    AS_HELP_STRING([--enable-glib-asserts[=@<:@no/auto/yes@:>@]],
       [Enable GLib assertion]),[enable_glib_assertions=$enableval],
-    [enable_glib_assertions=yes])
+    [enable_glib_assertions=auto])
+
+  if test "x$enable_glib_assertions" = "xauto"; then
+    dnl Enable assertions only for development versions
+    if test "x`expr $PACKAGE_VERSION_MINOR % 2`" = "x1" -a "x`expr $PACKAGE_VERSION_MICRO '<' 90`" = "x1"; then
+      enable_glib_assertions=yes
+    else
+      enable_glib_assertions=no
+    fi
+  fi
 
   if test "x$enable_glib_assertions" = "xno"; then
     GLIB_EXTRA_CFLAGS="$GLIB_EXTRA_CFLAGS -DG_DISABLE_ASSERT"
@@ -111,10 +120,6 @@ AC_DEFUN([AG_GST_GLIB_CHECK],
   GIO_LIBDIR="`$PKG_CONFIG --variable=libdir gio-2.0`"
   AC_DEFINE_UNQUOTED(GIO_LIBDIR, "$GIO_LIBDIR",
       [The GIO library directory.])
-  GIO_PREFIX="`$PKG_CONFIG --variable=prefix gio-2.0`"
-  AC_DEFINE_UNQUOTED(GIO_PREFIX, "$GIO_PREFIX",
-      [The GIO install prefix.])
-
   AC_SUBST(GIO_CFLAGS)
   AC_SUBST(GIO_LIBS)
   AC_SUBST(GIO_LDFLAGS)

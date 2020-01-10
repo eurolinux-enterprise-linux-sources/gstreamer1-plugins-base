@@ -1,0 +1,33 @@
+From 1327829fb263bc485351ee1c1c1bb6addc211fd4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tim-Philipp=20M=C3=BCller?= <tim@centricular.com>
+Date: Fri, 24 Oct 2014 12:26:40 +0100
+Subject: [PATCH 1/2] tests: fix adder check on big-endian
+
+---
+ tests/check/elements/adder.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/tests/check/elements/adder.c b/tests/check/elements/adder.c
+index 315bef4..d1a91a9 100644
+--- a/tests/check/elements/adder.c
++++ b/tests/check/elements/adder.c
+@@ -33,6 +33,7 @@
+ #include <gst/check/gstcheck.h>
+ #include <gst/check/gstconsistencychecker.h>
+ #include <gst/base/gstbasesrc.h>
++#include <gst/audio/audio.h>
+ 
+ static GMainLoop *main_loop;
+ 
+@@ -85,7 +86,7 @@ GST_START_TEST (test_filter_caps)
+   GstPad *pad;
+ 
+   filter_caps = gst_caps_new_simple ("audio/x-raw",
+-      "format", G_TYPE_STRING, "F32LE",
++      "format", G_TYPE_STRING, GST_AUDIO_NE (F32),
+       "layout", G_TYPE_STRING, "interleaved",
+       "rate", G_TYPE_INT, 44100, "channels", G_TYPE_INT, 1, NULL);
+ 
+-- 
+2.4.3
+

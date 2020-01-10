@@ -150,6 +150,7 @@ video_test_src_orc_splat_u32 (guint8 * ORC_RESTRICT d1, int p1, int n)
   int i;
   orc_union32 *ORC_RESTRICT ptr0;
   orc_union32 var32;
+  orc_union32 var33;
 
   ptr0 = (orc_union32 *) d1;
 
@@ -157,8 +158,10 @@ video_test_src_orc_splat_u32 (guint8 * ORC_RESTRICT d1, int p1, int n)
   var32.i = p1;
 
   for (i = 0; i < n; i++) {
-    /* 1: storel */
-    ptr0[i] = var32;
+    /* 1: copyl */
+    var33.i = var32.i;
+    /* 2: storel */
+    ptr0[i] = var33;
   }
 
 }
@@ -171,6 +174,7 @@ _backup_video_test_src_orc_splat_u32 (OrcExecutor * ORC_RESTRICT ex)
   int n = ex->n;
   orc_union32 *ORC_RESTRICT ptr0;
   orc_union32 var32;
+  orc_union32 var33;
 
   ptr0 = (orc_union32 *) ex->arrays[0];
 
@@ -178,8 +182,10 @@ _backup_video_test_src_orc_splat_u32 (OrcExecutor * ORC_RESTRICT ex)
   var32.i = ex->params[24];
 
   for (i = 0; i < n; i++) {
-    /* 1: storel */
-    ptr0[i] = var32;
+    /* 1: copyl */
+    var33.i = var32.i;
+    /* 2: storel */
+    ptr0[i] = var33;
   }
 
 }
@@ -201,7 +207,7 @@ video_test_src_orc_splat_u32 (guint8 * ORC_RESTRICT d1, int p1, int n)
       static const orc_uint8 bc[] = {
         1, 9, 28, 118, 105, 100, 101, 111, 95, 116, 101, 115, 116, 95, 115, 114,
         99, 95, 111, 114, 99, 95, 115, 112, 108, 97, 116, 95, 117, 51, 50, 11,
-        4, 4, 16, 4, 128, 0, 24, 2, 0,
+        4, 4, 16, 4, 112, 0, 24, 2, 0,
       };
       p = orc_program_new_from_static_bytecode (bc);
       orc_program_set_backup_function (p, _backup_video_test_src_orc_splat_u32);
@@ -212,7 +218,7 @@ video_test_src_orc_splat_u32 (guint8 * ORC_RESTRICT d1, int p1, int n)
       orc_program_add_destination (p, 4, "d1");
       orc_program_add_parameter (p, 4, "p1");
 
-      orc_program_append_2 (p, "storel", 0, ORC_VAR_D1, ORC_VAR_P1, ORC_VAR_D1,
+      orc_program_append_2 (p, "copyl", 0, ORC_VAR_D1, ORC_VAR_P1, ORC_VAR_D1,
           ORC_VAR_D1);
 #endif
 

@@ -43,11 +43,11 @@
  * <refsect2>
  * <title>Example pipelines</title>
  * |[
- * gst-launch-1.0 -v filesrc location=video.ogg ! oggdemux ! theoraparse ! fakesink
+ * gst-launch -v filesrc location=video.ogg ! oggdemux ! theoraparse ! fakesink
  * ]| This pipeline shows that the streamheader is set in the caps, and that each
  * buffer has the timestamp, duration, offset, and offset_end set.
  * |[
- * gst-launch-1.0 filesrc location=video.ogg ! oggdemux ! theoraparse \
+ * gst-launch filesrc location=video.ogg ! oggdemux ! theoraparse \
  *            ! oggmux ! filesink location=video-remuxed.ogg
  * ]| This pipeline shows remuxing. video-remuxed.ogg might not be exactly the same
  * as video.ogg, but they should produce exactly the same decoded data.
@@ -135,13 +135,13 @@ gst_theora_parse_class_init (GstTheoraParseClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 #endif
 
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &theora_parse_src_factory);
-  gst_element_class_add_static_pad_template (gstelement_class,
-      &theora_parse_sink_factory);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&theora_parse_src_factory));
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&theora_parse_sink_factory));
   gst_element_class_set_static_metadata (gstelement_class,
-      "Theora video parser", "Codec/Parser/Video", "parse raw theora streams",
-      "Andy Wingo <wingo@pobox.com>");
+      "Theora video parser", "Codec/Parser/Video",
+      "parse raw theora streams", "Andy Wingo <wingo@pobox.com>");
 
   gstelement_class->change_state = theora_parse_change_state;
 

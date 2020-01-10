@@ -60,8 +60,7 @@ G_BEGIN_DECLS
  * @GST_VIDEO_FORMAT_GRAY8: 8-bit grayscale
  * @GST_VIDEO_FORMAT_GRAY16_BE: 16-bit grayscale, most significant byte first
  * @GST_VIDEO_FORMAT_GRAY16_LE: 16-bit grayscale, least significant byte first
- * @GST_VIDEO_FORMAT_v308: packed 4:4:4 YUV (Y-U-V ...)
- * @GST_VIDEO_FORMAT_IYU2: packed 4:4:4 YUV (U-Y-V ...) (Since 1.10)
+ * @GST_VIDEO_FORMAT_v308: packed 4:4:4 YUV
  * @GST_VIDEO_FORMAT_RGB16: rgb 5-6-5 bits per component
  * @GST_VIDEO_FORMAT_BGR16: reverse rgb 5-6-5 bits per component
  * @GST_VIDEO_FORMAT_RGB15: rgb 5-5-5 bits per component
@@ -85,17 +84,8 @@ G_BEGIN_DECLS
  * @GST_VIDEO_FORMAT_GBR_10BE: planar 4:4:4 RGB, 10 bits per channel
  * @GST_VIDEO_FORMAT_GBR_10LE: planar 4:4:4 RGB, 10 bits per channel
  * @GST_VIDEO_FORMAT_NV16: planar 4:2:2 YUV with interleaved UV plane
- * @GST_VIDEO_FORMAT_NV61: planar 4:2:2 YUV with interleaved VU plane (Since 1.6)
  * @GST_VIDEO_FORMAT_NV24: planar 4:4:4 YUV with interleaved UV plane
  * @GST_VIDEO_FORMAT_NV12_64Z32: NV12 with 64x32 tiling in zigzag pattern
- * @GST_VIDEO_FORMAT_A420_10BE: planar 4:4:2:0 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_A420_10LE: planar 4:4:2:0 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_A422_10BE: planar 4:4:2:2 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_A422_10LE: planar 4:4:2:2 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_A444_10BE: planar 4:4:4:4 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_A444_10LE: planar 4:4:4:4 YUV, 10 bits per channel
- * @GST_VIDEO_FORMAT_P010_10BE: planar 4:2:0 YUV with interleaved UV plane, 10 bits per channel
- * @GST_VIDEO_FORMAT_P010_10LE: planar 4:2:0 YUV with interleaved UV plane, 10 bits per channel
  *
  * Enum value describing the most common video formats.
  */
@@ -154,16 +144,6 @@ typedef enum {
   GST_VIDEO_FORMAT_NV16,
   GST_VIDEO_FORMAT_NV24,
   GST_VIDEO_FORMAT_NV12_64Z32,
-  GST_VIDEO_FORMAT_A420_10BE,
-  GST_VIDEO_FORMAT_A420_10LE,
-  GST_VIDEO_FORMAT_A422_10BE,
-  GST_VIDEO_FORMAT_A422_10LE,
-  GST_VIDEO_FORMAT_A444_10BE,
-  GST_VIDEO_FORMAT_A444_10LE,
-  GST_VIDEO_FORMAT_NV61,
-  GST_VIDEO_FORMAT_P010_10BE,
-  GST_VIDEO_FORMAT_P010_10LE,
-  GST_VIDEO_FORMAT_IYU2,
 } GstVideoFormat;
 
 #define GST_VIDEO_MAX_PLANES 4
@@ -259,14 +239,9 @@ typedef enum
  * @width: the amount of pixels to unpack.
  *
  * Unpacks @width pixels from the given planes and strides containing data of
- * format @info. The pixels will be unpacked into @dest with each component
- * interleaved as per @info's unpack_format, which will usually be one of
- * #GST_VIDEO_FORMAT_ARGB, #GST_VIDEO_FORMAT_AYUV, #GST_VIDEO_FORMAT_ARGB64 or
- * #GST_VIDEO_FORMAT_AYUV64 depending on the format to unpack.
- * @dest should at least be big enough to hold @width * bytes_per_pixel bytes
- * where bytes_per_pixel relates to the unpack format and will usually be
- * either 4 or 8 depending on the unpack format. bytes_per_pixel will be
- * the same as the pixel stride for plane 0 for the above formats.
+ * format @info. The pixels will be unpacked into @dest which each component
+ * interleaved. @dest should at least be big enough to hold @width *
+ * n_components * size(unpack_format) bytes.
  *
  * For subsampled formats, the components will be duplicated in the destination
  * array. Reconstruction of the missing components can be performed in a
@@ -297,18 +272,14 @@ typedef void (*GstVideoFormatUnpack)         (const GstVideoFormatInfo *info,
  * contain at least pack_lines lines with a stride of @sstride and @y
  * should be a multiple of pack_lines.
  *
- * Subsampled formats will use the horizontally and vertically cosited
- * component from the source. Subsampling should be performed before
- * packing.
+ * Subsampled formats will use the horizontally cosited component in the
+ * destination. Subsampling should be performed before packing.
  *
- * Because this function does not have a x coordinate, it is not possible to
+ * Because tis function does not have a x coordinate, it is not possible to
  * pack pixels starting from an unaligned position. For tiled images this
  * means that packing should start from a tile coordinate. For subsampled
- * formats this means that a complete pixel needs to be packed.
+ * formats this means that a complete pixel need to be packed.
  */
-/* FIXME(2.0): remove the chroma_site, it is unused and is not relevant for
- * packing, chroma subsampling based on chroma-site should be done in a separate
- * step before packing*/
 typedef void (*GstVideoFormatPack)           (const GstVideoFormatInfo *info,
                                               GstVideoPackFlags flags,
                                               const gpointer src, gint sstride,
@@ -350,8 +321,8 @@ typedef void (*GstVideoFormatPack)           (const GstVideoFormatInfo *info,
  * @pack_lines: the amount of lines that will be packed
  * @pack_func: an pack function for this format
  * @tile_mode: The tiling mode
- * @tile_ws: The width of a tile, in bytes, represented as a shift
- * @tile_hs: The height of a tile, in bytes, represented as a shift
+ * @tile_ws The width of a tile, in bytes, represented as a shift
+ * @tile_hs The height of a tile, in bytes, represented as a shift
  *
  * Information for a video format.
  */
@@ -380,7 +351,6 @@ struct _GstVideoFormatInfo {
   guint tile_ws;
   guint tile_hs;
 
-  /*< private >*/
   gpointer _gst_reserved[GST_PADDING];
 };
 
@@ -403,8 +373,6 @@ struct _GstVideoFormatInfo {
 #define GST_VIDEO_FORMAT_INFO_DEPTH(info,c)      ((info)->depth[c])
 /**
  * GST_VIDEO_FORMAT_INFO_PSTRIDE:
- * @info: a #GstVideoFormatInfo
- * @c: the component index
  *
  * pixel stride for the given component. This is the amount of bytes to the
  * pixel immediately to the right, so basically bytes from one pixel to the
@@ -418,7 +386,6 @@ struct _GstVideoFormatInfo {
 #define GST_VIDEO_FORMAT_INFO_PSTRIDE(info,c)    ((info)->pixel_stride[c])
 /**
  * GST_VIDEO_FORMAT_INFO_N_PLANES:
- * @info: a #GstVideoFormatInfo
  *
  * Number of planes. This is the number of planes the pixel layout is
  * organized in in memory. The number of planes can be less than the
@@ -431,8 +398,6 @@ struct _GstVideoFormatInfo {
 #define GST_VIDEO_FORMAT_INFO_N_PLANES(info)     ((info)->n_planes)
 /**
  * GST_VIDEO_FORMAT_INFO_PLANE:
- * @info: a #GstVideoFormatInfo
- * @c: the component index
  *
  * Plane number where the given component can be found. A plane may
  * contain data for multiple components.
@@ -452,9 +417,6 @@ struct _GstVideoFormatInfo {
   (((guint8*)(planes)[(info)->plane[comp]]) + (info)->poffset[comp])
 /**
  * GST_VIDEO_FORMAT_INFO_STRIDE:
- * @info: a #GstVideoFormatInfo
- * @strides: an array of strides
- * @comp: the component index
  *
  * Row stride in bytes, that is number of bytes from the first pixel component
  * of a row to the first pixel component in the next row. This might include
@@ -498,11 +460,10 @@ gconstpointer  gst_video_format_get_palette          (GstVideoFormat format, gsi
 
 #define GST_VIDEO_FORMATS_ALL "{ I420, YV12, YUY2, UYVY, AYUV, RGBx, "  \
     "BGRx, xRGB, xBGR, RGBA, BGRA, ARGB, ABGR, RGB, BGR, Y41B, Y42B, "  \
-    "YVYU, Y444, v210, v216, NV12, NV21, NV16, NV61, NV24, GRAY8, GRAY16_BE, " \
-    "GRAY16_LE, v308, IYU2, RGB16, BGR16, RGB15, BGR15, UYVP, A420, RGB8P, YUV9, YVU9, " \
+    "YVYU, Y444, v210, v216, NV12, NV21, NV16, NV24, GRAY8, GRAY16_BE, GRAY16_LE, " \
+    "v308, RGB16, BGR16, RGB15, BGR15, UYVP, A420, RGB8P, YUV9, YVU9, " \
     "IYU1, ARGB64, AYUV64, r210, I420_10LE, I420_10BE, I422_10LE, I422_10BE, " \
-    "Y444_10LE, Y444_10BE, GBR, GBR_10LE, GBR_10BE, NV12_64Z32, A420_10LE, "\
-    "A420_10BE, A422_10LE, A422_10BE, A444_10LE, A444_10BE, P010_10LE, P010_10BE }"
+    " Y444_10LE, Y444_10BE, GBR, GBR_10LE, GBR_10BE, NV12_64Z32 }"
 
 /**
  * GST_VIDEO_CAPS_MAKE:

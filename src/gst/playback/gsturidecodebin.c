@@ -41,7 +41,9 @@
 #include "gstplay-enum.h"
 #include "gstrawcaps.h"
 #include "gstplayback.h"
-#include "gstplaybackutils.h"
+
+/* From gstdecodebin2.c */
+gint _decode_bin_compare_factories_func (gconstpointer p1, gconstpointer p2);
 
 #define GST_TYPE_URI_DECODE_BIN \
   (gst_uri_decode_bin_get_type())
@@ -108,7 +110,6 @@ struct _GstURIDecodeBin
   guint src_np_sig_id;          /* new-pad signal id */
   guint src_nmp_sig_id;         /* no-more-pads signal id */
   gint pending;
-  GList *missing_plugin_errors;
 
   gboolean async_pending;       /* async-start has been emitted */
 
@@ -195,7 +196,8 @@ enum
   PROP_DOWNLOAD,
   PROP_USE_BUFFERING,
   PROP_EXPOSE_ALL_STREAMS,
-  PROP_RING_BUFFER_MAX_SIZE
+  PROP_RING_BUFFER_MAX_SIZE,
+  PROP_LAST
 };
 
 static guint gst_uri_decode_bin_signals[LAST_SIGNAL] = { 0 };
@@ -319,7 +321,7 @@ gst_uri_decode_bin_update_factories_list (GstURIDecodeBin * dec)
         gst_element_factory_list_get_elements
         (GST_ELEMENT_FACTORY_TYPE_DECODABLE, GST_RANK_MARGINAL);
     dec->factories =
-        g_list_sort (dec->factories, gst_playback_utils_compare_factories_func);
+        g_list_sort (dec->factories, _decode_bin_compare_factories_func);
     dec->factories_cookie = cookie;
   }
 }
@@ -697,7 +699,8 @@ gst_uri_decode_bin_class_init (GstURIDecodeBinClass * klass)
       G_SIGNAL_RUN_LAST, 0, NULL, NULL,
       g_cclosure_marshal_generic, G_TYPE_NONE, 1, GST_TYPE_ELEMENT);
 
-  gst_element_class_add_static_pad_template (gstelement_class, &srctemplate);
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&srctemplate));
   gst_element_class_set_static_metadata (gstelement_class,
       "URI Decoder", "Generic/Bin/Decoder",
       "Autoplug and decode an URI to raw media",
@@ -740,8 +743,6 @@ gst_uri_decode_bin_init (GstURIDecodeBin * dec)
   dec->ring_buffer_max_size = DEFAULT_RING_BUFFER_MAX_SIZE;
 
   GST_OBJECT_FLAG_SET (dec, GST_ELEMENT_FLAG_SOURCE);
-  gst_bin_set_suppressed_flags (GST_BIN (dec),
-      GST_ELEMENT_FLAG_SOURCE | GST_ELEMENT_FLAG_SINK);
 }
 
 static void
@@ -985,33 +986,11 @@ done:
      * decodebins had missing plugins for all of their streams!
      */
     if (!decoder->streams || g_hash_table_size (decoder->streams) == 0) {
-      if (decoder->missing_plugin_errors) {
-        GString *str = g_string_new ("");
-        GList *l;
-
-        for (l = decoder->missing_plugin_errors; l; l = l->next) {
-          GstMessage *msg = l->data;
-          gchar *debug;
-
-          gst_message_parse_error (msg, NULL, &debug);
-          g_string_append (str, debug);
-          g_free (debug);
-          gst_message_unref (msg);
-        }
-        g_list_free (decoder->missing_plugin_errors);
-        decoder->missing_plugin_errors = NULL;
-
-        GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
-            ("no suitable plugins found:\n%s", str->str));
-        g_string_free (str, TRUE);
-      } else {
-        GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
-            ("no suitable plugins found"));
-      }
+      GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
+          ("no suitable plugins found"));
     } else {
       gst_element_no_more_pads (GST_ELEMENT_CAST (decoder));
     }
-    do_async_done (decoder);
   }
 
   return;
@@ -1287,7 +1266,7 @@ static const gchar *blacklisted_uris[] = { NULL };
 
 /* media types that use adaptive streaming */
 static const gchar *adaptive_media[] = {
-  "application/x-hls", "application/vnd.ms-sstr+xml",
+  "application/x-hls", "application/x-smoothstreaming-manifest",
   "application/dash+xml", NULL
 };
 
@@ -1342,6 +1321,17 @@ gen_source_element (GstURIDecodeBin * decoder)
 
   source_class = G_OBJECT_GET_CLASS (source);
 
+  /* make HTTP sources send extra headers so we get icecast
+   * metadata in case the stream is an icecast stream */
+  if (!strncmp (decoder->uri, "http://", 7)) {
+    pspec = g_object_class_find_property (source_class, "iradio-mode");
+
+    if (pspec && G_PARAM_SPEC_VALUE_TYPE (pspec) == G_TYPE_STRING) {
+      GST_LOG_OBJECT (decoder, "configuring iradio-mode");
+      g_object_set (source, "iradio-mode", TRUE, NULL);
+    }
+  }
+
   pspec = g_object_class_find_property (source_class, "connection-speed");
   if (pspec != NULL) {
     guint64 speed = decoder->connection_speed / 1000;
@@ -1371,7 +1361,7 @@ gen_source_element (GstURIDecodeBin * decoder)
       wrong_type = TRUE;
     }
 
-    if (!wrong_type) {
+    if (wrong_type == FALSE) {
       g_object_set (source, "connection-speed", speed, NULL);
 
       GST_DEBUG_OBJECT (decoder,
@@ -1488,7 +1478,6 @@ post_missing_plugin_error (GstElement * dec, const gchar * element_name)
   GST_ELEMENT_ERROR (dec, CORE, MISSING_PLUGIN,
       (_("Missing element '%s' - check your GStreamer installation."),
           element_name), (NULL));
-  do_async_done (GST_URI_DECODE_BIN (dec));
 }
 
 /**
@@ -1682,6 +1671,9 @@ remove_decoders (GstURIDecodeBin * bin, gboolean force)
     bin->pending_decodebins = NULL;
 
   }
+
+  /* Don't loose the SOURCE flag */
+  GST_OBJECT_FLAG_SET (bin, GST_ELEMENT_FLAG_SOURCE);
 }
 
 static void
@@ -1878,7 +1870,6 @@ no_decodebin:
     post_missing_plugin_error (GST_ELEMENT_CAST (decoder), "decodebin");
     GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
         ("No decodebin element, check your installation"));
-    do_async_done (decoder);
     return NULL;
   }
 no_typefind:
@@ -1886,7 +1877,6 @@ no_typefind:
     gst_object_unref (decodebin);
     GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
         ("No typefind element, decodebin is unusable, check your installation"));
-    do_async_done (decoder);
     return NULL;
   }
 }
@@ -1991,9 +1981,11 @@ type_found (GstElement * typefind, guint probability,
 
   /* PLAYING in one go might fail (see bug #632782) */
   gst_element_set_state (dec_elem, GST_STATE_PAUSED);
-  gst_element_sync_state_with_parent (dec_elem);
+  gst_element_set_state (dec_elem, GST_STATE_PLAYING);
   if (queue)
-    gst_element_sync_state_with_parent (queue);
+    gst_element_set_state (queue, GST_STATE_PLAYING);
+
+  do_async_done (decoder);
 
   return;
 
@@ -2007,7 +1999,6 @@ could_not_link:
   {
     GST_ELEMENT_ERROR (decoder, CORE, NEGOTIATION,
         (NULL), ("Can't link typefind to decodebin element"));
-    do_async_done (decoder);
     return;
   }
 no_buffer_element:
@@ -2043,6 +2034,8 @@ setup_streaming (GstURIDecodeBin * decoder)
       g_signal_connect (decoder->typefind, "have-type",
       G_CALLBACK (type_found), decoder);
 
+  do_async_start (decoder);
+
   return TRUE;
 
   /* ERRORS */
@@ -2051,7 +2044,6 @@ no_typefind:
     post_missing_plugin_error (GST_ELEMENT_CAST (decoder), "typefind");
     GST_ELEMENT_ERROR (decoder, CORE, MISSING_PLUGIN, (NULL),
         ("No typefind element, check your installation"));
-    do_async_done (decoder);
     return FALSE;
   }
 could_not_link:
@@ -2059,7 +2051,8 @@ could_not_link:
     GST_ELEMENT_ERROR (decoder, CORE, NEGOTIATION,
         (NULL), ("Can't link source to typefind element"));
     gst_bin_remove (GST_BIN_CAST (decoder), typefind);
-    do_async_done (decoder);
+    /* Don't loose the SOURCE flag */
+    GST_OBJECT_FLAG_SET (decoder, GST_ELEMENT_FLAG_SOURCE);
     return FALSE;
   }
 }
@@ -2107,6 +2100,8 @@ remove_source (GstURIDecodeBin * bin)
     g_hash_table_destroy (bin->streams);
     bin->streams = NULL;
   }
+  /* Don't loose the SOURCE flag */
+  GST_OBJECT_FLAG_SET (bin, GST_ELEMENT_FLAG_SOURCE);
 }
 
 /* is called when a dynamic source element created a new pad. */
@@ -2146,7 +2141,7 @@ source_new_pad (GstElement * element, GstPad * pad, GstURIDecodeBin * bin)
 
   GST_DEBUG_OBJECT (bin, "linked decoder to new pad");
 
-  gst_element_sync_state_with_parent (decoder);
+  gst_element_set_state (decoder, GST_STATE_PLAYING);
   GST_URI_DECODE_BIN_UNLOCK (bin);
 
   return;
@@ -2163,7 +2158,6 @@ could_not_link:
     GST_ELEMENT_ERROR (bin, CORE, NEGOTIATION,
         (NULL), ("Can't link source to decoder element"));
     GST_URI_DECODE_BIN_UNLOCK (bin);
-    do_async_done (bin);
     return;
   }
 }
@@ -2236,7 +2230,6 @@ setup_source (GstURIDecodeBin * decoder)
     /* source provides raw data, we added the pads and we can now signal a
      * no_more pads because we are done. */
     gst_element_no_more_pads (GST_ELEMENT_CAST (decoder));
-    do_async_done (decoder);
     return TRUE;
   }
   if (!have_out && !is_dynamic) {
@@ -2402,8 +2395,6 @@ handle_redirect_message (GstURIDecodeBin * dec, GstMessage * msg)
 static void
 handle_message (GstBin * bin, GstMessage * msg)
 {
-  GstURIDecodeBin *dec = GST_URI_DECODE_BIN (bin);
-
   switch (GST_MESSAGE_TYPE (msg)) {
     case GST_MESSAGE_ELEMENT:{
       if (gst_message_has_name (msg, "redirect")) {
@@ -2411,7 +2402,7 @@ handle_message (GstBin * bin, GstMessage * msg)
          * the user of this element as it can in most cases just pick the first item
          * of the sorted list as a good redirection candidate. It can of course
          * choose something else from the list if it has a better way. */
-        msg = handle_redirect_message (dec, msg);
+        msg = handle_redirect_message (GST_URI_DECODE_BIN (bin), msg);
       }
       break;
     }
@@ -2426,9 +2417,6 @@ handle_message (GstBin * bin, GstMessage * msg)
       if (g_error_matches (err, GST_CORE_ERROR, GST_CORE_ERROR_MISSING_PLUGIN)
           || g_error_matches (err, GST_STREAM_ERROR,
               GST_STREAM_ERROR_CODEC_NOT_FOUND)) {
-        dec->missing_plugin_errors =
-            g_list_prepend (dec->missing_plugin_errors, gst_message_ref (msg));
-
         no_more_pads_full (GST_ELEMENT (GST_MESSAGE_SRC (msg)), FALSE,
             GST_URI_DECODE_BIN (bin));
         gst_message_unref (msg);
@@ -2547,27 +2535,24 @@ decoder_query_latency_fold (const GValue * item, GValue * ret, QueryFold * fold)
     GstClockTime min, max;
     gboolean live;
 
+    g_value_set_boolean (ret, TRUE);
+
     gst_query_parse_latency (fold->query, &live, &min, &max);
 
-    GST_DEBUG_OBJECT (pad,
+    GST_DEBUG_OBJECT (item,
         "got latency min %" GST_TIME_FORMAT ", max %" GST_TIME_FORMAT
         ", live %d", GST_TIME_ARGS (min), GST_TIME_ARGS (max), live);
 
-    if (live) {
-      /* for the combined latency we collect the MAX of all min latencies and
-       * the MIN of all max latencies */
-      if (min > fold->min)
-        fold->min = min;
-      if (fold->max == -1)
-        fold->max = max;
-      else if (max < fold->max)
-        fold->max = max;
-
-      fold->live = TRUE;
-    }
-  } else {
-    GST_LOG_OBJECT (pad, "latency query failed");
-    g_value_set_boolean (ret, FALSE);
+    /* for the combined latency we collect the MAX of all min latencies and
+     * the MIN of all max latencies */
+    if (min > fold->min)
+      fold->min = min;
+    if (fold->max == -1)
+      fold->max = max;
+    else if (max < fold->max)
+      fold->max = max;
+    if (fold->live == FALSE)
+      fold->live = live;
   }
 
   return TRUE;
@@ -2599,7 +2584,7 @@ decoder_query_seeking_fold (const GValue * item, GValue * ret, QueryFold * fold)
 
     GST_DEBUG_OBJECT (item, "got seekable %d", seekable);
 
-    if (fold->seekable)
+    if (fold->seekable == TRUE)
       fold->seekable = seekable;
   }
 
@@ -2648,7 +2633,6 @@ gst_uri_decode_bin_query (GstElement * element, GstQuery * query)
   QueryDoneFunction fold_done = NULL;
   QueryFold fold_data;
   GValue ret = { 0 };
-  gboolean default_ret = FALSE;
 
   decoder = GST_URI_DECODE_BIN (element);
 
@@ -2670,7 +2654,6 @@ gst_uri_decode_bin_query (GstElement * element, GstQuery * query)
       fold_func = (GstIteratorFoldFunction) decoder_query_latency_fold;
       fold_init = decoder_query_init;
       fold_done = decoder_query_latency_done;
-      default_ret = TRUE;
       break;
     case GST_QUERY_SEEKING:
       /* iterate and collect durations */
@@ -2686,7 +2669,7 @@ gst_uri_decode_bin_query (GstElement * element, GstQuery * query)
   fold_data.query = query;
 
   g_value_init (&ret, G_TYPE_BOOLEAN);
-  g_value_set_boolean (&ret, default_ret);
+  g_value_set_boolean (&ret, FALSE);
 
   iter = gst_element_iterate_src_pads (element);
   GST_DEBUG_OBJECT (element, "Sending query %p (type %d) to src pads",
@@ -2705,7 +2688,7 @@ gst_uri_decode_bin_query (GstElement * element, GstQuery * query)
         gst_iterator_resync (iter);
         if (fold_init)
           fold_init (decoder, &fold_data);
-        g_value_set_boolean (&ret, default_ret);
+        g_value_set_boolean (&ret, FALSE);
         break;
       case GST_ITERATOR_OK:
       case GST_ITERATOR_DONE:
@@ -2735,51 +2718,26 @@ gst_uri_decode_bin_change_state (GstElement * element,
 
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-      do_async_start (decoder);
+      if (!setup_source (decoder))
+        goto source_failed;
       break;
     default:
       break;
   }
 
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
-  if (ret == GST_STATE_CHANGE_FAILURE)
-    goto setup_failed;
 
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       GST_DEBUG ("ready to paused");
-      if (!setup_source (decoder))
-        goto source_failed;
-
-      ret = GST_STATE_CHANGE_ASYNC;
-
-      /* And now sync the states of everything we added */
-      g_slist_foreach (decoder->decodebins,
-          (GFunc) gst_element_sync_state_with_parent, NULL);
-      if (decoder->typefind)
-        ret = gst_element_set_state (decoder->typefind, GST_STATE_PAUSED);
       if (ret == GST_STATE_CHANGE_FAILURE)
         goto setup_failed;
-      if (decoder->queue)
-        ret = gst_element_set_state (decoder->queue, GST_STATE_PAUSED);
-      if (ret == GST_STATE_CHANGE_FAILURE)
-        goto setup_failed;
-      if (decoder->source)
-        ret = gst_element_set_state (decoder->source, GST_STATE_PAUSED);
-      if (ret == GST_STATE_CHANGE_FAILURE)
-        goto setup_failed;
-      if (ret == GST_STATE_CHANGE_SUCCESS)
-        ret = GST_STATE_CHANGE_ASYNC;
-
       break;
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       GST_DEBUG ("paused to ready");
       remove_decoders (decoder, FALSE);
       remove_source (decoder);
       do_async_done (decoder);
-      g_list_free_full (decoder->missing_plugin_errors,
-          (GDestroyNotify) gst_message_unref);
-      decoder->missing_plugin_errors = NULL;
       break;
     case GST_STATE_CHANGE_READY_TO_NULL:
       GST_DEBUG ("ready to null");
@@ -2789,22 +2747,16 @@ gst_uri_decode_bin_change_state (GstElement * element,
     default:
       break;
   }
-
-  if (ret == GST_STATE_CHANGE_NO_PREROLL)
-    do_async_done (decoder);
-
   return ret;
 
   /* ERRORS */
 source_failed:
   {
-    do_async_done (decoder);
     return GST_STATE_CHANGE_FAILURE;
   }
 setup_failed:
   {
     /* clean up leftover groups */
-    do_async_done (decoder);
     return GST_STATE_CHANGE_FAILURE;
   }
 }

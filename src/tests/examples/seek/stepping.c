@@ -36,7 +36,7 @@ do_step (GstElement * bin)
 
   length = sin (period);
 
-  period += G_PI / 40;
+  period += M_PI / 40;
 
   length += 1.1;
   length *= 100 * GST_MSECOND;

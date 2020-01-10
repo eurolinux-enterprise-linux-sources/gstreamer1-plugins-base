@@ -1,25 +1,24 @@
-# German messages for gst-plugins-base 1.10.0
+# German messages for gst-plugins-base 1.4.0
 # Copyright © 2006 Karl Eichwalder
 # This file is distributed under the same license as the gst-plugins-base package.
 # Karl Eichwalder <ke@suse.de>, 2006.
 # Mario Blättermann <mariobl@gnome.org>, 2010.
-# Christian Kirbach <christian.kirbach@gmail.com>, 2009, 2010, 2011, 2012, 2013, 2016.
+# Christian Kirbach <christian.kirbach@gmail.com>, 2009, 2010, 2011, 2012, 2013.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: gst-plugins-base 1.10.0\n"
+"Project-Id-Version: gst-plugins-base 1.4.0\n"
 "Report-Msgid-Bugs-To: http://bugzilla.gnome.org/\n"
-"POT-Creation-Date: 2017-02-23 15:14+0200\n"
-"PO-Revision-Date: 2016-11-01 23:00+0100\n"
+"POT-Creation-Date: 2014-12-18 12:05+0100\n"
+"PO-Revision-Date: 2014-07-24 23:58+0100\n"
 "Last-Translator: Christian Kirbach <christian.kirbach@gmail.com>\n"
 "Language-Team: German <translation-team-de@lists.sourceforge.net>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Bugs: Report translation errors to the Language-Team address.\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 1.8.9\n"
+"X-Generator: Poedit 1.5.4\n"
 
 msgid "Could not open device for playback in mono mode."
 msgstr "Gerät konnte nicht zur Wiedergabe in Mono geöffnet werden."
@@ -76,10 +75,19 @@ msgstr "Suchvorgang auf der CD ist fehlgeschlagen."
 msgid "Could not read CD."
 msgstr "CD konnte nicht gelesen werden."
 
+msgid "Internal data stream error."
+msgstr "Interner Fehler im Datenstrom."
+
 #, c-format
 msgid "Missing element '%s' - check your GStreamer installation."
 msgstr ""
 "Das Element »%s« fehlt - überprüfen Sie Ihre Installation von GStreamer."
+
+#, c-format
+msgid "A %s plugin is required to play this stream, but not installed."
+msgstr ""
+"Ein Plugin »%s« wird zum Abspielen dieses Datenstroms benötigt, ist aber "
+"nicht installiert."
 
 msgid "Could not determine type of stream"
 msgstr "Der Typ des Datenstroms konnte nicht bestimmt werden"
@@ -89,12 +97,6 @@ msgstr "Dies scheint eine Textdatei zu sein"
 
 msgid "Could not create \"uridecodebin\" element."
 msgstr "Das Element »uridecodebin« konnte nicht erstellt werden."
-
-msgid "Could not create \"decodebin3\" element."
-msgstr "Das Element »decodebin3« konnte nicht erstellt werden."
-
-msgid "Could not create \"urisourcebin\" element."
-msgstr "Das Element »urisourcebin« konnte nicht erstellt werden."
 
 #, c-format
 msgid "Both autovideosink and %s elements are missing."
@@ -229,9 +231,6 @@ msgstr "Untertitel-Format TMPlayer"
 
 msgid "Kate subtitle format"
 msgstr "Untertitel-Format Kate"
-
-msgid "WebVTT subtitle format"
-msgstr "Untertitel-Format WebVTT"
 
 msgid "Uncompressed video"
 msgstr "Unkomprimiertes Video"
@@ -400,14 +399,6 @@ msgstr "Brennweite"
 msgid "Focal length of the lens used capturing the image, in mm"
 msgstr "Die verwendete Brennweite des Objektivs bei Bildaufnahme in mm"
 
-msgid "capturing 35 mm equivalent focal length"
-msgstr "Aufnahme entspricht einer äquivalenten Brennweite von 35 mm"
-
-msgid ""
-"35 mm equivalent focal length of the lens used capturing the image, in mm"
-msgstr ""
-"eine zu 35 mm äquivalente Brennweite des Objektivs bei Bildaufnahme, in mm"
-
 msgid "capturing digital zoom ratio"
 msgstr "Digitale Vergrößerung"
 
@@ -537,109 +528,11 @@ msgstr ""
 "Nicht nach dem Anzeigen der anfänglichen Geräteliste beenden, sondern auf "
 "das Hinzufügen/Entfernen von Geräten warten."
 
-#, c-format
-msgid "Volume: %.0f%%"
-msgstr "Lautstärke: %.0f%%"
-
 msgid "Buffering..."
 msgstr "Zwischenspeichern …"
 
 msgid "Clock lost, selecting a new one\n"
 msgstr "Uhrzeit verloren, es wird eine neue gewählt\n"
-
-msgid "Reached end of play list."
-msgstr "Das Ende der Wiedergabeliste wurde erreicht."
-
-msgid "Paused"
-msgstr "Angehalten"
-
-#, c-format
-msgid "Now playing %s\n"
-msgstr "Momentan wird %s wiedergegeben\n"
-
-#, c-format
-msgid "About to finish, preparing next title: %s"
-msgstr "Kurz vor dem Abschluss. Nächster Titel wird vorbereitet: %s"
-
-#, c-format
-msgid "Playback rate: %.2f"
-msgstr "Wiedergabegeschwindigkeit: %.2f"
-
-#, c-format
-msgid "Could not change playback rate to %.2f"
-msgstr "Wiedergabegeschwindigkeit konnte nicht auf %.2f geändert werden"
-
-msgid "space"
-msgstr "Leertaste"
-
-msgid "pause/unpause"
-msgstr "Anhalten/Fortsetzen"
-
-msgid "q or ESC"
-msgstr "q oder ESC"
-
-msgid "quit"
-msgstr "Beenden"
-
-msgid "> or n"
-msgstr "> oder n"
-
-msgid "play next"
-msgstr "Nächsten wiedergeben"
-
-msgid "< or b"
-msgstr "< oder b"
-
-msgid "play previous"
-msgstr "Vorherigen wiedergeben"
-
-msgid "seek forward"
-msgstr "Vorspulen"
-
-msgid "seek backward"
-msgstr "Zurückspulen"
-
-msgid "volume up"
-msgstr "Lauter"
-
-msgid "volume down"
-msgstr "Leiser"
-
-msgid "increase playback rate"
-msgstr "Schneller wiedergeben"
-
-msgid "decrease playback rate"
-msgstr "Langsamer wiedergeben"
-
-msgid "change playback direction"
-msgstr "Wiedergaberichtung ändern"
-
-msgid "enable/disable trick modes"
-msgstr "Trickmodi einschalten/ausschalten"
-
-msgid "change audio track"
-msgstr "Audio-Titel wechseln"
-
-msgid "change video track"
-msgstr "Videl-Titel wechseln"
-
-msgid "change subtitle track"
-msgstr "Untertitel wechseln"
-
-msgid "seek to beginning"
-msgstr "An den Anfang springen"
-
-msgid "show keyboard shortcuts"
-msgstr "Tastenkombinationen anzeigen"
-
-msgid "Interactive mode - keyboard controls:"
-msgstr "Interaktiver Modus - Tastatursteuerung:"
-
-msgid "Output status information and property notifications"
-msgstr "Zustandsinformation und Eigenschaftsmitteilungen ausgeben"
-
-msgid "Control playback behaviour setting playbin 'flags' property"
-msgstr "Steuerung der Wiedergabe mittels der playbin-Eigenschaft »flags«"
 
 msgid "Video sink to use (default is autovideosink)"
 msgstr "Zu verwendende Video-Ziel (Voreinstellung ist »autovideosink«)"
@@ -653,17 +546,14 @@ msgstr "Lückenlose Wiedergabe einschalten"
 msgid "Shuffle playlist"
 msgstr "Wiedergabeliste mischen"
 
-msgid "Disable interactive control via the keyboard"
-msgstr "Interaktive Steuerung via Tastatur deaktivieren"
+msgid "Interactive control via keyboard"
+msgstr "Interaktive Steuerung via Tastatur"
 
 msgid "Volume"
 msgstr "Lautstärke"
 
 msgid "Playlist file containing input media files"
 msgstr "Datei mit Wiedergabeliste enthält Eingabe-Mediendateien"
-
-msgid "Do not print any output (apart from errors)"
-msgstr "Nichts ausgeben (außer Fehlermeldungen)"
 
 #, c-format
 msgid "Usage: %s FILE1|URI1 [FILE2|URI2] [FILE3|URI3] ..."
@@ -673,17 +563,6 @@ msgid "You must provide at least one filename or URI to play."
 msgstr ""
 "Sie müssen mindestens einen Dateinamen oder eine Adresse zur Wiedergabe "
 "angeben."
-
-msgid "Press 'k' to see a list of keyboard shortcuts.\n"
-msgstr "Geben Sie »k« ein, um die Liste der Tastenkombinationen zu sehen.\n"
-
-#~ msgid "Internal data stream error."
-#~ msgstr "Interner Fehler im Datenstrom."
-
-#~ msgid "A %s plugin is required to play this stream, but not installed."
-#~ msgstr ""
-#~ "Ein Plugin »%s« wird zum Abspielen dieses Datenstroms benötigt, ist aber "
-#~ "nicht installiert."
 
 #~ msgid "Uncompressed %s YUV %s"
 #~ msgstr "Unkomprimiertes %s YUV %s"
@@ -837,6 +716,9 @@ msgstr "Geben Sie »k« ein, um die Liste der Tastenkombinationen zu sehen.\n"
 
 #~ msgid "Internal data flow error."
 #~ msgstr "Interner Fehler im Datenstrom."
+
+#~ msgid "Could not create \"decodebin2\" element."
+#~ msgstr "Das Element »decodebin2« konnte nicht erstellt werden."
 
 #~ msgid "Could not create \"queue2\" element."
 #~ msgstr "Das Element »queue2« konnte nicht erstellt werden."

@@ -23,7 +23,6 @@
 #define __GST_ALLOCATORS_H__
 
 #include <gst/allocators/gstdmabuf.h>
-#include <gst/allocators/gstfdmemory.h>
 
 #endif /* __GST_ALLOCATORS_H__ */
 

@@ -47,8 +47,6 @@
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
 
-#include <string.h>
-
 #include "pbutils.h"
 #include "pbutils-private.h"
 
@@ -529,7 +527,7 @@ _event_probe (GstPad * pad, GstPadProbeInfo * info, PrivateStream * ps)
 static GstStaticCaps subtitle_caps = GST_STATIC_CAPS ("text/x-raw; "
     "subpicture/x-pgs; subpicture/x-dvb; subpicture/x-dvd; "
     "application/x-subtitle-unknown; application/x-ssa; application/x-ass; "
-    "subtitle/x-kate; application/x-kate; subpicture/x-xsub");
+    "subtitle/x-kate; application/x-kate");
 
 static gboolean
 is_subtitle_caps (const GstCaps * caps)
@@ -549,9 +547,7 @@ got_subtitle_data (GstPad * pad, GstPadProbeInfo * info, GstDiscoverer * dc)
 {
 
   if (!(GST_IS_BUFFER (info->data) || (GST_IS_EVENT (info->data)
-              && (GST_EVENT_TYPE ((GstEvent *) info->data) == GST_EVENT_GAP
-                  || GST_EVENT_TYPE ((GstEvent *) info->data) ==
-                  GST_EVENT_EOS))))
+              && GST_EVENT_TYPE ((GstEvent *) info->data) == GST_EVENT_GAP)))
     return GST_PAD_PROBE_OK;
 
 
@@ -807,7 +803,7 @@ collect_information (GstDiscoverer * dc, const GstStructure * st,
   GstStructure *caps_st;
   GstTagList *tags_st;
   const gchar *name;
-  gint tmp, tmp2;
+  int tmp;
   guint utmp;
 
   if (!st || !gst_structure_id_has_field (st, _CAPS_QUARK)) {
@@ -816,14 +812,6 @@ collect_information (GstDiscoverer * dc, const GstStructure * st,
   }
 
   gst_structure_id_get (st, _CAPS_QUARK, GST_TYPE_CAPS, &caps, NULL);
-
-  if (!caps || gst_caps_is_empty (caps) || gst_caps_is_any (caps)) {
-    GST_WARNING ("Couldn't find caps !");
-    if (caps)
-      gst_caps_unref (caps);
-    return make_info (parent, GST_TYPE_DISCOVERER_STREAM_INFO, NULL);
-  }
-
   caps_st = gst_caps_get_structure (caps, 0);
   name = gst_structure_get_name (caps_st);
 
@@ -849,8 +837,7 @@ collect_information (GstDiscoverer * dc, const GstStructure * st,
 
       format = gst_audio_format_from_string (format_str);
       finfo = gst_audio_format_get_info (format);
-      if (finfo)
-        info->depth = GST_AUDIO_FORMAT_INFO_DEPTH (finfo);
+      info->depth = GST_AUDIO_FORMAT_INFO_DEPTH (finfo);
     }
 
     if (gst_structure_id_has_field (st, _TAGS_QUARK)) {
@@ -882,50 +869,26 @@ collect_information (GstDiscoverer * dc, const GstStructure * st,
   } else if (g_str_has_prefix (name, "video/") ||
       g_str_has_prefix (name, "image/")) {
     GstDiscovererVideoInfo *info;
-    const gchar *caps_str;
+    GstVideoInfo vinfo;
 
     info = (GstDiscovererVideoInfo *) make_info (parent,
         GST_TYPE_DISCOVERER_VIDEO_INFO, caps);
 
-    if (gst_structure_get_int (caps_st, "width", &tmp))
-      info->width = (guint) tmp;
-    if (gst_structure_get_int (caps_st, "height", &tmp))
-      info->height = (guint) tmp;
+    if (gst_video_info_from_caps (&vinfo, caps)) {
+      info->width = (guint) vinfo.width;
+      info->height = (guint) vinfo.height;
 
-    if (gst_structure_get_fraction (caps_st, "framerate", &tmp, &tmp2)) {
-      info->framerate_num = (guint) tmp;
-      info->framerate_denom = (guint) tmp2;
-    } else {
-      info->framerate_num = 0;
-      info->framerate_denom = 1;
+      info->depth = vinfo.finfo->bits * vinfo.finfo->n_components;
+
+      info->par_num = vinfo.par_n;
+      info->par_denom = vinfo.par_d;
+
+      info->framerate_num = vinfo.fps_n;
+      info->framerate_denom = vinfo.fps_d;
+
+      info->interlaced =
+          vinfo.interlace_mode != GST_VIDEO_INTERLACE_MODE_PROGRESSIVE;
     }
-
-    if (gst_structure_get_fraction (caps_st, "pixel-aspect-ratio", &tmp, &tmp2)) {
-      info->par_num = (guint) tmp;
-      info->par_denom = (guint) tmp2;
-    } else {
-      info->par_num = 1;
-      info->par_denom = 1;
-    }
-
-    /* FIXME: we only want to extract depth if raw video is what's in the
-     * container (i.e. not if there is a decoder involved) */
-    caps_str = gst_structure_get_string (caps_st, "format");
-    if (caps_str != NULL) {
-      const GstVideoFormatInfo *finfo;
-      GstVideoFormat format;
-
-      format = gst_video_format_from_string (caps_str);
-      finfo = gst_video_format_get_info (format);
-      if (finfo)
-        info->depth = finfo->bits * finfo->n_components;
-    }
-
-    caps_str = gst_structure_get_string (caps_st, "interlace-mode");
-    if (!caps_str || strcmp (caps_str, "progressive") == 0)
-      info->interlaced = FALSE;
-    else
-      info->interlaced = TRUE;
 
     if (gst_structure_id_has_field (st, _TAGS_QUARK)) {
       gst_structure_id_get (st, _TAGS_QUARK, GST_TYPE_TAG_LIST, &tags_st, NULL);
@@ -1041,19 +1004,9 @@ find_stream_for_node (GstDiscoverer * dc, const GstStructure * topology)
 static gboolean
 child_is_same_stream (const GstCaps * _parent, const GstCaps * child)
 {
-  GstCaps *parent;
-  guint i, size;
+  GstCaps *parent = gst_caps_copy (_parent);
+  guint i, size = gst_caps_get_size (parent);
   gboolean res;
-
-  if (_parent == child)
-    return TRUE;
-  if (!_parent)
-    return FALSE;
-  if (!child)
-    return FALSE;
-
-  parent = gst_caps_copy (_parent);
-  size = gst_caps_get_size (parent);
 
   for (i = 0; i < size; i++) {
     gst_structure_remove_field (gst_caps_get_structure (parent, i), "parsed");
@@ -1070,13 +1023,6 @@ child_is_raw_stream (const GstCaps * parent, const GstCaps * child)
 {
   const GstStructure *st1, *st2;
   const gchar *name1, *name2;
-
-  if (parent == child)
-    return TRUE;
-  if (!parent)
-    return FALSE;
-  if (!child)
-    return FALSE;
 
   st1 = gst_caps_get_structure (parent, 0);
   name1 = gst_structure_get_name (st1);
@@ -1155,8 +1101,7 @@ parse_stream_topology (GstDiscoverer * dc, const GstStructure * topology,
           res->next = next;
           next->previous = res;
         }
-        if (caps)
-          gst_caps_unref (caps);
+        gst_caps_unref (caps);
       }
     }
 
@@ -1443,7 +1388,6 @@ handle_message (GstDiscoverer * dc, GstMessage * msg)
          */
         if (dc->priv->current_info->misc)
           gst_structure_free (dc->priv->current_info->misc);
-        dc->priv->current_info->misc = gst_structure_copy (structure);
         g_ptr_array_add (dc->priv->current_info->missing_elements_details,
             gst_missing_plugin_message_get_installer_detail (msg));
       } else if (sttype == _STREAM_TOPOLOGY_QUARK) {
@@ -1479,9 +1423,7 @@ handle_message (GstDiscoverer * dc, GstMessage * msg)
 
       gst_message_parse_toc (msg, &tmp, NULL);
       GST_DEBUG_OBJECT (GST_MESSAGE_SRC (msg), "Got toc %" GST_PTR_FORMAT, tmp);
-      if (dc->priv->current_info->toc)
-        gst_toc_unref (dc->priv->current_info->toc);
-      dc->priv->current_info->toc = tmp;        /* transfer ownership */
+      dc->priv->current_info->toc = tmp;
       GST_DEBUG_OBJECT (GST_MESSAGE_SRC (msg), "Current info %p, toc %"
           GST_PTR_FORMAT, dc->priv->current_info, tmp);
     }
@@ -1519,11 +1461,6 @@ handle_current_sync (GstDiscoverer * dc)
     GST_DEBUG ("we timed out! Setting result to TIMEOUT");
     dc->priv->current_info->result = GST_DISCOVERER_TIMEOUT;
   }
-
-  DISCO_LOCK (dc);
-  dc->priv->processing = FALSE;
-  DISCO_UNLOCK (dc);
-
 
   GST_DEBUG ("Done");
 
@@ -1693,316 +1630,6 @@ beach:
   return res;
 }
 
-/* Serializing code */
-
-static GVariant *
-_serialize_common_stream_info (GstDiscovererStreamInfo * sinfo,
-    GstDiscovererSerializeFlags flags)
-{
-  GVariant *common;
-  gchar *caps_str = NULL, *tags_str = NULL, *misc_str = NULL;
-
-  if (sinfo->caps && (flags & GST_DISCOVERER_SERIALIZE_CAPS))
-    caps_str = gst_caps_to_string (sinfo->caps);
-
-  if (sinfo->tags && (flags & GST_DISCOVERER_SERIALIZE_TAGS))
-    tags_str = gst_tag_list_to_string (sinfo->tags);
-
-  if (sinfo->misc && (flags & GST_DISCOVERER_SERIALIZE_MISC))
-    misc_str = gst_structure_to_string (sinfo->misc);
-
-  common =
-      g_variant_new ("(msmsmsms)", sinfo->stream_id, caps_str, tags_str,
-      misc_str);
-
-  g_free (caps_str);
-  g_free (tags_str);
-  g_free (misc_str);
-
-  return common;
-}
-
-static GVariant *
-_serialize_info (GstDiscovererInfo * info, GstDiscovererSerializeFlags flags)
-{
-  gchar *tags_str = NULL;
-  GVariant *ret;
-
-  if (info->tags && (flags & GST_DISCOVERER_SERIALIZE_TAGS))
-    tags_str = gst_tag_list_to_string (info->tags);
-
-  ret =
-      g_variant_new ("(mstbms)", info->uri, info->duration, info->seekable,
-      tags_str);
-
-  g_free (tags_str);
-
-  return ret;
-}
-
-static GVariant *
-_serialize_audio_stream_info (GstDiscovererAudioInfo * ainfo)
-{
-  return g_variant_new ("(uuuuums)",
-      ainfo->channels,
-      ainfo->sample_rate,
-      ainfo->bitrate, ainfo->max_bitrate, ainfo->depth, ainfo->language);
-}
-
-static GVariant *
-_serialize_video_stream_info (GstDiscovererVideoInfo * vinfo)
-{
-  return g_variant_new ("(uuuuuuubuub)",
-      vinfo->width,
-      vinfo->height,
-      vinfo->depth,
-      vinfo->framerate_num,
-      vinfo->framerate_denom,
-      vinfo->par_num,
-      vinfo->par_denom,
-      vinfo->interlaced, vinfo->bitrate, vinfo->max_bitrate, vinfo->is_image);
-}
-
-static GVariant *
-_serialize_subtitle_stream_info (GstDiscovererSubtitleInfo * sinfo)
-{
-  return g_variant_new ("ms", sinfo->language);
-}
-
-static GVariant *
-gst_discoverer_info_to_variant_recurse (GstDiscovererStreamInfo * sinfo,
-    GstDiscovererSerializeFlags flags)
-{
-  GVariant *stream_variant = NULL;
-  GVariant *common_stream_variant =
-      _serialize_common_stream_info (sinfo, flags);
-
-  if (GST_IS_DISCOVERER_CONTAINER_INFO (sinfo)) {
-    GList *tmp;
-    GList *streams =
-        gst_discoverer_container_info_get_streams (GST_DISCOVERER_CONTAINER_INFO
-        (sinfo));
-
-    if (g_list_length (streams) > 0) {
-      GVariantBuilder children;
-      GVariant *child_variant;
-      g_variant_builder_init (&children, G_VARIANT_TYPE_ARRAY);
-
-      for (tmp = streams; tmp; tmp = tmp->next) {
-        child_variant =
-            gst_discoverer_info_to_variant_recurse (tmp->data, flags);
-        g_variant_builder_add (&children, "v", child_variant);
-      }
-      stream_variant =
-          g_variant_new ("(yvav)", 'c', common_stream_variant, &children);
-    } else {
-      stream_variant =
-          g_variant_new ("(yvav)", 'c', common_stream_variant, NULL);
-    }
-
-    gst_discoverer_stream_info_list_free (streams);
-  } else if (GST_IS_DISCOVERER_AUDIO_INFO (sinfo)) {
-    GVariant *audio_stream_info =
-        _serialize_audio_stream_info (GST_DISCOVERER_AUDIO_INFO (sinfo));
-    stream_variant =
-        g_variant_new ("(yvv)", 'a', common_stream_variant, audio_stream_info);
-  } else if (GST_IS_DISCOVERER_VIDEO_INFO (sinfo)) {
-    GVariant *video_stream_info =
-        _serialize_video_stream_info (GST_DISCOVERER_VIDEO_INFO (sinfo));
-    stream_variant =
-        g_variant_new ("(yvv)", 'v', common_stream_variant, video_stream_info);
-  } else if (GST_IS_DISCOVERER_SUBTITLE_INFO (sinfo)) {
-    GVariant *subtitle_stream_info =
-        _serialize_subtitle_stream_info (GST_DISCOVERER_SUBTITLE_INFO (sinfo));
-    stream_variant =
-        g_variant_new ("(yvv)", 's', common_stream_variant,
-        subtitle_stream_info);
-  }
-
-  return stream_variant;
-}
-
-/* Parsing code */
-
-#define GET_FROM_TUPLE(v, t, n, val) G_STMT_START{         \
-  GVariant *child = g_variant_get_child_value (v, n); \
-  *val = g_variant_get_##t(child); \
-  g_variant_unref (child); \
-}G_STMT_END
-
-static const gchar *
-_maybe_get_string_from_tuple (GVariant * tuple, guint index)
-{
-  const gchar *ret = NULL;
-  GVariant *maybe;
-  GET_FROM_TUPLE (tuple, maybe, index, &maybe);
-  if (maybe) {
-    ret = g_variant_get_string (maybe, NULL);
-    g_variant_unref (maybe);
-  }
-
-  return ret;
-}
-
-static void
-_parse_info (GstDiscovererInfo * info, GVariant * info_variant)
-{
-  const gchar *str;
-
-  str = _maybe_get_string_from_tuple (info_variant, 0);
-  if (str)
-    info->uri = g_strdup (str);
-
-  GET_FROM_TUPLE (info_variant, uint64, 1, &info->duration);
-  GET_FROM_TUPLE (info_variant, boolean, 2, &info->seekable);
-
-  str = _maybe_get_string_from_tuple (info_variant, 3);
-  if (str)
-    info->tags = gst_tag_list_new_from_string (str);
-}
-
-static void
-_parse_common_stream_info (GstDiscovererStreamInfo * sinfo, GVariant * common)
-{
-  const gchar *str;
-
-  str = _maybe_get_string_from_tuple (common, 0);
-  if (str)
-    sinfo->stream_id = g_strdup (str);
-
-  str = _maybe_get_string_from_tuple (common, 1);
-  if (str)
-    sinfo->caps = gst_caps_from_string (str);
-
-  str = _maybe_get_string_from_tuple (common, 2);
-  if (str)
-    sinfo->tags = gst_tag_list_new_from_string (str);
-
-  str = _maybe_get_string_from_tuple (common, 3);
-  if (str)
-    sinfo->misc = gst_structure_new_from_string (str);
-
-  g_variant_unref (common);
-}
-
-static void
-_parse_audio_stream_info (GstDiscovererAudioInfo * ainfo, GVariant * specific)
-{
-  const gchar *str;
-
-  GET_FROM_TUPLE (specific, uint32, 0, &ainfo->channels);
-  GET_FROM_TUPLE (specific, uint32, 1, &ainfo->sample_rate);
-  GET_FROM_TUPLE (specific, uint32, 2, &ainfo->bitrate);
-  GET_FROM_TUPLE (specific, uint32, 3, &ainfo->max_bitrate);
-  GET_FROM_TUPLE (specific, uint32, 4, &ainfo->depth);
-
-  str = _maybe_get_string_from_tuple (specific, 5);
-
-  if (str)
-    ainfo->language = g_strdup (str);
-
-  g_variant_unref (specific);
-}
-
-static void
-_parse_video_stream_info (GstDiscovererVideoInfo * vinfo, GVariant * specific)
-{
-  GET_FROM_TUPLE (specific, uint32, 0, &vinfo->width);
-  GET_FROM_TUPLE (specific, uint32, 1, &vinfo->height);
-  GET_FROM_TUPLE (specific, uint32, 2, &vinfo->depth);
-  GET_FROM_TUPLE (specific, uint32, 3, &vinfo->framerate_num);
-  GET_FROM_TUPLE (specific, uint32, 4, &vinfo->framerate_denom);
-  GET_FROM_TUPLE (specific, uint32, 5, &vinfo->par_num);
-  GET_FROM_TUPLE (specific, uint32, 6, &vinfo->par_denom);
-  GET_FROM_TUPLE (specific, boolean, 7, &vinfo->interlaced);
-  GET_FROM_TUPLE (specific, uint32, 8, &vinfo->bitrate);
-  GET_FROM_TUPLE (specific, uint32, 9, &vinfo->max_bitrate);
-  GET_FROM_TUPLE (specific, boolean, 10, &vinfo->is_image);
-
-  g_variant_unref (specific);
-}
-
-static void
-_parse_subtitle_stream_info (GstDiscovererSubtitleInfo * sinfo,
-    GVariant * specific)
-{
-  GVariant *maybe;
-
-  maybe = g_variant_get_maybe (specific);
-  if (maybe) {
-    sinfo->language = g_strdup (g_variant_get_string (maybe, NULL));
-    g_variant_unref (maybe);
-  }
-
-  g_variant_unref (specific);
-}
-
-static GstDiscovererStreamInfo *
-_parse_discovery (GVariant * variant, GstDiscovererInfo * info)
-{
-  gchar type;
-  GVariant *common = g_variant_get_child_value (variant, 1);
-  GVariant *specific = g_variant_get_child_value (variant, 2);
-  GstDiscovererStreamInfo *sinfo = NULL;
-
-  GET_FROM_TUPLE (variant, byte, 0, &type);
-  switch (type) {
-    case 'c':
-      sinfo = g_object_new (GST_TYPE_DISCOVERER_CONTAINER_INFO, NULL);
-      break;
-    case 'a':
-      sinfo = g_object_new (GST_TYPE_DISCOVERER_AUDIO_INFO, NULL);
-      _parse_audio_stream_info (GST_DISCOVERER_AUDIO_INFO (sinfo),
-          g_variant_get_child_value (specific, 0));
-      break;
-    case 'v':
-      sinfo = g_object_new (GST_TYPE_DISCOVERER_VIDEO_INFO, NULL);
-      _parse_video_stream_info (GST_DISCOVERER_VIDEO_INFO (sinfo),
-          g_variant_get_child_value (specific, 0));
-      break;
-    case 's':
-      sinfo = g_object_new (GST_TYPE_DISCOVERER_SUBTITLE_INFO, NULL);
-      _parse_subtitle_stream_info (GST_DISCOVERER_SUBTITLE_INFO (sinfo),
-          g_variant_get_child_value (specific, 0));
-      break;
-    default:
-      GST_WARNING ("Unexpected discoverer info type %d", type);
-      goto out;
-  }
-
-  _parse_common_stream_info (sinfo, g_variant_get_child_value (common, 0));
-
-  info->stream_list = g_list_append (info->stream_list, sinfo);
-
-  if (!info->stream_info) {
-    info->stream_info = sinfo;
-  }
-
-  if (GST_IS_DISCOVERER_CONTAINER_INFO (sinfo)) {
-    GVariantIter iter;
-    GVariant *child;
-
-    GstDiscovererContainerInfo *cinfo = GST_DISCOVERER_CONTAINER_INFO (sinfo);
-    g_variant_iter_init (&iter, specific);
-    while ((child = g_variant_iter_next_value (&iter))) {
-      GstDiscovererStreamInfo *child_info;
-      child_info = _parse_discovery (g_variant_get_variant (child), info);
-      if (child_info != NULL) {
-        cinfo->streams =
-            g_list_append (cinfo->streams,
-            gst_discoverer_stream_info_ref (child_info));
-      }
-      g_variant_unref (child);
-    }
-  }
-
-out:
-
-  g_variant_unref (common);
-  g_variant_unref (specific);
-  g_variant_unref (variant);
-  return sinfo;
-}
 
 /**
  * gst_discoverer_start:
@@ -2017,8 +1644,6 @@ gst_discoverer_start (GstDiscoverer * discoverer)
 {
   GSource *source;
   GMainContext *ctx = NULL;
-
-  g_return_if_fail (GST_IS_DISCOVERER (discoverer));
 
   GST_DEBUG_OBJECT (discoverer, "Starting...");
 
@@ -2057,8 +1682,6 @@ gst_discoverer_start (GstDiscoverer * discoverer)
 void
 gst_discoverer_stop (GstDiscoverer * discoverer)
 {
-  g_return_if_fail (GST_IS_DISCOVERER (discoverer));
-
   GST_DEBUG_OBJECT (discoverer, "Stopping...");
 
   if (!discoverer->priv->async) {
@@ -2124,8 +1747,6 @@ gst_discoverer_discover_uri_async (GstDiscoverer * discoverer,
 {
   gboolean can_run;
 
-  g_return_val_if_fail (GST_IS_DISCOVERER (discoverer), FALSE);
-
   GST_DEBUG_OBJECT (discoverer, "uri : %s", uri);
 
   DISCO_LOCK (discoverer);
@@ -2163,18 +1784,12 @@ gst_discoverer_discover_uri (GstDiscoverer * discoverer, const gchar * uri,
   GstDiscovererResult res = 0;
   GstDiscovererInfo *info;
 
-  g_return_val_if_fail (GST_IS_DISCOVERER (discoverer), NULL);
-  g_return_val_if_fail (uri, NULL);
-
   GST_DEBUG_OBJECT (discoverer, "uri:%s", uri);
 
   DISCO_LOCK (discoverer);
   if (G_UNLIKELY (discoverer->priv->current_info)) {
     DISCO_UNLOCK (discoverer);
     GST_WARNING_OBJECT (discoverer, "Already handling a uri");
-    if (err)
-      *err = g_error_new (GST_CORE_ERROR, GST_CORE_ERROR_FAILED,
-          "Already handling a uri");
     return NULL;
   }
 
@@ -2231,77 +1846,4 @@ gst_discoverer_new (GstClockTime timeout, GError ** err)
     res = NULL;
   }
   return res;
-}
-
-/**
- * gst_discoverer_info_to_variant:
- * @info: A #GstDiscovererInfo
- * @flags: A combination of #GstDiscovererSerializeFlags to specify
- * what needs to be serialized.
- *
- * Serializes @info to a #GVariant that can be parsed again
- * through gst_discoverer_info_from_variant().
- *
- * Note that any #GstToc (s) that might have been discovered will not be serialized
- * for now.
- *
- * Returns: (transfer full): A newly-allocated #GVariant representing @info.
- *
- * Since: 1.6
- */
-GVariant *
-gst_discoverer_info_to_variant (GstDiscovererInfo * info,
-    GstDiscovererSerializeFlags flags)
-{
-  /* FIXME: implement TOC support */
-  GVariant *stream_variant;
-  GVariant *variant;
-  GstDiscovererStreamInfo *sinfo;
-  GVariant *wrapper;
-
-  g_return_val_if_fail (GST_IS_DISCOVERER_INFO (info), NULL);
-  g_return_val_if_fail (gst_discoverer_info_get_result (info) ==
-      GST_DISCOVERER_OK, NULL);
-
-  sinfo = gst_discoverer_info_get_stream_info (info);
-  stream_variant = gst_discoverer_info_to_variant_recurse (sinfo, flags);
-  variant =
-      g_variant_new ("(vv)", _serialize_info (info, flags), stream_variant);
-
-  /* Returning a wrapper implies some small overhead, but simplifies 
-   * deserializing from bytes */
-  wrapper = g_variant_new_variant (variant);
-
-  gst_discoverer_stream_info_unref (sinfo);
-  return wrapper;
-}
-
-/**
- * gst_discoverer_info_from_variant:
- * @variant: A #GVariant to deserialize into a #GstDiscovererInfo.
- *
- * Parses a #GVariant as produced by gst_discoverer_info_to_variant()
- * back to a #GstDiscovererInfo.
- *
- * Returns: (transfer full): A newly-allocated #GstDiscovererInfo.
- *
- * Since: 1.6
- */
-GstDiscovererInfo *
-gst_discoverer_info_from_variant (GVariant * variant)
-{
-  GstDiscovererInfo *info = g_object_new (GST_TYPE_DISCOVERER_INFO, NULL);
-  GVariant *info_variant = g_variant_get_variant (variant);
-  GVariant *info_specific_variant;
-  GVariant *wrapped;
-
-  GET_FROM_TUPLE (info_variant, variant, 0, &info_specific_variant);
-  GET_FROM_TUPLE (info_variant, variant, 1, &wrapped);
-
-  _parse_info (info, info_specific_variant);
-  _parse_discovery (wrapped, info);
-  g_variant_unref (info_specific_variant);
-  g_variant_unref (info_variant);
-
-  return info;
 }
