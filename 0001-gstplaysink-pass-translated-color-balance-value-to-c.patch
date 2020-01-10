@@ -1,0 +1,52 @@
+From 2731012d832b593c54a50492a27d328f2de9b596 Mon Sep 17 00:00:00 2001
+From: Daniel Drake <dsd@laptop.org>
+Date: Wed, 29 May 2013 10:33:48 -0600
+Subject: [PATCH] gstplaysink: pass translated color balance value to channel
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We found a case where untranslated values were being passed from the
+proxy to the underlying channel, causing bad color balance values
+in some setups.
+
+Thanks to Sebastian Dröge for clarifying how the code works, and
+suggesting the fix.
+
+Fixes https://bugzilla.gnome.org/show_bug.cgi?id=701202
+---
+ gst/playback/gstplaysink.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+Index: gst-plugins-base-1.0.7/gst/playback/gstplaysink.c
+===================================================================
+--- gst-plugins-base-1.0.7.orig/gst/playback/gstplaysink.c
++++ gst-plugins-base-1.0.7/gst/playback/gstplaysink.c
+@@ -1540,6 +1540,7 @@ update_colorbalance (GstPlaySink * plays
+     GstColorBalanceChannel *proxy = l->data;
+     GstColorBalanceChannel *channel = NULL;
+     const GList *channels, *k;
++    gdouble new_val;
+ 
+     channels = gst_color_balance_list_channels (balance);
+     for (k = channels; k; k = k->next) {
+@@ -1553,8 +1554,18 @@ update_colorbalance (GstPlaySink * plays
+ 
+     g_assert (channel);
+ 
++    /* Convert to [0, 1] range */
++    new_val =
++        ((gdouble) playsink->colorbalance_values[i] -
++        (gdouble) proxy->min_value) / ((gdouble) proxy->max_value -
++        (gdouble) proxy->min_value);
++    /* Convert to channel range */
++    new_val =
++        channel->min_value + new_val * ((gdouble) channel->max_value -
++        (gdouble) channel->min_value);
++
+     gst_color_balance_set_value (balance, channel,
+-        playsink->colorbalance_values[i]);
++        (gint) (new_val + 0.5));
+   }
+ 
+   g_signal_handlers_unblock_by_func (balance,
