@@ -3,7 +3,7 @@
 
 Name:           gstreamer1-plugins-base
 Version:        1.0.7
-Release:        3%{?dist}
+Release:        5%{?dist}
 Summary:        GStreamer streaming media framework base plugins
 
 License:        LGPLv2+
@@ -334,6 +334,12 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-discoverer-1.0
 
 
 %changelog
+* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 1.0.7-5
+- Mass rebuild 2014-01-24
+
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 1.0.7-4
+- Mass rebuild 2013-12-27
+
 * Tue Nov  5 2013 Matthias Clasen <mclasen@redhat.com> - 1.0.7-3
 - Drop mention of Fedora in package configuration
 - Enable hardened build
