@@ -3,7 +3,7 @@
 
 Name:           gstreamer1-plugins-base
 Version:        1.10.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        GStreamer streaming media framework base plugins
 
 License:        LGPLv2+
@@ -32,6 +32,10 @@ BuildRequires:  chrpath
 BuildRequires:  gtk-doc >= 1.3
 
 Requires:       iso-codes
+
+# Whenever a plugin gets moved into this package, make a conflict
+# with the package version that contained the plugin before the move.
+Conflicts: gstreamer1-plugins-bad-free < 1.10.4
 
 
 %description
@@ -415,6 +419,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gst-play-1.0
 
 
 %changelog
+* Fri Jun 08 2018 Wim Taymans <wtaymans@redhat.com> - 1.10.4-2
+- Add Conflicts: for plugin moved into this package
+- Resolves: #1451211
+
 * Fri Feb 24 2017 Wim Taymans <wtaymans@redhat.com> - 1.10.4-1
 - Update to 1.10.4
 - Resolves: #1428918 
